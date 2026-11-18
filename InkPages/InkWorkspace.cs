@@ -43,11 +43,13 @@ public sealed class InkWorkspace
         };
 
         Input.Shapes.Shape = (ShapeKind)Math.Max(0, bar.ShapeKind.SelectedIndex);
+        // The tool's setting and the user's choices (ChoicesChanged) in one handler each
         bar.ShapeKind.SelectionChanged += (_, _) =>
         {
             if (bar.ShapeKind.SelectedIndex >= 0)
             {
                 Input.Shapes.Shape = (ShapeKind)bar.ShapeKind.SelectedIndex;
+                RaiseChoicesChanged();
             }
         };
         Selection.Mode = (SelectMode)Math.Max(0, bar.SelectMode.SelectedIndex);
@@ -56,6 +58,7 @@ public sealed class InkWorkspace
             if (bar.SelectMode.SelectedIndex >= 0)
             {
                 Selection.Mode = (SelectMode)bar.SelectMode.SelectedIndex;
+                RaiseChoicesChanged();
             }
         };
         Tools.CustomToolChanged += (_, _) => Input.Tool =
@@ -82,8 +85,6 @@ public sealed class InkWorkspace
 
         Commands = new InkCommands(this, bar, scroller);
         // The user's tool choices: one event for every change the app keeps (ChoicesChanged).
-        bar.ShapeKind.SelectionChanged += (_, _) => RaiseChoicesChanged(bar.ShapeKind.SelectedIndex >= 0);
-        bar.SelectMode.SelectionChanged += (_, _) => RaiseChoicesChanged(bar.SelectMode.SelectedIndex >= 0);
         bar.EraserRadius.ValueChanged += (_, _) => RaiseChoicesChanged();
         bar.RecognizeShapes.Click += (_, _) => RaiseChoicesChanged();
         PartialErasingChanged += (_, _) => RaiseChoicesChanged();
@@ -126,12 +127,8 @@ public sealed class InkWorkspace
 
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? choicesTimer;
 
-    private void RaiseChoicesChanged(bool valid = true)
+    private void RaiseChoicesChanged()
     {
-        if (!valid)
-        {
-            return;
-        }
         if (choicesTimer == null)
         {
             choicesTimer = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().CreateTimer();
@@ -267,9 +264,6 @@ public sealed class InkWorkspace
             {
                 detach();
             }
-        }
-        foreach (var gone in pages.Except(now))
-        {
             gone.IsMarkedCurrent = false;
         }
         pages = now;
@@ -475,7 +469,7 @@ public sealed class InkWorkspace
                     }
                     catch (Exception e)
                     {
-                        InkLog.Write("shape recognition (stroke kept as drawn)", e);
+                        InkLog.Error("shape recognition (stroke kept as drawn)", e);
                     }
                     if (generation != shown || pageResets.GetValueOrDefault(page) != pageShown || page.Parent == null)
                     {
@@ -498,7 +492,7 @@ public sealed class InkWorkspace
         }
         catch (Exception e) // async void: logged, then it goes on to the app's unhandled-exception handler
         {
-            InkLog.Write("strokes collected", e);
+            InkLog.Error("strokes collected", e);
             throw;
         }
         finally

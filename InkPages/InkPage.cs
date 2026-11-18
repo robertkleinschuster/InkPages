@@ -148,9 +148,13 @@ public abstract partial class InkPage : UserControl
     protected virtual void OnStrokeReplaced(uint oldId, uint newId) { }
 
     /// <summary>The strokes on the page now for strokes an edit remembers: each itself or its copy; null where gone.</summary>
-    public List<InkStroke?> CurrentStrokes(IEnumerable<InkStroke> strokes)
+    public List<InkStroke?> CurrentStrokes(IEnumerable<InkStroke> strokes) =>
+        CurrentStrokes(strokes, Ink.StrokeContainer.GetStrokes());
+
+    /// <summary><see cref="CurrentStrokes(IEnumerable{InkStroke})"/> with the page's strokes already read.</summary>
+    internal List<InkStroke?> CurrentStrokes(IEnumerable<InkStroke> strokes, IEnumerable<InkStroke> onPage)
     {
-        var byId = Ink.StrokeContainer.GetStrokes().ToDictionary(s => s.Id);
+        var byId = onPage.ToDictionary(s => s.Id);
         return strokes.Select(stroke =>
         {
             uint id = stroke.Id;

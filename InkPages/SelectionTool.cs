@@ -81,7 +81,7 @@ public sealed class SelectionTool(UndoStack undo)
         catch (Exception e)
         {
             strokes.ForEach(s => s.Selected = false);
-            InkLog.Write("move to another page (the content stays on its page)", e);
+            InkLog.Error("move to another page (the content stays on its page)", e);
             TransferFailed?.Invoke(e);
             return null;
         }

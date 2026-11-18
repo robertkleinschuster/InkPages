@@ -24,7 +24,7 @@ is specific to them (xournal-studio-windows: .xopp, PDF, explorer, sync; MatheTr
   behavior. When an API is broken, find the root cause (issue/PR) and report the options. The partial eraser is an
   agreed exception: Windows ink erases whole strokes only (proposal microsoft-ui-xaml #1530).
 - **Never swallow exceptions.** Log type, HResult and message (`InkLog`; handlers on forwarded ink events log
-  themselves through `InkTools.Logged`).
+  themselves through `InkLog.Guard`).
 - **No app dependencies.** No file format and no app texts: `PenToolbarTexts` holds English defaults, and apps pass
   their own language. Built in code with no XAML resources, so nothing has to be merged into an app's .pri.
 - Small classes with one job. Logic without UI goes into `Model/` (unit-tested).
@@ -62,7 +62,7 @@ xournal-studio-windows' CLAUDE.md on 2026-11-18 so that every embedding app (Mat
   `InputProcessingMode.None`; barrel → `RightDragAction.LeaveUnprocessed`. Readable on the UI thread only with the
   fork's runtime (PR #12292; the stock 2.6.6 runtime throws 0x80004021 CO_E_NOT_SUPPORTED on `CurrentPoint`).
   **Positions are the InkCanvas' coordinates** = stroke and overlay coordinates – no transform (an extra
-  XamlRoot→page transform put every lasso beside the page). Handlers log their own exceptions (`InkTools.Logged`):
+  XamlRoot→page transform put every lasso beside the page). Handlers log their own exceptions (`InkLog.Guard`):
   WinUI's forwarding would not hand them to `App.UnhandledException`.
 - Unprocessed input also carries **Entered/Hovered/Exited while the presenters ink**, with `IsInverted` (eraser end;
   the Lenovo pen's eraser button makes the pen re-enter as a new pointer with `inv=1`, the touch then has `IsEraser`);

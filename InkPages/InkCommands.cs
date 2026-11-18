@@ -115,7 +115,7 @@ public sealed class InkCommands
         }
         catch (Exception e)
         {
-            InkLog.Write("duplicate (what was added is taken back)", e);
+            InkLog.Error("duplicate (what was added is taken back)", e);
             TakeBack(edit);
             throw;
         }
@@ -214,7 +214,7 @@ public sealed class InkCommands
         }
         catch (Exception e)
         {
-            InkLog.Write("paste ink (what was added is taken back)", e);
+            InkLog.Error("paste ink (what was added is taken back)", e);
             try
             {
                 // Strokes Windows ink added before it failed (found by id).
@@ -224,7 +224,7 @@ public sealed class InkCommands
             }
             catch (Exception inner)
             {
-                InkLog.Write("paste ink: finding the strokes to take back", inner);
+                InkLog.Error("paste ink: finding the strokes to take back", inner);
             }
             TakeBack(edit);
             throw;
@@ -269,7 +269,7 @@ public sealed class InkCommands
         }
         catch (Exception e)
         {
-            InkLog.Write($"{operation}: select the added content", e);
+            InkLog.Error($"{operation}: select the added content", e);
         }
     }
     /// <summary>Removes all strokes and pictures of the page as one undo step. False: the page was empty.</summary>
@@ -341,7 +341,7 @@ public sealed class InkCommands
             // The clipboard is busy (clipboard history opens it right after a copy, another app may hold it): the button
             // keeps its state and the check runs again shortly (a few times), then at the next clipboard change, copy
             // or the app's call (e.g. when its window is activated).
-            InkLog.Write("paste ink: reading the clipboard", e);
+            InkLog.Error("paste ink: reading the clipboard", e);
             if (pasteRetries++ < 4)
             {
                 pasteRetry ??= bar.DispatcherQueue.CreateTimer();
@@ -394,7 +394,7 @@ public sealed class InkCommands
                 }
                 catch (Exception ex)
                 {
-                    InkLog.Write($"shortcut {modifiers}+{key}", ex);
+                    InkLog.Error($"shortcut {modifiers}+{key}", ex);
                 }
             };
             root.KeyboardAccelerators.Add(accelerator);
@@ -416,7 +416,7 @@ public sealed class InkCommands
         }
         catch (Exception e)
         {
-            InkLog.Write("paste ink: the visible part of the page (pasted at its top left)", e);
+            InkLog.Error("paste ink: the visible part of the page (pasted at its top left)", e);
             return new Point(PasteMargin, PasteMargin);
         }
     }
@@ -431,7 +431,7 @@ public sealed class InkCommands
         }
         catch (Exception e)
         {
-            InkLog.Write("taking back the strokes of a failed add", e);
+            InkLog.Error("taking back the strokes of a failed add", e);
         }
         var onPage = edit.Page.Pictures.ToHashSet(ReferenceEqualityComparer.Instance);
         var attached = edit.AddedPictures.Where(onPage.Contains).ToList();
@@ -443,7 +443,7 @@ public sealed class InkCommands
             }
             catch (Exception e)
             {
-                InkLog.Write("taking back the pictures of a failed add", e);
+                InkLog.Error("taking back the pictures of a failed add", e);
             }
         }
     }

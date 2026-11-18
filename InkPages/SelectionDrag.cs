@@ -27,10 +27,10 @@ public sealed class SelectionDrag(SelectionTool selection, Action<bool> takeOver
     public Action Attach(InkPage view)
     {
         var surface = view.Surface;
-        PointerEventHandler moved = (_, e) => Logged("moved", () => OnMoved(view, e));
-        PointerEventHandler pressed = (_, e) => Logged("pressed", () => OnPressed(view, e));
-        PointerEventHandler released = (_, e) => Logged("released", () => OnReleased(e));
-        PointerEventHandler captureLost = (_, e) => Logged("capture lost", () =>
+        PointerEventHandler moved = (_, e) => InkLog.Guard("selection drag moved", () => OnMoved(view, e));
+        PointerEventHandler pressed = (_, e) => InkLog.Guard("selection drag pressed", () => OnPressed(view, e));
+        PointerEventHandler released = (_, e) => InkLog.Guard("selection drag released", () => OnReleased(e));
+        PointerEventHandler captureLost = (_, e) => InkLog.Guard("selection drag capture lost", () =>
         {
             if (Owns(e))
             {
@@ -46,7 +46,7 @@ public sealed class SelectionDrag(SelectionTool selection, Action<bool> takeOver
                 Finish(e.GetCurrentPoint(page!.InkCanvas).Position);
             }
         });
-        PointerEventHandler canceled = (_, e) => Logged("canceled", () =>
+        PointerEventHandler canceled = (_, e) => InkLog.Guard("selection drag canceled", () =>
         {
             if (Owns(e))
             {
@@ -54,7 +54,7 @@ public sealed class SelectionDrag(SelectionTool selection, Action<bool> takeOver
                 Cancel();
             }
         });
-        PointerEventHandler exited = (_, e) => Logged("exited", () =>
+        PointerEventHandler exited = (_, e) => InkLog.Guard("selection drag exited", () =>
         {
             if (!IsRunning && IsPen(e))
             {
@@ -174,17 +174,4 @@ public sealed class SelectionDrag(SelectionTool selection, Action<bool> takeOver
         takeOver(selection.Grabs(view, p)); // still over the selection: the next press moves it again
     }
 
-    // Pointer handlers run from XAML's input dispatch: an exception is logged before it propagates (never swallowed).
-    private static void Logged(string name, Action handler)
-    {
-        try
-        {
-            handler();
-        }
-        catch (Exception ex)
-        {
-            InkLog.Write($"selection drag {name}", ex);
-            throw;
-        }
-    }
 }

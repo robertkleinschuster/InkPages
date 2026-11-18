@@ -23,6 +23,30 @@ public sealed class PartialEraser(UndoStack undo, Action<IReadOnlyCollection<Ink
     // drag, not on every pointer event.
     private readonly Dictionary<uint, SampledStroke> sampled = new();
 
+    // The drag page's strokes with their bounds, read once per drag and kept up to date with the pieces (each read
+    // from the ink is an interop call: a 660-stroke page cost ~1300 per pointer event). An undo or redo during the drag
+    // (keyboard) changes the ink behind it: then it is read again.
+    private List<(InkStroke Stroke, Rect Bounds)>? strokes;
+    private bool watchingUndo;
+
+    private void OnUndoChanged(object? sender, EventArgs e) => strokes = null;
+
+    private void Watch(bool on)
+    {
+        if (on != watchingUndo)
+        {
+            if (on)
+            {
+                undo.Changed += OnUndoChanged;
+            }
+            else
+            {
+                undo.Changed -= OnUndoChanged;
+            }
+            watchingUndo = on;
+        }
+    }
+
     private static readonly Windows.UI.Color CursorColor = Microsoft.UI.Colors.DimGray;
 
     /// <summary>Radius in page points.</summary>
@@ -71,6 +95,8 @@ public sealed class PartialEraser(UndoStack undo, Action<IReadOnlyCollection<Ink
         page = null;
         edit = null;
         sampled.Clear();
+        strokes = null;
+        Watch(false);
     }
 
     /// <summary>The page is no longer shown (its view was released): its circle goes.</summary>
@@ -88,6 +114,8 @@ public sealed class PartialEraser(UndoStack undo, Action<IReadOnlyCollection<Ink
         edit = new PageEdit(view);
         last = p;
         sampled.Clear();
+        strokes = null;
+        Watch(true);
         Hover(view, p);
         EraseAt(new[] { p });
     }
@@ -120,6 +148,7 @@ public sealed class PartialEraser(UndoStack undo, Action<IReadOnlyCollection<Ink
     /// <summary>The drag ended (or was canceled: what was erased stays erased): one undo step.</summary>
     public void End()
     {
+        Watch(false); // before the push: it raises Changed itself
         if (edit != null)
         {
             undo.Push(edit);
@@ -127,6 +156,7 @@ public sealed class PartialEraser(UndoStack undo, Action<IReadOnlyCollection<Ink
         edit = null;
         page = null;
         sampled.Clear();
+        strokes = null;
     }
 
     /// <summary>Applies one pointer event's swept eraser circles in a single pass over the page's strokes.</summary>
@@ -142,9 +172,10 @@ public sealed class PartialEraser(UndoStack undo, Action<IReadOnlyCollection<Ink
         var sweepBounds = new Rect(left, top, right - left, bottom - top);
         var removed = new List<(InkStroke Stroke, List<List<InkSample>> Pieces,
             Windows.UI.Input.Inking.InkDrawingAttributes Attributes)>();
-        foreach (var stroke in ink.GetStrokes())
+        strokes ??= ink.GetStrokes().Select(s => (s, s.BoundingRect)).ToList(); // bounds include the stroke's width
+        foreach (var (stroke, strokeBounds) in strokes)
         {
-            var bounds = stroke.BoundingRect; // includes the stroke's width
+            var bounds = strokeBounds;
             bounds.Intersect(sweepBounds);
             if (bounds.IsEmpty)
             {
@@ -198,11 +229,14 @@ public sealed class PartialEraser(UndoStack undo, Action<IReadOnlyCollection<Ink
                 var rest = InkStrokes.FromSamples(piece, attributes);
                 ink.AddStroke(rest);
                 edit.AddedStrokes.Add(rest);
+                strokes.Add((rest, rest.BoundingRect));
                 sampled[rest.Id] = SampledStroke.Made(piece, attributes); // what reading it would give
             }
         }
         if (removed.Count != 0)
         {
+            var gone = removed.Select(r => r.Stroke).ToHashSet(ReferenceEqualityComparer.Instance);
+            strokes.RemoveAll(s => gone.Contains(s.Stroke));
             // The touched strokes come from the ink itself (no identity lookup); no other stroke is ever left selected.
             foreach (var (stroke, _, _) in removed)
             {

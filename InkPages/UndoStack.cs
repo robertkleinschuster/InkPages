@@ -97,11 +97,12 @@ public sealed class PageEdit(InkPage page) : IPageEdit
     /// <summary>Marks exactly these strokes (as they are on the page now) as selected; returns them.</summary>
     public static List<InkStroke> SelectOnly(InkPage page, IEnumerable<InkStroke> strokes)
     {
-        foreach (var s in page.Ink.StrokeContainer.GetStrokes())
+        var onPage = page.Ink.StrokeContainer.GetStrokes(); // read once: deselect and find
+        foreach (var s in onPage)
         {
             s.Selected = false;
         }
-        var current = page.CurrentStrokes(strokes).OfType<InkStroke>().ToList();
+        var current = page.CurrentStrokes(strokes, onPage).OfType<InkStroke>().ToList();
         current.ForEach(s => s.Selected = true);
         return current;
     }

@@ -109,12 +109,12 @@ public sealed class InkTools(UndoStack undo, Func<InkDrawingAttributes> pen)
         var detachDrag = Drag?.Attach(view);
         var input = view.Ink.UnprocessedInput;
         TypedEventHandler<InkUnprocessedInput, CorePointerEventArgs>
-            pressed = (_, e) => Logged("Pressed", () => OnPressed(view, e)),
-            moved = (_, e) => Logged("Moved", () => OnMoved(view, e)),
-            released = (_, e) => Logged("Released", () => OnReleased(view, e)),
-            entered = (_, e) => Logged("Entered", () => OnMoved(view, e)),
-            hovered = (_, e) => Logged("Hovered", () => OnHover(view, e)),
-            exited = (_, e) => Logged("Exited", () =>
+            pressed = (_, e) => InkLog.Guard("unprocessed Pressed", () => OnPressed(view, e)),
+            moved = (_, e) => InkLog.Guard("unprocessed Moved", () => OnMoved(view, e)),
+            released = (_, e) => InkLog.Guard("unprocessed Released", () => OnReleased(view, e)),
+            entered = (_, e) => InkLog.Guard("unprocessed Entered", () => OnMoved(view, e)),
+            hovered = (_, e) => InkLog.Guard("unprocessed Hovered", () => OnHover(view, e)),
+            exited = (_, e) => InkLog.Guard("unprocessed Exited", () =>
             {
                 eraser?.Hide();
                 if (running == null)
@@ -123,7 +123,7 @@ public sealed class InkTools(UndoStack undo, Func<InkDrawingAttributes> pen)
                 }
                 EndIfLifted(e.CurrentPoint, e);
             }),
-            lost = (_, e) => Logged("Lost", () =>
+            lost = (_, e) => InkLog.Guard("unprocessed Lost", () =>
             {
                 if (Owns(view, e))
                 {
@@ -171,20 +171,6 @@ public sealed class InkTools(UndoStack undo, Func<InkDrawingAttributes> pen)
         TakeForSelection(toSelection);
     }
 
-    // WinUI raises these events from its ink thread's forwarding: an exception would not reach App.UnhandledException,
-    // so it is logged here before it propagates (never swallowed).
-    private static void Logged(string name, Action handler)
-    {
-        try
-        {
-            handler();
-        }
-        catch (Exception ex)
-        {
-            InkLog.Write($"unprocessed {name}", ex);
-            throw;
-        }
-    }
 
     // The running gesture is on this page and of this pointer.
     private bool Owns(InkPage view, CorePointerEventArgs e) =>

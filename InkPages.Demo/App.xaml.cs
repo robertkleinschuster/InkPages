@@ -18,8 +18,8 @@ public partial class App : Application
             InkLog.Writer = message => File.AppendAllText(log, $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}");
         }
         // Exceptions must never vanish silently.
-        UnhandledException += (_, e) => InkLog.Write("unhandled", e.Exception);
-        TaskScheduler.UnobservedTaskException += (_, e) => InkLog.Write("unobserved task", e.Exception);
+        UnhandledException += (_, e) => InkLog.Error("unhandled", e.Exception);
+        TaskScheduler.UnobservedTaskException += (_, e) => InkLog.Error("unobserved task", e.Exception);
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
