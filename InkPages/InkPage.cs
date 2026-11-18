@@ -22,6 +22,11 @@ namespace InkPages;
 public abstract partial class InkPage : UserControl
 {
     private readonly Grid sheet;
+    private readonly Border currentMark;
+
+    // The mark of the current page: an accent outline this far outside the page (never over it: the ink would draw
+    // above it, and the page's coordinates stay as they are).
+    private const double MarkGap = 3, MarkThickness = 2;
 
     protected InkPage(double width, double height)
     {
@@ -34,7 +39,22 @@ public abstract partial class InkPage : UserControl
         sheet.Children.Add(UnderInk);
         sheet.Children.Add(InkCanvas);
         sheet.Children.Add(Overlay);
-        Content = sheet;
+        currentMark = Themed.Load<Border>("Border",
+            $"BorderBrush='{{ThemeResource AccentFillColorDefaultBrush}}' BorderThickness='{MarkThickness}' CornerRadius='4'");
+        currentMark.Margin = new Thickness(-(MarkGap + MarkThickness));
+        currentMark.IsHitTestVisible = false;
+        currentMark.Visibility = Visibility.Collapsed;
+        var root = new Grid();
+        root.Children.Add(currentMark);
+        root.Children.Add(sheet);
+        Content = root;
+    }
+
+    /// <summary>Whether the page is marked as the one the toolbar drives (<see cref="InkWorkspace.MarkCurrentPage"/>).</summary>
+    public bool IsMarkedCurrent
+    {
+        get => currentMark.Visibility == Visibility.Visible;
+        internal set => currentMark.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>

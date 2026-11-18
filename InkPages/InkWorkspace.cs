@@ -274,9 +274,41 @@ public sealed class InkWorkspace
                 detach();
             }
         }
+        foreach (var gone in pages.Except(now))
+        {
+            gone.IsMarkedCurrent = false;
+        }
         pages = now;
         InkHidden = inkHidden; // also on the pages new here (and on a page shown again)
         Tools.SetPages(pages);
+        ShowCurrentPage();
+    }
+
+    private bool? markCurrentPage;
+
+    /// <summary>
+    /// Whether the page the toolbar drives (<see cref="CurrentPage"/>: the ruler, where the user writes) is marked with
+    /// an accent outline around it. Null (the default): while more than one page is shown. An app that shows only some
+    /// of a document's pages decides by the document (e.g. true from two pages on).
+    /// </summary>
+    public bool? MarkCurrentPage
+    {
+        get => markCurrentPage;
+        set
+        {
+            markCurrentPage = value;
+            ShowCurrentPage();
+        }
+    }
+
+    private void ShowCurrentPage()
+    {
+        bool mark = markCurrentPage ?? pages.Count > 1;
+        var current = CurrentPage;
+        foreach (var page in pages)
+        {
+            page.IsMarkedCurrent = mark && page == current;
+        }
     }
 
     /// <summary>
@@ -297,7 +329,11 @@ public sealed class InkWorkspace
     /// (before it every page lies at y 0). Not needed with one page: <see cref="SetPages"/> makes the first page the
     /// toolbar's target while none of the shown pages is.
     /// </summary>
-    public void SetCurrentPage(InkPage? page) => Tools.SetCurrentPage(page);
+    public void SetCurrentPage(InkPage? page)
+    {
+        Tools.SetCurrentPage(page);
+        ShowCurrentPage();
+    }
 
     /// <summary>Other pages are shown (another document): drags end, no selection, no history.</summary>
     public void Reset()

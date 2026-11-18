@@ -155,6 +155,10 @@ xournal-studio-windows' CLAUDE.md on 2026-11-18 so that every embedding app (Mat
 - `InkWorkspace` also holds `Commands` (`InkCommands`), `CurrentPage`, `Choices`/`ChoicesChanged` (the user's
   `ToolChoices`, raised once changes settle), `InkHidden` (collapse all pages' ink while a dialog lies over them, also
   on pages attached later) and `ResetPage` (a page's ink replaced without undo: load, new task).
+- The page the toolbar drives (`CurrentPage`: ruler, where the user writes) is outlined in the accent color while more
+  than one page is shown (`MarkCurrentPage`: null = by the shown pages; an app with lazy views decides by its
+  document). The outline lies 3 px outside the page (never over the ink; the page's coordinates stay), so the pages'
+  spacing must leave room for it (16 in the apps). Screenshots: `InkPages.Demo/UiTests/CurrentPageMark.ps1`.
 - `UndoStack.ContentChanged` (edit recorded, undone, redone – not on clearing) and the save point (`MarkSaved`,
   `IsAtSavePoint`, `Model/SavePoint`) tell the apps whether there is something to save. `InkLog.ErrorWriter` takes the
   errors (exceptions, `InkLog.Error`) apart from the rest.
