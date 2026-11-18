@@ -1,8 +1,9 @@
-# Fetches the WinUI Release runtime that XournalStudio.csproj copies over the official package's runtime:
+# Fetches the WinUI Release runtime that build\WinUIForkRuntime.targets puts over the official package's runtime in
+# every app that uses InkPages:
 # upstream microsoft-ui-xaml main + PR #12292 (readable InkPresenter.UnprocessedInput pointer args) + the InkToolbar custom
 # tool states fix + pointer capture kept across PointerRoutedAway/To + custom pens' drawing attributes (branch
 # fix/ink-runtime-highlighter), built in the fork
-# robertkleinschuster/microsoft-ui-xaml and published there as a release asset. See CLAUDE.md, "Current WinUI ink state".
+# robertkleinschuster/microsoft-ui-xaml and published there as a release asset. See README.md, "WinUI runtime", and CLAUDE.md.
 # Pinned by URL and SHA-256; extracted to .local-build\winui-fre. Does nothing when that runtime is already there.
 param([switch]$Force)
 

@@ -1,28 +1,23 @@
-﻿# UI test in Windows Sandbox with real (synthetic) pen and touch input.
-# Copies the installed app, a test document (+ its PDF) and SandboxTest.ps1 into a shared folder,
-# starts a sandbox, runs the test in its user session and collects screenshots, the app log and
-# the saved .xopp files in <Work>\out. Then exports page 1-2 of the result with the GTK version
-# to check that it still reads the file.
-# -App runs another build (e.g. a dotnet publish folder) instead of the installed app; -Test runs another
-# in-sandbox script (an experiment, or the library demo's tests: InkPages.Demo\UiTests) instead of SandboxTest.ps1.
-# Scripts can dot-source C:\sbx\TestKit.ps1 (shared helpers).
+﻿# UI test in Windows Sandbox with real (synthetic) pen and touch input (the sandbox window opens on the desktop).
+# Copies an app build (-App, e.g. a dotnet publish folder), optional test data and the test script into a shared folder,
+# starts a sandbox, runs the script in its user session and collects screenshots and logs in <Work>\out.
+# In-sandbox scripts dot-source C:\sbx\TestKit.ps1 (shared helpers: start the app, UI Automation, pen injection).
+# The library's own tests: dotnet publish InkPages.Demo -c Release -o .local-build\demo, then
+#   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test InkPages.Demo\UiTests\ToolsTest.ps1
+# Apps that embed InkPages can use this runner and TestKit.ps1 for their own UI tests.
 param(
-    [string]$Document,                             # .xopp (its PDF next to it); not needed by the demo's tests
-    [string]$Work = (Join-Path $env:TEMP 'xs-sandbox-test'),
-    [string]$App = (Join-Path $env:LOCALAPPDATA 'Programs\Xournal Studio for Windows'),
-    [string]$Test = (Join-Path $PSScriptRoot 'SandboxTest.ps1'),
-    [int]$TimeoutSeconds = 240,
-    [string]$GtkExe = (Join-Path $env:LOCALAPPDATA 'Programs\Xournal Studio\bin\xournalpp.exe')
+    [Parameter(Mandatory)][string]$App,            # folder with the app (copied to C:\sbx\app)
+    [Parameter(Mandatory)][string]$Test,           # in-sandbox script (copied to C:\sbx\test.ps1)
+    [string[]]$Data = @(),                         # files copied to C:\sbx\data
+    [string]$Work = (Join-Path $env:TEMP 'inkpages-sandbox-test'),
+    [int]$TimeoutSeconds = 240
 )
 $ErrorActionPreference = 'Stop'
 
 if (Test-Path $Work) { Remove-Item -Recurse -Force $Work }
 New-Item -ItemType Directory -Force "$Work\data", "$Work\out" | Out-Null
 robocopy $App "$Work\app" /MIR /NFL /NDL /NJH /NJS /MT:16 | Out-Null
-if ($Document) {
-    Copy-Item $Document "$Work\data\test.xopp"
-    Get-ChildItem (Split-Path $Document) -File | Where-Object { $_.Extension -in '.pdf', '.png', '.jpg' } | Copy-Item -Destination "$Work\data"
-}
+foreach ($file in $Data) { Copy-Item $file "$Work\data" }
 Copy-Item "$PSScriptRoot\Inj.cs", "$PSScriptRoot\TestKit.ps1" $Work
 Copy-Item $Test "$Work\test.ps1"
 
@@ -38,12 +33,4 @@ finally {
     wsb stop --id $id | Out-Null
 }
 Get-Content "$Work\out\transcript.txt" | Select-String -Pattern '^(init|shot|exited|ERROR)'
-
-if ((Test-Path $GtkExe) -and (Test-Path "$Work\out\saved2.xopp")) {
-    New-Item -ItemType Directory -Force "$Work\gtk" | Out-Null
-    Copy-Item "$Work\out\saved2.xopp" "$Work\gtk\test.xopp"
-    Copy-Item "$Work\data\*.pdf" "$Work\gtk"
-    $env:XDG_CONFIG_HOME = "$Work\gtk\cfg"; $env:XDG_DATA_HOME = "$Work\gtk\data"
-    & $GtkExe "--create-img=$Work\gtk\page.png" --export-range=1-2 "$Work\gtk\test.xopp"
-}
 "Results: $Work\out"
