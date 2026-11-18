@@ -7,10 +7,6 @@ using Windows.UI;
 
 namespace InkPages;
 
-/// <summary>A pen preset: one tap selects it; it keeps its own color and width (an InkToolbar pen button of its own).</summary>
-/// <param name="ColorIndex">Index into the palette.</param>
-public sealed record PenPreset(int ColorIndex, double Width);
-
 /// <summary>A palette color with its name (the preset buttons are named after their color).</summary>
 public sealed record NamedColor(Color Color, string Name);
 
@@ -28,6 +24,20 @@ public sealed class PenToolbar : UserControl
     private const double CommandWidth = 44; // dense: operated with the pen, not optimized for fingers
     private readonly StackPanel extensions = new() { Orientation = Orientation.Horizontal, Spacing = 2 };
     private readonly string presetTip;
+
+    /// <summary>
+    /// The toolbar with Xournal's palette (<see cref="XournalPalette"/>) and the user's choices: their presets (else the
+    /// defaults), shape, selection mode, eraser radius and shape recognition. The eraser's mode is the workspace's
+    /// (<c>new InkWorkspace(bar, scroller, choices)</c>).
+    /// </summary>
+    public PenToolbar(PenToolbarTexts texts, ToolChoices choices)
+        : this(texts, XournalPalette.Pens(texts), choices.PensOrDefault, XournalPalette.Highlighters(texts), choices.HighlightersOrDefault)
+    {
+        ShapeKind.SelectedIndex = Math.Clamp((int)choices.Shape, 0, texts.ShapeKinds.Count - 1);
+        SelectMode.SelectedIndex = choices.SelectMode == InkPages.SelectMode.Rectangle ? 1 : 0;
+        EraserRadius.Value = Math.Clamp(choices.EraserRadius, EraserRadius.Minimum, EraserRadius.Maximum);
+        RecognizeShapes.IsChecked = choices.RecognizeShapes;
+    }
 
     /// <param name="palette">The pens' colors (a preset's color is an index into it).</param>
     /// <param name="highlighterPalette">The highlighters' colors.</param>

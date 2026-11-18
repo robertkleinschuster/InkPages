@@ -56,12 +56,19 @@ xournal-studio-windows' CLAUDE.md.
   `SetPages` (the pages that have a view now), `Holds(page)` (the page's view must stay: history, selection, running
   gesture or drag hand-over, shape recognition), `Reset`, `Removing/Removed`, `UndoStep`, `TransferToPage` (the app
   moves a dragged selection's content to another page).
+- `InkWorkspace` also holds `Commands` (`InkCommands`), `CurrentPage`, `Choices`/`ChoicesChanged` (the user's
+  `ToolChoices`) and `InkHidden` (collapse all pages' ink while a dialog lies over them).
 - `InkPage`: the abstract page. It holds the app's `UnderInk` layers, the InkCanvas, the `Overlay` and the `Surface`.
-  The app implements stroke identity/preview/transform, placements, pictures as its own objects, and removal tokens.
-  `CreatePlaceholder` is a blank sheet for a page without a view.
-- `PenToolbar` (+ `PenToolbarTexts`, `BallpointPen`/`HighlighterPen`, `Extensions` for app buttons,
-  `PenToolbar.Command`). The row: undo | pens | highlighters | eraser (+ whole-stroke toggle) | select, shapes,
-  ruler | selection commands | app extensions.
+  Stroke identity across undo (replaced ids), previews, placements and pictures have defaults for a page with ink only
+  (`ClearInk` empties it without undo); an app with data per stroke or pictures overrides them (pictures are its own
+  objects, removal tokens its own). `CreatePlaceholder` is a blank sheet for a page without a view.
+- `InkCommands`: the edit commands on Windows ink shared by the apps - undo/redo, delete, duplicate (`CopyPicture` for
+  pictures), cut/copy/paste through Windows ink's clipboard, select all, `ClearPage`, `SelectAdded`; refused while the
+  selection is dragged (`Refused`). `WireToolbar` and `AddShortcuts` (hidden accelerator tooltips, not while typing).
+- `PenToolbar` (+ `PenToolbarTexts` with `German`, `BallpointPen`/`HighlighterPen`, `Extensions` for app buttons,
+  `PenToolbar.Command`). `new PenToolbar(texts, choices)` uses `XournalPalette` and the user's `ToolChoices`
+  (`Model/`, defaults: black/blue/red pens, yellow/green highlighters). The row: undo | pens | highlighters | eraser
+  (+ whole-stroke toggle) | select, shapes, ruler | selection commands | app extensions.
 - `ToolController`: copies the InkToolbar's tool to all pages' presenters. For a custom tool and for hover takeovers
   it sets processing mode None, and then switches only the mode.
 - `InkTools`: routes the presenters' unprocessed pen/mouse input to `SelectionTool`, `ShapeTool` and
@@ -72,7 +79,7 @@ xournal-studio-windows' CLAUDE.md.
   coordinates drift once its page scrolls. Auto-scroll runs on `CompositionTarget.Rendering`.
 - `PartialEraser`, `ShapeTool`, `ShapeRecognition`, `UndoStack` (`IPageEdit`: `PageEdit`, `TransformEdit`,
   `CombinedEdit`), `InkLog`.
-- `Model/` has no UI: `StrokeEraser`, `ShapeGeometry`/`ShapeKind`, `InkStrokes` (drawn width;
+- `Model/` has no UI: `ToolChoices`/`PenPreset`, `StrokeEraser`, `ShapeGeometry`/`ShapeKind`, `InkStrokes` (drawn width;
   `FullPressureFactor` = 1.75), `PenWidths` (Xournal's width steps), `SampledStroke`, `SelectMode`.
 
 ## Testing

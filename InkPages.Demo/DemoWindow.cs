@@ -19,26 +19,6 @@ namespace InkPages.Demo;
 /// </summary>
 public sealed class DemoWindow : Window
 {
-    private const float Step = 14.17f;
-
-    private static readonly NamedColor[] Palette =
-    [
-        new(Color.FromArgb(255, 0x00, 0x00, 0x00), "Black"),
-        new(Color.FromArgb(255, 0x33, 0x33, 0xcc), "Blue"),
-        new(Color.FromArgb(255, 0xff, 0x00, 0x00), "Red"),
-        new(Color.FromArgb(255, 0x00, 0x80, 0x00), "Green"),
-        new(Color.FromArgb(255, 0x80, 0x80, 0x80), "Gray"),
-        new(Color.FromArgb(255, 0xff, 0x80, 0x00), "Orange"),
-    ];
-
-    private static readonly NamedColor[] HighlighterPalette =
-    [
-        new(Color.FromArgb(255, 0xff, 0xff, 0x00), "Yellow"),
-        new(Color.FromArgb(255, 0x00, 0xff, 0x00), "Green"),
-        new(Color.FromArgb(255, 0x00, 0xc0, 0xff), "Light blue"),
-        new(Color.FromArgb(255, 0xff, 0x00, 0xff), "Magenta"),
-    ];
-
     private readonly PenToolbar bar;
     private readonly ScrollView scroller;
     private readonly StackPanel panel = new() { Spacing = 16, Padding = new Thickness(16), HorizontalAlignment = HorizontalAlignment.Center };
@@ -53,8 +33,8 @@ public sealed class DemoWindow : Window
             presenter.Maximize();
         }
 
-        bar = new PenToolbar(new PenToolbarTexts(), Palette, [new(0, 1.41), new(1, 1.41), new(2, 1.41)],
-            HighlighterPalette, [new(0, 8.5), new(1, 8.5)]);
+        var choices = new ToolChoices(); // the defaults (an app loads the user's saved choices)
+        bar = new PenToolbar(new PenToolbarTexts(), choices);
         scroller = new ScrollView
         {
             // The pen never pans (it would capture the pen); touch and touchpad scroll and zoom.
@@ -65,7 +45,7 @@ public sealed class DemoWindow : Window
             VerticalScrollBarVisibility = ScrollingScrollBarVisibility.Hidden,
             Content = panel,
         };
-        ink = new InkWorkspace(bar, scroller);
+        ink = new InkWorkspace(bar, scroller, choices);
         ink.TransferToPage = TransferToPage;
 
         AddCommands();
@@ -80,19 +60,15 @@ public sealed class DemoWindow : Window
         scroller.ViewChanged += (_, _) => ink.SetCurrentPage(CurrentPage);
         scroller.SizeChanged += (_, _) => ink.SetCurrentPage(CurrentPage);
 
-        // The accelerators' tooltip would open wherever the pen hovers over the window - a windowed popup, and while one
-        // is open a selection drag loses the pen (sandbox 2026-11-17). Hidden: no tooltip over the pages.
-        var root = new Grid { RequestedTheme = theme, KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden };
+        var root = new Grid { RequestedTheme = theme };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition());
         bar.Margin = new Thickness(8, 4, 8, 4);
         root.Children.Add(bar);
         Grid.SetRow(scroller, 1);
         root.Children.Add(scroller);
-        root.KeyboardAccelerators.Add(Accelerator(VirtualKey.Z, VirtualKeyModifiers.Control, () => ink.UndoStep()));
-        root.KeyboardAccelerators.Add(Accelerator(VirtualKey.Y, VirtualKeyModifiers.Control, () => ink.RedoStep()));
-        root.KeyboardAccelerators.Add(Accelerator(VirtualKey.Delete, VirtualKeyModifiers.None, Delete));
-        root.KeyboardAccelerators.Add(Accelerator(VirtualKey.D, VirtualKeyModifiers.Control, Duplicate));
+        // Ctrl+Z/Y/X/C/V/D/A and Del, with the accelerators' tooltips hidden (a windowed popup over the pages breaks pen drags).
+        ink.Commands.AddShortcuts(root);
         Content = root;
         // The page has the keyboard focus at start (not the first toolbar button, which would show a focus rectangle).
         root.Loaded += (_, _) => scroller.Focus(FocusState.Programmatic);
@@ -106,38 +82,17 @@ public sealed class DemoWindow : Window
 
     private void AddCommands()
     {
-        bar.Undo.Click += (_, _) => ink.UndoStep();
-        bar.Redo.Click += (_, _) => ink.RedoStep();
-        bar.DeleteSelection.Click += (_, _) => Delete();
-        bar.Duplicate.Click += (_, _) => Duplicate();
-        bar.Copy.Click += (_, _) => Copy();
-        bar.Cut.Click += (_, _) =>
-        {
-            // The demo's clipboard holds ink only: a selection with pictures is not cut (they would be lost).
-            if (ink.Selection.Current is { Pictures.Count: 0 })
-            {
-                Copy();
-                Delete();
-            }
-        };
+        // The library's commands on Windows ink; duplicate also copies the demo's pictures.
+        ink.Commands.CopyPicture = (picture, m) =>
+            new DemoPicture(Selection.TransformBounds(((DemoPicture)picture).Bounds, m), ((DemoPicture)picture).Color);
+        ink.Commands.WireToolbar();
         var paste = PenToolbar.Command(new SymbolIcon(Symbol.Paste), "Paste ink", "PasteButton");
-        paste.Click += (_, _) => Paste();
+        paste.Click += (_, _) => ink.Commands.PasteInk();
         var addPage = PenToolbar.Command(new SymbolIcon(Symbol.Add), "Add page", "InsertPageButton");
         addPage.Click += (_, _) => AddPage();
         bar.Extensions.Add(paste);
         bar.Extensions.Add(new AppBarSeparator());
         bar.Extensions.Add(addPage);
-    }
-
-    private static KeyboardAccelerator Accelerator(VirtualKey key, VirtualKeyModifiers modifiers, Action action)
-    {
-        var accelerator = new KeyboardAccelerator { Key = key, Modifiers = modifiers };
-        accelerator.Invoked += (_, e) =>
-        {
-            action();
-            e.Handled = true;
-        };
-        return accelerator;
     }
 
     private void AddPage()
@@ -148,65 +103,7 @@ public sealed class DemoWindow : Window
         ink.SetPages(Pages);
     }
 
-    // ---------------------------------------------------------------- the demo's commands
-
-    private void Delete()
-    {
-        if (ink.Selection.Current is not { HasContent: true } current || ink.Selection.IsDragging)
-        {
-            return;
-        }
-        var edit = PageEdit.RemoveSelected(current);
-        ink.Selection.Clear();
-        ink.Undo.Push(edit);
-    }
-
-    private void Duplicate()
-    {
-        if (ink.Selection.Current is not { HasContent: true } current || ink.Selection.IsDragging)
-        {
-            return;
-        }
-        var page = current.Page;
-        var (strokes, pictures) = Copies(current, page, Matrix3x2.CreateTranslation(Step, Step));
-        var edit = new PageEdit(page);
-        edit.AddedStrokes.AddRange(strokes);
-        edit.AddedPictures.AddRange(pictures);
-        ink.Undo.Push(edit);
-        ink.Selection.Select(page, strokes, pictures);
-    }
-
-    // Strokes through Windows ink's clipboard (pictures are not copied by the demo).
-    private void Copy()
-    {
-        if (ink.Selection.Current is not { } current || current.Strokes.Count == 0 || ink.Selection.IsDragging)
-        {
-            return;
-        }
-        PageEdit.SelectOnly(current.Page, current.Strokes);
-        current.Page.Ink.StrokeContainer.CopySelectedToClipboard();
-        foreach (var stroke in current.Strokes)
-        {
-            stroke.Selected = false;
-        }
-    }
-
-    private void Paste()
-    {
-        if (CurrentPage is not { } page || ink.Selection.IsDragging || !page.Ink.StrokeContainer.CanPasteFromClipboard())
-        {
-            return;
-        }
-        var container = page.Ink.StrokeContainer;
-        var before = container.GetStrokes().Select(s => s.Id).ToHashSet();
-        container.PasteFromClipboard(new Point(Step, Step));
-        var added = container.GetStrokes().Where(s => !before.Contains(s.Id)).ToList();
-        added.ForEach(s => s.Selected = false);
-        var edit = new PageEdit(page);
-        edit.AddedStrokes.AddRange(added);
-        ink.Undo.Push(edit);
-        ink.Selection.Select(page, added, []);
-    }
+    // ---------------------------------------------------------------- moving across pages
 
     // Copies of the selection's strokes and pictures added to a page, transformed by m.
     private static (List<InkStroke> Strokes, List<object> Pictures) Copies(Selection selection, InkPage target, Matrix3x2 m)
@@ -227,8 +124,6 @@ public sealed class DemoWindow : Window
         }
         return (strokes, pictures);
     }
-
-    // ---------------------------------------------------------------- moving across pages
 
     // The selection's content moves to another page during a drag: copies there, the originals taken away.
     private (List<InkStroke> Strokes, List<object> Pictures, IPageEdit Edit)? TransferToPage(Selection current, InkPage target, Matrix3x2 m)

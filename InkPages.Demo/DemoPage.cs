@@ -29,7 +29,6 @@ public sealed partial class DemoPage : InkPage
     private readonly XamlCanvas pictureLayer = new();
     private readonly List<DemoPicture> pictures = new();
     private readonly Dictionary<DemoPicture, Border> shown = new();
-    private readonly Dictionary<uint, uint> replacedIds = new();
 
     public DemoPage(double width, double height) : base(width, height)
     {
@@ -59,35 +58,8 @@ public sealed partial class DemoPage : InkPage
 
     // ---------------------------------------------------------------- strokes
 
-    public override void StrokeReplaced(uint oldId, uint newId)
-    {
-        while (replacedIds.TryGetValue(oldId, out uint next))
-        {
-            oldId = next;
-        }
-        replacedIds[oldId] = newId;
-    }
-
-    public override List<InkStroke?> CurrentStrokes(IEnumerable<InkStroke> strokes)
-    {
-        var byId = Ink.StrokeContainer.GetStrokes().ToDictionary(s => s.Id);
-        return strokes.Select(stroke =>
-        {
-            uint id = stroke.Id;
-            while (replacedIds.TryGetValue(id, out uint next))
-            {
-                id = next;
-            }
-            return byId.GetValueOrDefault(id);
-        }).ToList();
-    }
-
-    // The demo keeps no data of its own per stroke: the ink is all there is.
-    public override void BeginStrokePreview(InkStroke stroke, Matrix3x2 committed) { }
-
-    public override void EndStrokePreview(IEnumerable<InkStroke> strokes) { }
-
-    public override void StrokeTransformed(InkStroke stroke, Matrix3x2 m) { }
+    // Stroke identity across undo/redo and the previews are InkPage's defaults: the demo keeps no data per stroke.
+    // Placements and pictures are its own (it has pictures).
 
     private sealed record Placement(List<(InkStroke Stroke, Matrix3x2 Transform)> Strokes, List<(DemoPicture Picture, Rect Bounds)> Pictures);
 

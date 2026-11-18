@@ -78,6 +78,70 @@ public sealed class InkWorkspace
             bar.Undo.IsEnabled = Undo.CanUndo;
             bar.Redo.IsEnabled = Undo.CanRedo;
         };
+
+        Commands = new InkCommands(this, bar, scroller);
+        // The user's tool choices: one event for every change the app keeps (ChoicesChanged).
+        bar.ShapeKind.SelectionChanged += (_, _) => RaiseChoicesChanged(bar.ShapeKind.SelectedIndex >= 0);
+        bar.SelectMode.SelectionChanged += (_, _) => RaiseChoicesChanged(bar.SelectMode.SelectedIndex >= 0);
+        bar.EraserRadius.ValueChanged += (_, _) => RaiseChoicesChanged();
+        bar.RecognizeShapes.Click += (_, _) => RaiseChoicesChanged();
+        PartialErasingChanged += (_, _) => RaiseChoicesChanged();
+        Tools.PresetsChanged += (_, _) => RaiseChoicesChanged();
+    }
+
+    /// <summary>The workspace with the eraser's mode of the user's choices (the toolbar made from them: <c>new PenToolbar(texts, choices)</c>).</summary>
+    public InkWorkspace(PenToolbar bar, ScrollView scroller, ToolChoices choices)
+        : this(bar, scroller, partialErasing: !choices.WholeStrokeErasing)
+    {
+    }
+
+    /// <summary>The edit commands (delete, duplicate, clipboard, select all, shortcuts).</summary>
+    public InkCommands Commands { get; }
+
+    /// <summary>The page the toolbar drives (<see cref="SetCurrentPage"/>; before that the first page).</summary>
+    public InkPage? CurrentPage => pages.FirstOrDefault(p => p.InkCanvas == bar.Ink.TargetInkCanvas);
+
+    /// <summary>The user's tool choices as they are now (to save them).</summary>
+    public ToolChoices Choices => new()
+    {
+        Pens = Tools.PenSettings.Select(p => new PenPreset(p.ColorIndex, p.Width)).ToList(),
+        Highlighters = Tools.HighlighterSettings.Select(p => new PenPreset(p.ColorIndex, p.Width)).ToList(),
+        Shape = (ShapeKind)Math.Max(0, bar.ShapeKind.SelectedIndex),
+        SelectMode = (SelectMode)Math.Max(0, bar.SelectMode.SelectedIndex),
+        EraserRadius = bar.EraserRadius.Value,
+        WholeStrokeErasing = !PartialErasing,
+        RecognizeShapes = bar.RecognizeShapes.IsChecked == true,
+    };
+
+    /// <summary>The user changed a tool choice (a preset, the shape, the selection mode, the eraser): save <see cref="Choices"/>.</summary>
+    public event EventHandler? ChoicesChanged;
+
+    private void RaiseChoicesChanged(bool valid = true)
+    {
+        if (valid)
+        {
+            ChoicesChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private bool inkHidden;
+
+    /// <summary>
+    /// Hides the ink of all pages (also of pages shown later) while a dialog or another view lies over them: the
+    /// experimental InkCanvas draws its ink above all XAML laid over it and takes the input there
+    /// (microsoft-ui-xaml #10461/#11928). Remove its use when the Windows App SDK fixes that.
+    /// </summary>
+    public bool InkHidden
+    {
+        get => inkHidden;
+        set
+        {
+            inkHidden = value;
+            foreach (var page in pages)
+            {
+                page.InkCanvas.Visibility = value ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
+            }
+        }
     }
 
     public UndoStack Undo { get; } = new();
@@ -190,6 +254,7 @@ public sealed class InkWorkspace
             }
         }
         pages = now;
+        InkHidden = inkHidden; // also on the pages new here (and on a page shown again)
         Tools.SetPages(pages);
     }
 

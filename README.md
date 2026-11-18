@@ -67,16 +67,24 @@ In CI, check out with `submodules: true` and run `external\InkPages\tools\Get-Wi
 In code (see `InkPages.Demo/DemoWindow.cs` and `DemoPage.cs` for a complete example):
 
 ```csharp
-var bar = new PenToolbar(new PenToolbarTexts(), palette, pens, highlighterPalette, highlighters);
+var choices = LoadChoices() ?? new ToolChoices();          // the user's tool choices (plain data, e.g. JSON)
+var bar = new PenToolbar(PenToolbarTexts.German, choices); // Xournal++'s palette; English: new PenToolbarTexts()
 var scroller = new ScrollView { IgnoredInputKinds = ScrollingInputKinds.Pen, /* pages in a StackPanel */ };
-var ink = new InkWorkspace(bar, scroller);
+var ink = new InkWorkspace(bar, scroller, choices);
+ink.ChoicesChanged += (_, _) => SaveChoices(ink.Choices);
 foreach (var page in pages) ink.Attach(page);     // your InkPage subclasses
 ink.SetPages(pages);                              // the pages that have a view now
-bar.Undo.Click += (_, _) => ink.UndoStep();
-bar.Redo.Click += (_, _) => ink.RedoStep();
+ink.Commands.WireToolbar();                       // undo/redo, cut/copy/duplicate/delete on Windows ink
+ink.Commands.AddShortcuts(root);                  // Ctrl+Z/Y/X/C/V/D/A, Del (not while typing)
+ink.Commands.Refused += (_, command) => Say("Let go first");  // a command while the selection is dragged
 bar.Extensions.Add(PenToolbar.Command(icon, "Paste"));  // app commands after the library's buttons
+ink.InkHidden = true;                             // while a dialog is open (the ink would draw over it)
 ```
 
+A page that keeps nothing beside its ink derives from `InkPage` and only fills `UnderInk` (e.g. ruled paper): stroke
+identity across undo, placements and "no pictures" are defaults. An app with its own data per stroke or with pictures
+overrides those members. An app with its own clipboard format (pictures, file elements) wires the toolbar's buttons
+itself and uses the rest of `InkCommands` (`Delete`, `SelectAll`, `PasteInk`, `SelectAdded`, `Refuses`).
 Rules the library depends on:
 
 - The `ScrollView` must ignore the pen (`IgnoredInputKinds = Pen`). Otherwise it captures the pen for panning.
