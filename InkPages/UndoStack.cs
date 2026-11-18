@@ -181,6 +181,12 @@ public sealed class UndoStack
     public event EventHandler? ContentChanged;
 
     /// <summary>
+    /// The same as <see cref="ContentChanged"/>, with the edit (recorded, undone or redone): which pages it changed is
+    /// <see cref="IPageEdit.Touches"/> (e.g. to draw only their thumbnails again).
+    /// </summary>
+    public event EventHandler<IPageEdit>? ContentEdited;
+
+    /// <summary>
     /// Whether the content is as it was at <see cref="MarkSaved"/> (or at the last <see cref="Clear"/>): false after an
     /// edit, true again after undoing back to it.
     /// </summary>
@@ -206,6 +212,7 @@ public sealed class UndoStack
         InkLog.Write($"undo: recorded {edit.GetType().Name} ({undo.Count} steps)");
         Changed?.Invoke(this, EventArgs.Empty);
         ContentChanged?.Invoke(this, EventArgs.Empty);
+        ContentEdited?.Invoke(this, edit);
     }
 
     /// <summary>No history (other pages are shown): the content as it is now counts as saved.</summary>
@@ -241,6 +248,7 @@ public sealed class UndoStack
             redo.Push(edit);
             Changed?.Invoke(this, EventArgs.Empty);
             ContentChanged?.Invoke(this, EventArgs.Empty);
+            ContentEdited?.Invoke(this, edit);
         }
     }
 
@@ -253,6 +261,7 @@ public sealed class UndoStack
             undo.Push(edit);
             Changed?.Invoke(this, EventArgs.Empty);
             ContentChanged?.Invoke(this, EventArgs.Empty);
+            ContentEdited?.Invoke(this, edit);
         }
     }
 
