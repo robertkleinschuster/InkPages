@@ -36,6 +36,7 @@ public abstract partial class InkPage : UserControl
         Overlay = new XamlCanvas { IsHitTestVisible = false };
         UnderInk = new Grid { IsHitTestVisible = false };
         sheet = Themed.Load<Grid>("Grid", "BorderBrush='{ThemeResource CardStrokeColorDefaultBrush}' BorderThickness='0.5'");
+        sheet.Children.Add(paperLines);
         sheet.Children.Add(UnderInk);
         sheet.Children.Add(InkCanvas);
         sheet.Children.Add(Overlay);
@@ -82,6 +83,32 @@ public abstract partial class InkPage : UserControl
 
     /// <summary>Receives the pen as XAML pointer input while the presenters leave it (moving the selection).</summary>
     public UIElement Surface => sheet;
+
+    // The paper's ruling: below the app's layers and the ink (never over the ink).
+    private readonly Microsoft.UI.Xaml.Shapes.Path paperLines = new() { IsHitTestVisible = false };
+    private Paper? paper;
+
+    /// <summary>
+    /// The sheet's paper: plain, graph or lined (<see cref="InkPages.Paper"/>), drawn below the app's layers
+    /// (<see cref="UnderInk"/>) and the ink, in page units over the whole sheet. Null (the default): none – an app that
+    /// draws its own background (e.g. a file's ruling or a PDF page) leaves it so.
+    /// </summary>
+    public Paper? Paper
+    {
+        get => paper;
+        set
+        {
+            paper = value;
+            var lines = new GeometryGroup();
+            foreach (var (from, to) in value?.Lines(Width, Height) ?? [])
+            {
+                lines.Children.Add(new LineGeometry { StartPoint = from, EndPoint = to });
+            }
+            paperLines.Data = lines;
+            paperLines.Stroke = value == null ? null : new SolidColorBrush(value.Color);
+            paperLines.StrokeThickness = value?.Thickness ?? 0;
+        }
+    }
 
     /// <summary>The sheet's color.</summary>
     public Brush? SheetBackground

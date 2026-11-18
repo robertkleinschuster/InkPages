@@ -33,27 +33,8 @@ public sealed partial class DemoPage : InkPage
     public DemoPage(double width, double height) : base(width, height)
     {
         SheetBackground = new SolidColorBrush(Colors.White);
-        UnderInk.Children.Add(GraphPaper(width, height));
+        Paper = new Paper(PaperKind.Graph, Grid, Color.FromArgb(255, 0xbd, 0xbd, 0xbd), 0.5); // the library's paper
         UnderInk.Children.Add(pictureLayer);
-    }
-
-    private static Microsoft.UI.Xaml.Shapes.Path GraphPaper(double width, double height)
-    {
-        var lines = new GeometryGroup();
-        for (double x = Grid; x < width; x += Grid)
-        {
-            lines.Children.Add(new LineGeometry { StartPoint = new Point(x, 0), EndPoint = new Point(x, height) });
-        }
-        for (double y = Grid; y < height; y += Grid)
-        {
-            lines.Children.Add(new LineGeometry { StartPoint = new Point(0, y), EndPoint = new Point(width, y) });
-        }
-        return new Microsoft.UI.Xaml.Shapes.Path
-        {
-            Data = lines,
-            Stroke = new SolidColorBrush(Color.FromArgb(255, 0xbd, 0xbd, 0xbd)),
-            StrokeThickness = 0.5,
-        };
     }
 
     // ---------------------------------------------------------------- strokes

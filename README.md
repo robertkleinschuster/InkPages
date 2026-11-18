@@ -79,6 +79,8 @@ ink.Commands.AddShortcuts(root);                  // Ctrl+Z/Y/X/C/V/D/A, Del (no
 ink.Commands.Refused += (_, command) => Say(texts.Refused);  // a command while the selection is dragged
 bar.Extensions.Add(PenToolbar.Command(icon, "Paste"));  // app commands after the library's buttons
 ink.InkHidden = true;                             // while a dialog is open (the ink would draw over it)
+page.Paper = new Paper(PaperKind.Graph, Spacing: 24); // ruled paper below everything (Plain, Graph, Lined)
+bar.Compact = true;                               // a narrower row for narrow windows
 ink.Undo.ContentChanged += (_, _) => ShowUnsaved(!ink.Undo.IsAtSavePoint);  // ink edited, undone or redone
 ink.Undo.MarkSaved();                             // after saving (or loading)
 ink.ResetPage(page, loadedStrokes);               // a page's ink replaced without undo (load, new task)

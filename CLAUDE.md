@@ -172,6 +172,11 @@ xournal-studio-windows' CLAUDE.md on 2026-11-18 so that every embedding app (Mat
   selection is dragged or the ink hidden (`Refused`; text `PenToolbarTexts.Refused`). `PasteInk`: null = refused, empty =
   nothing pasted. `WireToolbar(clipboard)` (false: an app with its own clipboard format wires cut/copy/duplicate) and
   `AddShortcuts` (hidden accelerator tooltips, not while typing).
+- `InkPage.Paper` (`Model/PaperLines.cs`: `Paper`, `PaperKind` Plain/Graph/Lined, spacing in page units/DIPs, line
+  color and thickness; default color #D6E2F0): ruling drawn below the app's layers and the ink. Null: none (an app with
+  its own background, e.g. Xournal Studio's file ruling or PDF pages). The demo uses it.
+- `PenToolbar.Compact`: 40-wide command buttons (also the app's extensions), no separators, no spacing – for narrow
+  windows (MatheTrainer at ~1280 DIP); names/tooltips/UIA ids stay; the InkToolbar's own buttons keep WinUI's size.
 - `PenToolbar` (+ `PenToolbarTexts` with `German`, `BallpointPen`/`HighlighterPen`, `Extensions` for app buttons,
   `PenToolbar.Command`). `new PenToolbar(texts, choices)` uses `XournalPalette` and the user's `ToolChoices`
   (`Model/`, defaults: black/blue/red pens, yellow/green highlighters). The row: undo | pens | highlighters | eraser

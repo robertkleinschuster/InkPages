@@ -22,6 +22,8 @@ public sealed record NamedColor(Color Color, string Name);
 public sealed class PenToolbar : UserControl
 {
     private const double CommandWidth = 44; // dense: operated with the pen, not optimized for fingers
+    private const double CompactCommandWidth = 40;
+    private readonly List<AppBarSeparator> separators = [];
     private readonly StackPanel extensions = new() { Orientation = Orientation.Horizontal, Spacing = 2 };
     private readonly string presetTip;
 
@@ -133,19 +135,58 @@ public sealed class PenToolbar : UserControl
         }
         Undo.IsEnabled = Redo.IsEnabled = false;
 
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
+        row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
         row.Children.Add(Undo);
         row.Children.Add(Redo);
-        row.Children.Add(new AppBarSeparator());
+        row.Children.Add(Separator());
         row.Children.Add(Ink);
-        row.Children.Add(new AppBarSeparator());
+        row.Children.Add(Separator());
         row.Children.Add(Cut);
         row.Children.Add(Copy);
         row.Children.Add(Duplicate);
         row.Children.Add(DeleteSelection);
-        row.Children.Add(new AppBarSeparator());
+        row.Children.Add(Separator());
         row.Children.Add(extensions);
         Content = row;
+    }
+
+    private readonly StackPanel row;
+
+    private AppBarSeparator Separator()
+    {
+        var separator = new AppBarSeparator();
+        separators.Add(separator);
+        return separator;
+    }
+
+    private bool compact;
+
+    /// <summary>
+    /// A narrower row for a narrow window: the command buttons (the toolbar's and those in <see cref="Extensions"/>)
+    /// 40 instead of 44 wide, no separators between the groups, no spacing. Names, tooltips and UI Automation ids stay.
+    /// The InkToolbar's own buttons keep their size (WinUI's template). Set it again after adding extensions.
+    /// </summary>
+    public bool Compact
+    {
+        get => compact;
+        set
+        {
+            compact = value;
+            row.Spacing = extensions.Spacing = value ? 0 : 2;
+            foreach (var separator in separators)
+            {
+                separator.Visibility = value ? Visibility.Collapsed : Visibility.Visible;
+            }
+            double width = value ? CompactCommandWidth : CommandWidth;
+            foreach (var button in row.Children.Concat(extensions.Children).OfType<AppBarButton>())
+            {
+                button.Width = width;
+            }
+            foreach (var separator in extensions.Children.OfType<AppBarSeparator>())
+            {
+                separator.Visibility = value ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
     }
 
     /// <summary>The duplicate icon (two sheets, a plus on the front one), 20×20; also for an app's menu.</summary>
