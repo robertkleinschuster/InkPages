@@ -29,8 +29,8 @@ public sealed class PenToolbar : UserControl
 
     /// <summary>
     /// The toolbar with Xournal's palette (<see cref="XournalPalette"/>) and the user's choices: their presets (else the
-    /// defaults), shape, selection mode, eraser radius and shape recognition. The eraser's mode is the workspace's
-    /// (<c>new InkWorkspace(bar, scroller, choices)</c>).
+    /// defaults), shape, selection mode, eraser radius, eraser mode and shape recognition – the one place the choices go
+    /// in (<c>new InkWorkspace(bar, scroller)</c> takes them from the toolbar; <c>InkWorkspace.Choices</c> reads them back).
     /// </summary>
     public PenToolbar(PenToolbarTexts texts, ToolChoices choices)
         : this(texts, XournalPalette.Pens(texts), choices.PensOrDefault, XournalPalette.Highlighters(texts), choices.HighlightersOrDefault)
@@ -39,11 +39,12 @@ public sealed class PenToolbar : UserControl
         SelectMode.SelectedIndex = choices.SelectMode == InkPages.SelectMode.Rectangle ? 1 : 0;
         EraserRadius.Value = Math.Clamp(choices.EraserRadius, EraserRadius.Minimum, EraserRadius.Maximum);
         RecognizeShapes.IsChecked = choices.RecognizeShapes;
+        WholeStrokeErase.IsChecked = choices.WholeStrokeErasing;
     }
 
     /// <param name="palette">The pens' colors (a preset's color is an index into it).</param>
     /// <param name="highlighterPalette">The highlighters' colors.</param>
-    public PenToolbar(PenToolbarTexts texts, IReadOnlyList<NamedColor> palette, IReadOnlyList<PenPreset> pens,
+    private PenToolbar(PenToolbarTexts texts, IReadOnlyList<NamedColor> palette, IReadOnlyList<PenPreset> pens,
         IReadOnlyList<NamedColor> highlighterPalette, IReadOnlyList<PenPreset> highlighters)
     {
         if (pens.Count == 0 || palette.Count == 0)
@@ -229,9 +230,16 @@ public sealed class PenToolbar : UserControl
     // commands itself).
     private bool hasSelection;
 
-    internal void ShowSelecting(bool selected)
+    /// <summary>
+    /// The selection's commands for <paramref name="selection"/>: copy for any selection, cut, duplicate and delete when
+    /// it holds content (a kept area alone can only be copied). They live in the row, not in a flyout at the selection: a
+    /// flyout over the page is a windowed popup, and while one is open the release of a barrel drag never reaches the app.
+    /// </summary>
+    internal void ShowSelection(Selection? selection)
     {
-        hasSelection = selected;
+        hasSelection = selection != null;
+        Copy.IsEnabled = hasSelection;
+        Cut.IsEnabled = Duplicate.IsEnabled = DeleteSelection.IsEnabled = selection?.HasContent == true;
         ShowState();
     }
 

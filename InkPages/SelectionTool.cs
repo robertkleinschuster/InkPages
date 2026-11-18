@@ -50,7 +50,7 @@ public sealed class SelectionTool(UndoStack undo)
     /// A dragged selection could not go on to another page (its content stays on its page for the rest of the drag): the
     /// exception, or null when the page's <see cref="InkPage.CopyTo"/> refused (and told the user). Once per drag.
     /// </summary>
-    public event Action<Exception?>? TransferFailed;
+    public event EventHandler<Exception?>? TransferFailed;
 
     /// <summary>
     /// Moves a selection's content to another page with this transform (from its place before the drag into the target
@@ -69,7 +69,7 @@ public sealed class SelectionTool(UndoStack undo)
             if (current.Page.CopyTo(target, strokes, pictures, m) is not { } copies)
             {
                 strokes.ForEach(s => s.Selected = false);
-                TransferFailed?.Invoke(null);
+                TransferFailed?.Invoke(this, null);
                 return null;
             }
             var adding = new PageEdit(target);
@@ -82,13 +82,13 @@ public sealed class SelectionTool(UndoStack undo)
         {
             strokes.ForEach(s => s.Selected = false);
             InkLog.Error("move to another page (the content stays on its page)", e);
-            TransferFailed?.Invoke(e);
+            TransferFailed?.Invoke(this, e);
             return null;
         }
     }
 
     /// <summary>A dragged selection went on to another page: the drag continues there (the pen in its coordinates).</summary>
-    public event Action<InkPage, Point>? DragChangedPage;
+    internal event Action<InkPage, Point>? DragChangedPage;
 
     // The steps of the running drag that are already made (hand-overs to other pages); recorded as one undo step with
     // the final move when the drag ends.

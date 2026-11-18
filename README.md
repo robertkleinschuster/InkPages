@@ -70,14 +70,14 @@ In code (see `InkPages.Demo/DemoWindow.cs` and `DemoPage.cs` for a complete exam
 var choices = LoadChoices() ?? new ToolChoices();          // the user's tool choices (plain data, e.g. JSON)
 var bar = new PenToolbar(PenToolbarTexts.German, choices); // Xournal++'s palette; English: new PenToolbarTexts()
 var scroller = new ScrollView { IgnoredInputKinds = ScrollingInputKinds.Pen, /* pages in a StackPanel */ };
-var ink = new InkWorkspace(bar, scroller, choices);
+var ink = new InkWorkspace(bar, scroller);   // the choices come from the toolbar
 ink.ChoicesChanged += (_, _) => SaveChoices(ink.Choices);
 foreach (var page in pages) ink.Attach(page);     // your InkPage subclasses
 ink.SetPages(pages);                              // the pages that have a view now
-ink.Commands.WireToolbar();                       // undo/redo/delete, cut/copy/duplicate on Windows ink (false: not these three)
+ink.Commands.WireToolbar();                       // undo/redo/delete, cut/copy/duplicate/paste on Windows ink (false: the app wires those four)
 ink.Commands.AddShortcuts(root);                  // Ctrl+Z/Y/X/C/V/D/A, Del (not while typing)
-ink.Commands.Refused += (_, command) => Say(texts.Refused);  // a command while the selection is dragged
-bar.Extensions.Add(PenToolbar.Command(icon, "Paste"));  // app commands after the library's buttons
+ink.Commands.Refused += (_, command) => Say(texts.RefusedTitle(command), texts.Refused);  // a command while the selection is dragged
+bar.Extensions.Add(PenToolbar.Command(icon, "Add page"));  // app commands after the library's buttons
 ink.InkHidden = true;                             // while a dialog is open (the ink would draw over it)
 page.Paper = new Paper(PaperKind.Graph, Spacing: 24); // ruled paper below everything (Plain, Graph, Lined)
 bar.Compact = true;                               // a narrower row for narrow windows

@@ -13,7 +13,7 @@ namespace InkPages;
 /// while the pages scroll. (The presenters' positions drift once the page that has the pen scrolls out of view – measured
 /// in the sandbox 2026-11-17 – so a long drag with auto-scroll cannot follow them.)
 /// </summary>
-public sealed class SelectionDrag(SelectionTool selection, Action<bool> takeOver)
+internal sealed class SelectionDrag(SelectionTool selection, Action<bool> takeOver)
 {
     private InkPage? page;        // the drag's page (a hand-over moves it to another page)
     private UIElement? captured;   // the page surface holding the pen
@@ -111,10 +111,12 @@ public sealed class SelectionDrag(SelectionTool selection, Action<bool> takeOver
     {
         if (Owns(e))
         {
-            var p = e.GetCurrentPoint(page!.InkCanvas).Position;
+            var before = page!;
+            var p = e.GetCurrentPoint(before.InkCanvas).Position;
             selection.Move(p);
             // The move may have handed the content over to another page (FollowPage): its own coordinates from here.
-            AutoScroll?.Track(page, e.GetCurrentPoint(page.InkCanvas).Position, q =>
+            var at = page == before ? p : e.GetCurrentPoint(page!.InkCanvas).Position;
+            AutoScroll?.Track(page!, at, q =>
             {
                 if (IsRunning)
                 {

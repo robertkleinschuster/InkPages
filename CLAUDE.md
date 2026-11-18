@@ -176,9 +176,10 @@ xournal-studio-windows' CLAUDE.md on 2026-11-18 so that every embedding app (Mat
 - `InkPage.Paper` (`Model/PaperLines.cs`: `Paper`, `PaperKind` Plain/Graph/Lined, spacing in page units/DIPs, line
   color and thickness; default color #D6E2F0): ruling drawn below the app's layers and the ink. Null: none (an app with
   its own background, e.g. Xournal Studio's file ruling or PDF pages). The demo uses it.
-- `PenToolbar.Paste` (Windows ink): collapsed unless `InkCommands.WireToolbar(clipboard: true)` runs it (Xournal Studio
-  has its own paste button, "PasteButton"); enabled while the clipboard holds ink (`RefreshPaste`: on
-  `Clipboard.ContentChanged`, after copy/cut; an app may call it when its window is activated).
+- `PenToolbar.Paste` ("PasteInkButton"): in the row once `InkCommands.WireToolbar` runs. With `clipboard: true` it
+  pastes Windows ink and is enabled while the clipboard holds ink (`RefreshPaste`: on `Clipboard.ContentChanged`, after
+  copy/cut; an app may call it when its window is activated); with `false` (own clipboard format, Xournal Studio) the
+  app wires its Click and IsEnabled.
   `PenToolbar.Contextual` (opt-in, MatheTrainer): the row swaps with the state – writing: the tools; something selected:
   select, undo/redo and the selection's commands, the other tools collapsed (the active tool stays active); in both,
   paste while the clipboard holds ink. Commands that cannot run are collapsed, not disabled (in a CommandBar the app's
@@ -194,7 +195,7 @@ xournal-studio-windows' CLAUDE.md on 2026-11-18 so that every embedding app (Mat
 - `InkTools`: routes the presenters' unprocessed pen/mouse input to `SelectionTool`, `ShapeTool` and
   `PartialEraser`. A barrel press always goes to the selection. It also handles the hover takeovers (the eraser end,
   the tip over the selection).
-- `Selection`, `SelectionDrag`, `DragAutoScroll` and `SelectionCommands` handle the selection. A move or scale runs
+- `Selection`, `SelectionDrag` and `DragAutoScroll` handle the selection (its commands' state: `PenToolbar.ShowSelection`). A move or scale runs
   on XAML pointer input on the page's `Surface`, because the presenter that got the press keeps the pen and its
   coordinates drift once its page scrolls. Auto-scroll runs on `CompositionTarget.Rendering`.
 - `PartialEraser`, `ShapeTool`, `ShapeRecognition`, `UndoStack` (`IPageEdit`: `PageEdit`, `TransformEdit`,

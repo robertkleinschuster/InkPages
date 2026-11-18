@@ -10,7 +10,7 @@ namespace InkPages;
 /// pen – strokes are cut by <see cref="StrokeEraser"/> and replaced by what is left of them, one undo step per drag.
 /// The circle follows the pen while it hovers and erases; its outer edge is where erasing ends.
 /// </summary>
-public sealed class PartialEraser(UndoStack undo, Action<IReadOnlyCollection<InkStroke>> erased)
+internal sealed class PartialEraser(UndoStack undo, Action<IReadOnlyCollection<InkStroke>> erased)
 {
     private InkPage? cursorPage;
     private Ellipse? cursor;

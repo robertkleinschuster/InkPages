@@ -10,7 +10,7 @@ namespace InkPages;
 /// (<see cref="CompositionTarget.Rendering"/>, XAML's hook for per-frame work): each frame scrolls by speed × frame time
 /// and hands the drag the pen's place on its page, so content and view move together and smoothly.
 /// </summary>
-public sealed class DragAutoScroll(ScrollView scroller)
+internal sealed class DragAutoScroll(ScrollView scroller)
 {
     private const double Band = 48;          // DIPs inside the view's edge where scrolling begins
     private const double MaxSpeed = 1500;    // DIPs per second at the edge and beyond

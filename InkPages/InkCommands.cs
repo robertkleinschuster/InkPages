@@ -290,15 +290,17 @@ public sealed class InkCommands
     }
 
     /// <summary>
-    /// The toolbar's undo, redo and delete buttons run these commands, and with <paramref name="clipboard"/> also cut, copy
-    /// and duplicate (Windows ink's clipboard). An app with its own clipboard format passes false and wires those three
-    /// itself (checking <see cref="Refuses"/> first).
+    /// The toolbar's undo, redo and delete buttons run these commands, and the paste button joins the row. With
+    /// <paramref name="clipboard"/> cut, copy, duplicate and paste use Windows ink's clipboard (paste enabled while it
+    /// holds ink). An app with its own clipboard format passes false and wires cut, copy, duplicate and paste itself –
+    /// including <see cref="PenToolbar.Paste"/>'s IsEnabled – checking <see cref="Refuses"/> first.
     /// </summary>
     public void WireToolbar(bool clipboard = true)
     {
         bar.Undo.Click += (_, _) => Undo();
         bar.Redo.Click += (_, _) => Redo();
         bar.DeleteSelection.Click += (_, _) => Delete();
+        bar.ShowPaste();
         if (clipboard)
         {
             bar.Cut.Click += (_, _) => { CutInk(); RefreshPaste(); };
@@ -306,7 +308,6 @@ public sealed class InkCommands
             bar.Duplicate.Click += (_, _) => Duplicate();
             // Paste: enabled while the clipboard holds Windows ink (checked when the clipboard changes and after copying)
             bar.Paste.Click += (_, _) => PasteInk();
-            bar.ShowPaste();
             // Clipboard.ContentChanged is static: attached while the toolbar is in the tree, so a toolbar that is gone
             // neither stays alive through it nor reads the clipboard on every copy
             EventHandler<object> changed = (_, _) => bar.DispatcherQueue.TryEnqueue(() => RefreshPaste());

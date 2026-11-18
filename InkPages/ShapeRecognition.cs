@@ -7,7 +7,7 @@ namespace InkPages;
 /// Shape recognition by Windows ink analysis (<see cref="InkAnalyzer"/>): a stroke Windows recognizes as a circle,
 /// ellipse, triangle, rectangle or other polygon is replaced by a clean stroke along that shape.
 /// </summary>
-public static class ShapeRecognition
+internal static class ShapeRecognition
 {
     /// <summary>The clean shape for a drawn stroke, or null if Windows sees no shape in it.</summary>
     public static async Task<InkStroke?> RecognizeAsync(InkStroke stroke)

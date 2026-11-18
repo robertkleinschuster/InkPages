@@ -6,7 +6,7 @@ using InkDrawingAttributes = Windows.UI.Input.Inking.InkDrawingAttributes;
 namespace InkPages;
 
 /// <summary>The shape tool: line, arrow, rectangle or ellipse dragged out, previewed, then added as one stroke.</summary>
-public sealed class ShapeTool(UndoStack undo, Func<InkDrawingAttributes> pen)
+internal sealed class ShapeTool(UndoStack undo, Func<InkDrawingAttributes> pen)
 {
     private InkPage? view;
     private Point start;

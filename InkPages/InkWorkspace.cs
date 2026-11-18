@@ -15,13 +15,15 @@ public sealed class InkWorkspace
     private readonly PenToolbar bar;
     private int generation; // counts Reset: recognition still running for older pages is dropped
 
-    /// <param name="partialErasing">The eraser erases exactly the circle at the pen (the default; the toolbar's
-    /// "whole strokes" toggle unchecked).</param>
-    public InkWorkspace(PenToolbar bar, ScrollView scroller, bool partialErasing = true)
+    /// <summary>
+    /// The workspace for <paramref name="bar"/>, which holds the user's choices (<c>new PenToolbar(texts, choices)</c>):
+    /// the eraser's mode is its "whole strokes" toggle.
+    /// </summary>
+    public InkWorkspace(PenToolbar bar, ScrollView scroller)
     {
         this.bar = bar;
         Tools = new ToolController(bar.Ink, bar.Pens, bar.Highlighters);
-        this.partialErasing = partialErasing;
+        partialErasing = bar.WholeStrokeErase.IsChecked != true;
         Input = new InkTools(Undo, () => Tools.PenAttributes) { SelectionTakenOver = () => Tools.SelectionTakenOver };
         Selection.OtherPageAt = OtherPageAt;
 
@@ -31,11 +33,9 @@ public sealed class InkWorkspace
         // Moving/scaling the selection: XAML pointer input while the pen hovers over it (before any page is attached).
         Input.Drag = new SelectionDrag(Selection, over => Tools.SelectionTakenOver = over) { AutoScroll = autoScroll };
         Selection.DragChangedPage += Input.FollowDrag;
-        var commands = new SelectionCommands(bar.Copy, new[] { bar.Cut, bar.Duplicate, bar.DeleteSelection });
         Selection.SelectionChanged += (_, _) =>
         {
-            commands.ShowFor(Selection.Current);
-            bar.ShowSelecting(Selection.Current != null);
+            bar.ShowSelection(Selection.Current);
             if (Selection.Current == null)
             {
                 Tools.SelectionTakenOver = false; // nothing to grab: the pen inks again even before its next hover
@@ -73,7 +73,6 @@ public sealed class InkWorkspace
         Input.TakeForSelection = over => Tools.SelectionTakenOver = over;
         ApplyEraserMode();
         // The eraser's mode is the toolbar's toggle (not a tool): the eraser tool and the pen's eraser follow it.
-        bar.WholeStrokeErase.IsChecked = !partialErasing;
         bar.WholeStrokeErase.Checked += (_, _) => PartialErasing = false;
         bar.WholeStrokeErase.Unchecked += (_, _) => PartialErasing = true;
 
@@ -89,12 +88,6 @@ public sealed class InkWorkspace
         bar.RecognizeShapes.Click += (_, _) => RaiseChoicesChanged();
         PartialErasingChanged += (_, _) => RaiseChoicesChanged();
         Tools.PresetsChanged += (_, _) => RaiseChoicesChanged();
-    }
-
-    /// <summary>The workspace with the eraser's mode of the user's choices (the toolbar made from them: <c>new PenToolbar(texts, choices)</c>).</summary>
-    public InkWorkspace(PenToolbar bar, ScrollView scroller, ToolChoices choices)
-        : this(bar, scroller, partialErasing: !choices.WholeStrokeErasing)
-    {
     }
 
     /// <summary>The edit commands (delete, duplicate, clipboard, select all, shortcuts).</summary>
@@ -164,18 +157,18 @@ public sealed class InkWorkspace
 
     public UndoStack Undo { get; } = new();
 
-    public ToolController Tools { get; }
+    internal ToolController Tools { get; }
 
-    public InkTools Input { get; }
+    internal InkTools Input { get; }
 
     public SelectionTool Selection => Input.Selection;
 
-    public PartialEraser Eraser { get; }
+    internal PartialEraser Eraser { get; }
 
     private bool partialErasing;
 
     /// <summary>The eraser erases exactly the circle at the pen (the toolbar's "whole strokes" toggle off): the tool and the pen's eraser.</summary>
-    public bool PartialErasing
+    internal bool PartialErasing
     {
         get => partialErasing;
         private set
@@ -189,7 +182,7 @@ public sealed class InkWorkspace
         }
     }
 
-    public event EventHandler? PartialErasingChanged;
+    internal event EventHandler? PartialErasingChanged;
 
     private List<InkPage> pages = [];
 
@@ -385,7 +378,7 @@ public sealed class InkWorkspace
     /// Undoes the last step (the selection ends: undo may replace its strokes). False while the selection is being moved
     /// or scaled: nothing is undone (the app may say "let go first").
     /// </summary>
-    public bool UndoStep()
+    internal bool UndoStep()
     {
         if (Selection.IsDragging)
         {
@@ -397,7 +390,7 @@ public sealed class InkWorkspace
     }
 
     /// <summary>Redoes the last undone step; false (nothing done) while the selection is being moved or scaled.</summary>
-    public bool RedoStep()
+    internal bool RedoStep()
     {
         if (Selection.IsDragging)
         {

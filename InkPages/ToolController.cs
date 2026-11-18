@@ -12,7 +12,7 @@ namespace InkPages;
 /// One InkToolbar drives a target page's InkCanvas and shares its selected drawing settings with every page.
 /// Custom tools and barrel-button selection use the presenter's native UnprocessedInput stream.
 /// </summary>
-public sealed class ToolController
+internal sealed class ToolController
 {
     private readonly InkToolbar toolbar;
     private readonly IReadOnlyList<InkToolbarPenButton> pens;

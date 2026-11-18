@@ -5,7 +5,7 @@ using InkDrawingAttributes = Windows.UI.Input.Inking.InkDrawingAttributes;
 
 namespace InkPages;
 
-public enum InkTool
+internal enum InkTool
 {
     None,
     Select,
@@ -21,7 +21,7 @@ public enum InkTool
 /// button is left unprocessed (<c>RightDragAction.LeaveUnprocessed</c>), and hovers – reported also while the presenters
 /// ink – hand the pen to the app before it touches: the eraser end with partial erasing, the tip over the selection.
 /// </summary>
-public sealed class InkTools(UndoStack undo, Func<InkDrawingAttributes> pen)
+internal sealed class InkTools(UndoStack undo, Func<InkDrawingAttributes> pen)
 {
     // The drag in progress: its tool, its page and its pointer – a gesture belongs to its pointer, another one (a palm,
     // a finger beside the pen) neither moves, finishes nor cancels it.

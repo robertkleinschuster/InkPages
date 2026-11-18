@@ -45,8 +45,8 @@ public sealed class DemoWindow : Window
             VerticalScrollBarVisibility = ScrollingScrollBarVisibility.Hidden,
             Content = panel,
         };
-        ink = new InkWorkspace(bar, scroller, choices);
-        ink.Selection.TransferFailed += e => InkLog.Write("demo: the selection stays on its page" + (e == null ? "" : $" ({e.Message})"));
+        ink = new InkWorkspace(bar, scroller);
+        ink.Selection.TransferFailed += (_, e) => InkLog.Write("demo: the selection stays on its page" + (e == null ? "" : $" ({e.Message})"));
 
         AddCommands();
         for (int i = 0; i < 3; i++)
@@ -85,13 +85,9 @@ public sealed class DemoWindow : Window
         // The library's commands on Windows ink; duplicate also copies the demo's pictures.
         ink.Commands.CopyPicture = (picture, m) =>
             new DemoPicture(Selection.TransformBounds(((DemoPicture)picture).Bounds, m), ((DemoPicture)picture).Color);
-        ink.Commands.WireToolbar();
-        var paste = PenToolbar.Command(new SymbolIcon(Symbol.Paste), "Paste ink", "PasteButton");
-        paste.Click += (_, _) => ink.Commands.PasteInk();
+        ink.Commands.WireToolbar(); // also the toolbar's paste button (Windows ink)
         var addPage = PenToolbar.Command(new SymbolIcon(Symbol.Add), "Add page", "InsertPageButton");
         addPage.Click += (_, _) => AddPage();
-        bar.Extensions.Add(paste);
-        bar.Extensions.Add(new AppBarSeparator());
         bar.Extensions.Add(addPage);
     }
 
