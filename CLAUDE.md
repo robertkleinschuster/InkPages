@@ -178,9 +178,9 @@ xournal-studio-windows' CLAUDE.md on 2026-11-18 so that every embedding app (Mat
 - `PenToolbar.Paste` (Windows ink): collapsed unless `InkCommands.WireToolbar(clipboard: true)` runs it (Xournal Studio
   has its own paste button, "PasteButton"); enabled while the clipboard holds ink (`RefreshPaste`: on
   `Clipboard.ContentChanged`, after copy/cut; an app may call it when its window is activated).
-  `PenToolbar.Contextual` (opt-in, MatheTrainer): the row swaps with the state – writing: the tools and paste (when the
-  clipboard holds ink); something selected: select, undo/redo and the selection's commands, the other tools collapsed
-  (the active tool stays active). Commands that cannot run are collapsed, not disabled (in a CommandBar the app's
+  `PenToolbar.Contextual` (opt-in, MatheTrainer): the row swaps with the state – writing: the tools; something selected:
+  select, undo/redo and the selection's commands, the other tools collapsed (the active tool stays active); in both,
+  paste while the clipboard holds ink. Commands that cannot run are collapsed, not disabled (in a CommandBar the app's
   commands get the room). Default: every button in place, disabled when it cannot run.
 - `PenToolbar.Compact`: 40-wide command buttons (also the app's extensions), no separators, no spacing – for narrow
   windows (MatheTrainer at ~1280 DIP); names/tooltips/UIA ids stay; the InkToolbar's own buttons keep WinUI's size.

@@ -198,9 +198,9 @@ public sealed class PenToolbar : UserControl
     private bool contextual, pasteInRow;
 
     /// <summary>
-    /// The row shows what fits the moment: while writing the tools (pens, highlighters, eraser, select, shapes, ruler) and
-    /// paste when the clipboard holds ink; while something is selected the selection's commands instead of the tools (the
-    /// select button and undo/redo stay). Commands that cannot run are collapsed, not disabled, so the row stays short
+    /// The row shows what fits the moment: while writing the tools (pens, highlighters, eraser, select, shapes, ruler);
+    /// while something is selected the selection's commands instead of the tools (the select button and undo/redo stay);
+    /// in both, paste when the clipboard holds ink. Commands that cannot run are collapsed, not disabled, so the row stays short
     /// (in a CommandBar the app's commands get the room). Default false: every button keeps its place, disabled when it
     /// cannot run (nothing jumps).
     /// </summary>
@@ -231,7 +231,7 @@ public sealed class PenToolbar : UserControl
         {
             command.Visibility = !contextual || command.IsEnabled ? Visibility.Visible : Visibility.Collapsed;
         }
-        Paste.Visibility = pasteInRow && (!contextual || (Paste.IsEnabled && !selecting)) ? Visibility.Visible : Visibility.Collapsed;
+        Paste.Visibility = pasteInRow && (!contextual || Paste.IsEnabled) ? Visibility.Visible : Visibility.Collapsed;
         // The tools make room for the selection's commands (the active tool stays active, only its button is hidden;
         // the select button stays: it shows the selection's mode and ends with another tool)
         foreach (var tool in Pens.Concat<FrameworkElement>(Highlighters).Concat(new FrameworkElement[] { Eraser, WholeStrokeErase, Shapes, Ruler }))
