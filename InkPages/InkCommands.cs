@@ -307,28 +307,58 @@ public sealed class InkCommands
             // Paste: enabled while the clipboard holds Windows ink (checked when the clipboard changes and after copying)
             bar.Paste.Click += (_, _) => PasteInk();
             bar.ShowPaste();
-            Windows.ApplicationModel.DataTransfer.Clipboard.ContentChanged += (_, _) =>
-                bar.DispatcherQueue.TryEnqueue(() => RefreshPaste());
+            // Clipboard.ContentChanged is static: attached while the toolbar is in the tree, so a toolbar that is gone
+            // neither stays alive through it nor reads the clipboard on every copy
+            EventHandler<object> changed = (_, _) => bar.DispatcherQueue.TryEnqueue(() => RefreshPaste());
+            bar.Loaded += (_, _) =>
+            {
+                Windows.ApplicationModel.DataTransfer.Clipboard.ContentChanged -= changed;
+                Windows.ApplicationModel.DataTransfer.Clipboard.ContentChanged += changed;
+                RefreshPaste();
+            };
+            bar.Unloaded += (_, _) => Windows.ApplicationModel.DataTransfer.Clipboard.ContentChanged -= changed;
+            if (bar.IsLoaded)
+            {
+                Windows.ApplicationModel.DataTransfer.Clipboard.ContentChanged += changed;
+            }
             RefreshPaste();
         }
     }
 
+    private int pasteRetries;
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? pasteRetry;
+
     /// <summary>Enables the toolbar's paste button while the clipboard holds Windows ink.</summary>
     public void RefreshPaste()
     {
-        bool can = false;
         try
         {
-            can = ink.CurrentPage is { } page && CanPasteInk(page);
+            bar.Paste.IsEnabled = ink.CurrentPage is { } page && CanPasteInk(page);
+            pasteRetries = 0;
         }
         catch (Exception e)
         {
-            // The clipboard can be busy (another app or clipboard history has it open): paste stays off until the next
-            // check (clipboard change, copy, or the app's call, e.g. when its window is activated).
+            // The clipboard is busy (clipboard history opens it right after a copy, another app may hold it): the button
+            // keeps its state and the check runs again shortly (a few times), then at the next clipboard change, copy
+            // or the app's call (e.g. when its window is activated).
             InkLog.Write("paste ink: reading the clipboard", e);
+            if (pasteRetries++ < 4)
+            {
+                pasteRetry ??= bar.DispatcherQueue.CreateTimer();
+                pasteRetry.Interval = TimeSpan.FromMilliseconds(150);
+                pasteRetry.IsRepeating = false;
+                pasteRetry.Tick -= RetryPaste;
+                pasteRetry.Tick += RetryPaste;
+                pasteRetry.Start();
+            }
+            else
+            {
+                pasteRetries = 0;
+            }
         }
-        bar.Paste.IsEnabled = can;
     }
+
+    private void RetryPaste(Microsoft.UI.Dispatching.DispatcherQueueTimer timer, object args) => RefreshPaste();
 
     /// <summary>
     /// The usual shortcuts on <paramref name="root"/>: Ctrl+Z/Y undo/redo, Ctrl+X/C/V cut/copy/paste (Windows ink),

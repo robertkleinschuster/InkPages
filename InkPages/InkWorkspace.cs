@@ -35,6 +35,7 @@ public sealed class InkWorkspace
         Selection.SelectionChanged += (_, _) =>
         {
             commands.ShowFor(Selection.Current);
+            bar.ShowSelecting(Selection.Current != null);
             if (Selection.Current == null)
             {
                 Tools.SelectionTakenOver = false; // nothing to grab: the pen inks again even before its next hover

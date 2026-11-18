@@ -221,12 +221,19 @@ public sealed class PenToolbar : UserControl
         ShowState();
     }
 
-    // Something is selected: the copy command runs (SelectionCommands enables it for any selection).
-    private bool Selecting => contextual && Copy.IsEnabled;
+    // Something is selected (the workspace's selection, not a button's state: an app may wire and disable the clipboard
+    // commands itself).
+    private bool hasSelection;
+
+    internal void ShowSelecting(bool selected)
+    {
+        hasSelection = selected;
+        ShowState();
+    }
 
     private void ShowState()
     {
-        bool selecting = Selecting;
+        bool selecting = contextual && hasSelection;
         foreach (var command in new[] { Cut, Copy, Duplicate, DeleteSelection })
         {
             command.Visibility = !contextual || command.IsEnabled ? Visibility.Visible : Visibility.Collapsed;
