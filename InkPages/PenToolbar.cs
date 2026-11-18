@@ -136,7 +136,7 @@ public sealed class PenToolbar : UserControl
         foreach (var button in new[] { Cut, Copy, Duplicate, DeleteSelection, Paste })
         {
             button.IsEnabled = false;
-            button.IsEnabledChanged += (_, _) => ShowContextual(button);
+            button.IsEnabledChanged += (_, _) => ShowState();
         }
         Undo.IsEnabled = Redo.IsEnabled = false;
 
@@ -198,9 +198,11 @@ public sealed class PenToolbar : UserControl
     private bool contextual, pasteInRow;
 
     /// <summary>
-    /// The selection's commands and paste only while they can run: collapsed instead of disabled, so the row is short
-    /// while nothing is selected (in a CommandBar the app's commands get the room back). Default false: the commands
-    /// keep their place and are disabled (nothing jumps).
+    /// The row shows what fits the moment: while writing the tools (pens, highlighters, eraser, select, shapes, ruler) and
+    /// paste when the clipboard holds ink; while something is selected the selection's commands instead of the tools (the
+    /// select button and undo/redo stay). Commands that cannot run are collapsed, not disabled, so the row stays short
+    /// (in a CommandBar the app's commands get the room). Default false: every button keeps its place, disabled when it
+    /// cannot run (nothing jumps).
     /// </summary>
     public bool Contextual
     {
@@ -208,10 +210,7 @@ public sealed class PenToolbar : UserControl
         set
         {
             contextual = value;
-            foreach (var button in new[] { Cut, Copy, Duplicate, DeleteSelection, Paste })
-            {
-                ShowContextual(button);
-            }
+            ShowState();
         }
     }
 
@@ -219,13 +218,26 @@ public sealed class PenToolbar : UserControl
     internal void ShowPaste()
     {
         pasteInRow = true;
-        ShowContextual(Paste);
+        ShowState();
     }
 
-    private void ShowContextual(AppBarButton button)
+    // Something is selected: the copy command runs (SelectionCommands enables it for any selection).
+    private bool Selecting => contextual && Copy.IsEnabled;
+
+    private void ShowState()
     {
-        bool inRow = button != Paste || pasteInRow;
-        button.Visibility = inRow && (!contextual || button.IsEnabled) ? Visibility.Visible : Visibility.Collapsed;
+        bool selecting = Selecting;
+        foreach (var command in new[] { Cut, Copy, Duplicate, DeleteSelection })
+        {
+            command.Visibility = !contextual || command.IsEnabled ? Visibility.Visible : Visibility.Collapsed;
+        }
+        Paste.Visibility = pasteInRow && (!contextual || (Paste.IsEnabled && !selecting)) ? Visibility.Visible : Visibility.Collapsed;
+        // The tools make room for the selection's commands (the active tool stays active, only its button is hidden;
+        // the select button stays: it shows the selection's mode and ends with another tool)
+        foreach (var tool in Pens.Concat<FrameworkElement>(Highlighters).Concat(new FrameworkElement[] { Eraser, WholeStrokeErase, Shapes, Ruler }))
+        {
+            tool.Visibility = selecting ? Visibility.Collapsed : Visibility.Visible;
+        }
     }
 
     /// <summary>The duplicate icon (two sheets, a plus on the front one), 20×20; also for an app's menu.</summary>
