@@ -129,9 +129,14 @@ public sealed class PenToolbar : UserControl
         // Duplicate: a copy (two sheets) with a plus; delete: Windows' trash can.
         Duplicate = Command(Path(DuplicateIcon), texts.Duplicate, "DuplicateSelectionButton");
         DeleteSelection = Command(new SymbolIcon(Symbol.Delete), texts.DeleteSelection, "DeleteSelectionButton");
-        foreach (var button in new[] { Cut, Copy, Duplicate, DeleteSelection })
+        // Paste (Windows ink): only part of the row once InkCommands.WireToolbar(clipboard: true) runs it – an app with
+        // its own clipboard format has its own paste button.
+        Paste = Command(new SymbolIcon(Symbol.Paste), texts.Paste, "PasteInkButton");
+        Paste.Visibility = Visibility.Collapsed;
+        foreach (var button in new[] { Cut, Copy, Duplicate, DeleteSelection, Paste })
         {
             button.IsEnabled = false;
+            button.IsEnabledChanged += (_, _) => ShowContextual(button);
         }
         Undo.IsEnabled = Redo.IsEnabled = false;
 
@@ -145,6 +150,7 @@ public sealed class PenToolbar : UserControl
         row.Children.Add(Copy);
         row.Children.Add(Duplicate);
         row.Children.Add(DeleteSelection);
+        row.Children.Add(Paste);
         row.Children.Add(Separator());
         row.Children.Add(extensions);
         Content = row;
@@ -187,6 +193,39 @@ public sealed class PenToolbar : UserControl
                 separator.Visibility = value ? Visibility.Collapsed : Visibility.Visible;
             }
         }
+    }
+
+    private bool contextual, pasteInRow;
+
+    /// <summary>
+    /// The selection's commands and paste only while they can run: collapsed instead of disabled, so the row is short
+    /// while nothing is selected (in a CommandBar the app's commands get the room back). Default false: the commands
+    /// keep their place and are disabled (nothing jumps).
+    /// </summary>
+    public bool Contextual
+    {
+        get => contextual;
+        set
+        {
+            contextual = value;
+            foreach (var button in new[] { Cut, Copy, Duplicate, DeleteSelection, Paste })
+            {
+                ShowContextual(button);
+            }
+        }
+    }
+
+    /// <summary>Paste belongs to the row (<see cref="InkCommands.WireToolbar"/> with Windows ink's clipboard).</summary>
+    internal void ShowPaste()
+    {
+        pasteInRow = true;
+        ShowContextual(Paste);
+    }
+
+    private void ShowContextual(AppBarButton button)
+    {
+        bool inRow = button != Paste || pasteInRow;
+        button.Visibility = inRow && (!contextual || button.IsEnabled) ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>The duplicate icon (two sheets, a plus on the front one), 20×20; also for an app's menu.</summary>
@@ -253,6 +292,8 @@ public sealed class PenToolbar : UserControl
     public AppBarButton Copy { get; }
     public AppBarButton Duplicate { get; }
     public AppBarButton DeleteSelection { get; }
+    /// <summary>Paste Windows ink (collapsed unless <see cref="InkCommands.WireToolbar"/> runs it with the clipboard).</summary>
+    public AppBarButton Paste { get; }
 
     /// <summary>The app's own buttons, at the end of the row.</summary>
     public UIElementCollection Extensions => extensions.Children;

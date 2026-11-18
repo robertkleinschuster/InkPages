@@ -301,10 +301,33 @@ public sealed class InkCommands
         bar.DeleteSelection.Click += (_, _) => Delete();
         if (clipboard)
         {
-            bar.Cut.Click += (_, _) => CutInk();
-            bar.Copy.Click += (_, _) => CopyInk();
+            bar.Cut.Click += (_, _) => { CutInk(); RefreshPaste(); };
+            bar.Copy.Click += (_, _) => { CopyInk(); RefreshPaste(); };
             bar.Duplicate.Click += (_, _) => Duplicate();
+            // Paste: enabled while the clipboard holds Windows ink (checked when the clipboard changes and after copying)
+            bar.Paste.Click += (_, _) => PasteInk();
+            bar.ShowPaste();
+            Windows.ApplicationModel.DataTransfer.Clipboard.ContentChanged += (_, _) =>
+                bar.DispatcherQueue.TryEnqueue(() => RefreshPaste());
+            RefreshPaste();
         }
+    }
+
+    /// <summary>Enables the toolbar's paste button while the clipboard holds Windows ink.</summary>
+    public void RefreshPaste()
+    {
+        bool can = false;
+        try
+        {
+            can = ink.CurrentPage is { } page && CanPasteInk(page);
+        }
+        catch (Exception e)
+        {
+            // The clipboard can be busy (another app or clipboard history has it open): paste stays off until the next
+            // check (clipboard change, copy, or the app's call, e.g. when its window is activated).
+            InkLog.Write("paste ink: reading the clipboard", e);
+        }
+        bar.Paste.IsEnabled = can;
     }
 
     /// <summary>
