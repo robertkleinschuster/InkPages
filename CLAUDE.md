@@ -175,6 +175,11 @@ xournal-studio-windows' CLAUDE.md on 2026-11-18 so that every embedding app (Mat
 - `InkPage.Paper` (`Model/PaperLines.cs`: `Paper`, `PaperKind` Plain/Graph/Lined, spacing in page units/DIPs, line
   color and thickness; default color #D6E2F0): ruling drawn below the app's layers and the ink. Null: none (an app with
   its own background, e.g. Xournal Studio's file ruling or PDF pages). The demo uses it.
+- `PenToolbar.Paste` (Windows ink): collapsed unless `InkCommands.WireToolbar(clipboard: true)` runs it (Xournal Studio
+  has its own paste button, "PasteButton"); enabled while the clipboard holds ink (`RefreshPaste`: on
+  `Clipboard.ContentChanged`, after copy/cut; an app may call it when its window is activated).
+  `PenToolbar.Contextual` (opt-in): the selection's commands and paste are collapsed instead of disabled, so they appear
+  only when they can run (in a CommandBar the app's commands get the room back). Default: in place, disabled.
 - `PenToolbar.Compact`: 40-wide command buttons (also the app's extensions), no separators, no spacing – for narrow
   windows (MatheTrainer at ~1280 DIP); names/tooltips/UIA ids stay; the InkToolbar's own buttons keep WinUI's size.
 - `PenToolbar` (+ `PenToolbarTexts` with `German`, `BallpointPen`/`HighlighterPen`, `Extensions` for app buttons,
