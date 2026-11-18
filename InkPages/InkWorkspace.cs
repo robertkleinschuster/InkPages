@@ -225,13 +225,6 @@ public sealed class InkWorkspace
         return null;
     }
 
-    /// <summary>Moves a dragged selection's content to another page (see <see cref="SelectionTool.TransferToPage"/>).</summary>
-    public Func<Selection, InkPage, System.Numerics.Matrix3x2, (List<InkStroke> Strokes, List<object> Pictures, IPageEdit Edit)?> TransferToPage
-    {
-        get => Selection.TransferToPage;
-        set => Selection.TransferToPage = value;
-    }
-
     /// <summary>Wires a new page: the tools' input, undo of its ink, shape recognition. Once per page.</summary>
     public void Attach(InkPage page)
     {

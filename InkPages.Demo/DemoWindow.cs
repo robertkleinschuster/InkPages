@@ -46,7 +46,7 @@ public sealed class DemoWindow : Window
             Content = panel,
         };
         ink = new InkWorkspace(bar, scroller, choices);
-        ink.TransferToPage = TransferToPage;
+        ink.Selection.TransferFailed += e => InkLog.Write("demo: the selection stays on its page" + (e == null ? "" : $" ({e.Message})"));
 
         AddCommands();
         for (int i = 0; i < 3; i++)
@@ -101,47 +101,4 @@ public sealed class DemoWindow : Window
         ink.Attach(page);
         panel.Children.Add(page);
         ink.SetPages(Pages);
-    }
-
-    // ---------------------------------------------------------------- moving across pages
-
-    // Copies of the selection's strokes and pictures added to a page, transformed by m.
-    private static (List<InkStroke> Strokes, List<object> Pictures) Copies(Selection selection, InkPage target, Matrix3x2 m)
-    {
-        var strokes = new List<InkStroke>();
-        foreach (var stroke in selection.Page.CurrentStrokes(selection.Strokes).OfType<InkStroke>())
-        {
-            var copy = stroke.Clone();
-            copy.PointTransform = stroke.PointTransform * m;
-            target.Ink.StrokeContainer.AddStroke(copy);
-            strokes.Add(copy);
-        }
-        var pictures = selection.Pictures.Cast<DemoPicture>()
-            .Select(p => (object)new DemoPicture(Selection.TransformBounds(p.Bounds, m), p.Color)).ToList();
-        if (pictures.Count > 0)
-        {
-            target.AddPictures(pictures);
-        }
-        return (strokes, pictures);
-    }
-
-    // The selection's content moves to another page during a drag: copies there, the originals taken away.
-    private (List<InkStroke> Strokes, List<object> Pictures, IPageEdit Edit)? TransferToPage(Selection current, InkPage target, Matrix3x2 m)
-    {
-        try
-        {
-            current.Revert(); // m maps the content as it was before the drag
-            var (strokes, pictures) = Copies(current, target, m);
-            var adding = new PageEdit(target);
-            adding.AddedStrokes.AddRange(strokes);
-            adding.AddedPictures.AddRange(pictures);
-            var removal = PageEdit.RemoveSelected(current);
-            return (strokes, pictures, new CombinedEdit(new IPageEdit[] { removal, adding }));
-        }
-        catch (Exception e)
-        {
-            InkLog.Write("demo: move to another page (the content stays on its page)", e);
-            return null;
-        }
-    }
-}
+    }}

@@ -104,7 +104,8 @@ xournal-studio-windows' CLAUDE.md on 2026-11-18 so that every embedding app (Mat
   MenuBar menus and `ConfigurationContent` flyouts are windowed popups: drawn above the ink, pen taps reach them.
 - Each page's ink is drawn only within its page (WinUI sizes the InkCanvas' `ContentExternalOutputLink` placement
   visual to the control; ink moved beyond it by `PointTransform` is cut off, z-order does not help). So a selection
-  dragged over another page is handed to that page (`InkWorkspace.TransferToPage`, the app moves its data) and the drag
+  dragged over another page is handed to that page (`SelectionTool` copies it there with `InkPage.CopyTo` – the app
+  copies its data – and removes the originals; `TransferFailed` when it cannot) and the drag
   goes on there; the whole drag is one undo step (`CombinedEdit`).
 - **Lazy page views:** memory is in the `InkStroke` objects, not the canvases (40-page document, 26.5k strokes:
   ~230 MB for all strokes, all views only ~85 MB more), so only pages near the viewport should have a view;
@@ -150,8 +151,7 @@ xournal-studio-windows' CLAUDE.md on 2026-11-18 so that every embedding app (Mat
 
 - `InkWorkspace`: the facade. It wires the toolbar, tools, input, auto-scroll and undo. Members: `Attach(page)`,
   `SetPages` (the pages that have a view now), `Holds(page)` (the page's view must stay: history, selection, running
-  gesture or drag hand-over, shape recognition), `Reset`, `Removing/Removed`, `UndoStep`, `TransferToPage` (the app
-  moves a dragged selection's content to another page).
+  gesture or drag hand-over, shape recognition), `Reset`, `Removing/Removed`, `UndoStep`.
 - `InkWorkspace` also holds `Commands` (`InkCommands`), `CurrentPage`, `Choices`/`ChoicesChanged` (the user's
   `ToolChoices`, raised once changes settle), `InkHidden` (collapse all pages' ink while a dialog lies over them, also
   on pages attached later) and `ResetPage` (a page's ink replaced without undo: load, new task).
@@ -163,12 +163,15 @@ xournal-studio-windows' CLAUDE.md on 2026-11-18 so that every embedding app (Mat
   `IsAtSavePoint`, `Model/SavePoint`) tell the apps whether there is something to save. `InkLog.ErrorWriter` takes the
   errors (exceptions, `InkLog.Error`) apart from the rest.
 - `InkPage`: the abstract page. It holds the app's `UnderInk` layers, the InkCanvas, the `Overlay` and the `Surface`.
-  Stroke identity across undo (replaced ids), previews, placements and pictures have defaults for a page with ink only
-  (`ClearInk` empties it without undo); an app with data per stroke or pictures overrides them (pictures are its own
-  objects, removal tokens its own). `CreatePlaceholder` is a blank sheet for a page without a view.
+  Stroke identity across undo is the library's (`StrokeReplaced`/`CurrentStrokes`, not virtual; an app with data per
+  stroke follows with `OnStrokeReplaced`). Copying to another page (`CopyTo`), previews, placements and pictures have
+  defaults for a page with ink only (`ClearInk` empties it without undo); an app with data per stroke or pictures
+  overrides them (pictures are its own objects, removal tokens its own). `CreatePlaceholder` is a blank sheet for a page without a view.
 - `InkCommands`: the edit commands on Windows ink shared by the apps - undo/redo, delete, duplicate (`CopyPicture` for
   pictures), cut/copy/paste through Windows ink's clipboard, select all, `ClearPage`, `SelectAdded`; refused while the
-  selection is dragged (`Refused`). `WireToolbar` and `AddShortcuts` (hidden accelerator tooltips, not while typing).
+  selection is dragged or the ink hidden (`Refused`; text `PenToolbarTexts.Refused`). `PasteInk`: null = refused, empty =
+  nothing pasted. `WireToolbar(clipboard)` (false: an app with its own clipboard format wires cut/copy/duplicate) and
+  `AddShortcuts` (hidden accelerator tooltips, not while typing).
 - `PenToolbar` (+ `PenToolbarTexts` with `German`, `BallpointPen`/`HighlighterPen`, `Extensions` for app buttons,
   `PenToolbar.Command`). `new PenToolbar(texts, choices)` uses `XournalPalette` and the user's `ToolChoices`
   (`Model/`, defaults: black/blue/red pens, yellow/green highlighters). The row: undo | pens | highlighters | eraser

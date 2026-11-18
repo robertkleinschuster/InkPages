@@ -47,11 +47,45 @@ public sealed class SelectionTool(UndoStack undo)
     public Func<InkPage, Point, (InkPage Page, Vector2 Offset)?> OtherPageAt { get; set; } = (_, _) => null;
 
     /// <summary>
-    /// Moves a selection's content to another page with this transform (from its place before the drag into the target
-    /// page's coordinates); returns what is there now and the edit (not recorded), null if it stayed (set by the owner).
+    /// A dragged selection could not go on to another page (its content stays on its page for the rest of the drag): the
+    /// exception, or null when the page's <see cref="InkPage.CopyTo"/> refused (and told the user). Once per drag.
     /// </summary>
-    public Func<Selection, InkPage, Matrix3x2, (List<InkStroke> Strokes, List<object> Pictures, IPageEdit Edit)?> TransferToPage
-    { get; set; } = (_, _, _) => null;
+    public event Action<Exception?>? TransferFailed;
+
+    /// <summary>
+    /// Moves a selection's content to another page with this transform (from its place before the drag into the target
+    /// page's coordinates): copies there (<see cref="InkPage.CopyTo"/>), the originals taken away; returns what is there
+    /// now and the edit of both pages (not recorded: the drag records itself), null if it stayed.
+    /// </summary>
+    private (List<InkStroke> Strokes, List<object> Pictures, IPageEdit Edit)? TransferToPage(Selection current, InkPage target, Matrix3x2 m)
+    {
+        List<InkStroke> strokes = [];
+        try
+        {
+            current.Revert(); // m maps the content as it was before the drag
+            strokes = PageEdit.SelectOnly(current.Page, current.Strokes); // what of it is still on the page (marked)
+            var onPage = current.Page.Pictures.ToHashSet(ReferenceEqualityComparer.Instance);
+            var pictures = current.Pictures.Where(onPage.Contains).ToList();
+            if (current.Page.CopyTo(target, strokes, pictures, m) is not { } copies)
+            {
+                strokes.ForEach(s => s.Selected = false);
+                TransferFailed?.Invoke(null);
+                return null;
+            }
+            var adding = new PageEdit(target);
+            adding.AddedStrokes.AddRange(copies.Strokes);
+            adding.AddedPictures.AddRange(copies.Pictures);
+            var removal = PageEdit.RemoveSelected(current);
+            return (copies.Strokes, copies.Pictures, new CombinedEdit(new IPageEdit[] { removal, adding }));
+        }
+        catch (Exception e)
+        {
+            strokes.ForEach(s => s.Selected = false);
+            InkLog.Write("move to another page (the content stays on its page)", e);
+            TransferFailed?.Invoke(e);
+            return null;
+        }
+    }
 
     /// <summary>A dragged selection went on to another page: the drag continues there (the pen in its coordinates).</summary>
     public event Action<InkPage, Point>? DragChangedPage;

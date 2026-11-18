@@ -92,6 +92,17 @@ public sealed partial class DemoPage : InkPage
 
     public override IEnumerable<object> Pictures => pictures;
 
+    // A dragged selection goes on to another page: the strokes as the library copies them, the pictures as new ones.
+    public override (List<InkStroke> Strokes, List<object> Pictures)? CopyTo(InkPage target, IReadOnlyList<InkStroke> strokes,
+        IReadOnlyCollection<object> pictures, Matrix3x2 m)
+    {
+        var copies = base.CopyTo(target, strokes, [], m)!.Value;
+        var moved = pictures.Cast<DemoPicture>()
+            .Select(p => (object)new DemoPicture(Selection.TransformBounds(p.Bounds, m), p.Color)).ToList();
+        target.AddPictures(moved);
+        return (copies.Strokes, moved);
+    }
+
     public override Rect PictureBounds(object picture) => ((DemoPicture)picture).Bounds;
 
     public override Action<Matrix3x2> PreviewPictures(IReadOnlyCollection<object> pictures)

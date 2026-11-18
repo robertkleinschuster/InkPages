@@ -173,15 +173,19 @@ public sealed class InkCommands
 
     /// <summary>
     /// Pastes Windows ink from the clipboard at <paramref name="at"/> (page points), as one undo step, selected. Ink
-    /// that would reach below the page goes to its top (<paramref name="margin"/>) instead. Null: nothing pasted
-    /// (no ink in the clipboard, or it held no strokes). If pasting fails, what was added is taken back and the error
-    /// thrown.
+    /// that would reach below the page goes to its top (<paramref name="margin"/>) instead. Null: refused (while the
+    /// selection is dragged or the ink is hidden: <see cref="Refused"/> was raised); empty: nothing pasted (no ink in the
+    /// clipboard, or it held no strokes). If pasting fails, what was added is taken back and the error thrown.
     /// </summary>
     public List<InkStroke>? PasteInk(InkPage page, Point at, double margin)
     {
-        if (Refuses(InkCommand.Paste) || !CanPasteInk(page))
+        if (Refuses(InkCommand.Paste))
         {
             return null;
+        }
+        if (!CanPasteInk(page))
+        {
+            return [];
         }
         var container = page.Ink.StrokeContainer;
         var before = container.GetStrokes().Select(s => s.Id).ToHashSet();
@@ -193,7 +197,7 @@ public sealed class InkCommands
             if (edit.AddedStrokes.Count == 0)
             {
                 InkLog.Error("paste ink: the clipboard's ink added no strokes");
-                return null;
+                return [];
             }
             var bounds = Rect.Empty;
             edit.AddedStrokes.ForEach(s => bounds.Union(s.BoundingRect));
@@ -286,17 +290,21 @@ public sealed class InkCommands
     }
 
     /// <summary>
-    /// The toolbar's undo, redo and selection buttons run these commands (Windows ink's clipboard). An app with its own
-    /// clipboard format wires the buttons itself instead.
+    /// The toolbar's undo, redo and delete buttons run these commands, and with <paramref name="clipboard"/> also cut, copy
+    /// and duplicate (Windows ink's clipboard). An app with its own clipboard format passes false and wires those three
+    /// itself (checking <see cref="Refuses"/> first).
     /// </summary>
-    public void WireToolbar()
+    public void WireToolbar(bool clipboard = true)
     {
         bar.Undo.Click += (_, _) => Undo();
         bar.Redo.Click += (_, _) => Redo();
-        bar.Cut.Click += (_, _) => CutInk();
-        bar.Copy.Click += (_, _) => CopyInk();
-        bar.Duplicate.Click += (_, _) => Duplicate();
         bar.DeleteSelection.Click += (_, _) => Delete();
+        if (clipboard)
+        {
+            bar.Cut.Click += (_, _) => CutInk();
+            bar.Copy.Click += (_, _) => CopyInk();
+            bar.Duplicate.Click += (_, _) => Duplicate();
+        }
     }
 
     /// <summary>

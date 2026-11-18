@@ -100,18 +100,28 @@ public abstract partial class InkPage : UserControl
     // Strokes that undo/redo replaced by copies (old id -> new id): CurrentStrokes follows the chain.
     private readonly Dictionary<uint, uint> replacedIds = new();
 
-    /// <summary>A copy of a stroke took its place (undo/redo put back a removed stroke): the app's data goes with it.</summary>
-    public virtual void StrokeReplaced(uint oldId, uint newId)
+    /// <summary>
+    /// A copy of a stroke took its place (undo/redo put back a removed stroke): the library follows the chain (an edit
+    /// may remember an older identity), the app's data goes with it (<see cref="OnStrokeReplaced"/>).
+    /// </summary>
+    public void StrokeReplaced(uint oldId, uint newId)
     {
         while (replacedIds.TryGetValue(oldId, out uint next))
         {
             oldId = next;
         }
         replacedIds[oldId] = newId;
+        OnStrokeReplaced(oldId, newId);
     }
 
+    /// <summary>
+    /// The stroke with <paramref name="oldId"/> (the latest identity it had) is now the copy <paramref name="newId"/>: an
+    /// app with data per stroke moves it to the new id.
+    /// </summary>
+    protected virtual void OnStrokeReplaced(uint oldId, uint newId) { }
+
     /// <summary>The strokes on the page now for strokes an edit remembers: each itself or its copy; null where gone.</summary>
-    public virtual List<InkStroke?> CurrentStrokes(IEnumerable<InkStroke> strokes)
+    public List<InkStroke?> CurrentStrokes(IEnumerable<InkStroke> strokes)
     {
         var byId = Ink.StrokeContainer.GetStrokes().ToDictionary(s => s.Id);
         return strokes.Select(stroke =>
@@ -136,8 +146,36 @@ public abstract partial class InkPage : UserControl
     }
 
     /// <summary>
+    /// Copies of strokes and pictures of this page on <paramref name="target"/>, transformed by <paramref name="m"/> (from
+    /// where they are now into the target's coordinates), added to the target's ink and pictures – a dragged selection
+    /// goes on to another page (each page's ink is drawn only within the page). Returns what was added, or null when
+    /// nothing could be added (the app told the user; then nothing may have been added). The library makes the rest:
+    /// the originals are removed, both as one undo step. The default copies the strokes (<c>Clone()</c>) and has no
+    /// pictures; an app with data per stroke or pictures copies those (all or nothing).
+    /// </summary>
+    public virtual (List<InkStroke> Strokes, List<object> Pictures)? CopyTo(InkPage target, IReadOnlyList<InkStroke> strokes,
+        IReadOnlyCollection<object> pictures, Matrix3x2 m)
+    {
+        if (pictures.Count > 0)
+        {
+            throw NoPictures();
+        }
+        var copies = new List<InkStroke>(strokes.Count);
+        foreach (var stroke in strokes)
+        {
+            var copy = stroke.Clone();
+            copy.PointTransform = stroke.PointTransform * m;
+            copy.Selected = false;
+            target.Ink.StrokeContainer.AddStroke(copy);
+            copies.Add(copy);
+        }
+        return (copies, []);
+    }
+
+    /// <summary>
     /// A move or scale is previewed on the stroke (its <c>PointTransform</c> shows it): until it ends the app treats
-    /// the stroke as having <paramref name="committed"/> (a snapshot never holds a half-done move).
+    /// the stroke as having <paramref name="committed"/> (a snapshot never holds a half-done move). An app that saves
+    /// the ink container itself saves after the drag (<c>SelectionTool.IsDragging</c>) instead.
     /// </summary>
     public virtual void BeginStrokePreview(InkStroke stroke, Matrix3x2 committed) { }
 
