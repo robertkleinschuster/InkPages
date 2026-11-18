@@ -42,6 +42,16 @@ public sealed record PenToolbarTexts
     public string Paste { get; init; } = "Paste";
     /// <summary>For <c>InkCommands.Refused</c>: a command while the selection is being moved or scaled.</summary>
     public string Refused { get; init; } = "Let go first – the selection is being moved.";
+    /// <summary>The commands' names (for messages), one per <see cref="InkCommand"/> in its order.</summary>
+    public IReadOnlyList<string> CommandNames { get; init; } = new[]
+        { "Undo", "Redo", "Cut", "Copy", "Paste", "Duplicate", "Delete", "Select all", "Clear page" };
+    /// <summary>A refused command's title; {0} is its name (<see cref="CommandNames"/>).</summary>
+    public string RefusedTitleFormat { get; init; } = "{0}: not done";
+
+    /// <summary>The title of the message for a refused command (its text: <see cref="Refused"/>).</summary>
+    public string RefusedTitle(InkCommand command) =>
+        string.Format(RefusedTitleFormat, (int)command < CommandNames.Count ? CommandNames[(int)command] : command.ToString());
+
     /// <summary>The names of <see cref="XournalPalette.PenColors"/>, in its order.</summary>
     public IReadOnlyList<string> PenColorNames { get; init; } = new[]
         { "Black", "Blue", "Red", "Green", "Gray", "Light blue", "Light green", "Magenta", "Orange", "Yellow" };
@@ -85,6 +95,9 @@ public sealed record PenToolbarTexts
         DeleteSelection = "Auswahl löschen (Entf)",
         Paste = "Einfügen (Strg+V)",
         Refused = "Erst loslassen – die Auswahl wird gerade verschoben.",
+        CommandNames = new[]
+            { "Rückgängig", "Wiederholen", "Ausschneiden", "Kopieren", "Einfügen", "Duplizieren", "Löschen", "Alles auswählen", "Seite leeren" },
+        RefusedTitleFormat = "{0}: nicht ausgeführt",
         PenColorNames = new[] { "Schwarz", "Blau", "Rot", "Grün", "Grau", "Hellblau", "Hellgrün", "Magenta", "Orange", "Gelb" },
         HighlighterColorNames = new[] { "Gelb", "Grün", "Hellblau", "Magenta", "Orange" },
     };

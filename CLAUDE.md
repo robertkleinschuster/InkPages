@@ -169,7 +169,8 @@ xournal-studio-windows' CLAUDE.md on 2026-11-18 so that every embedding app (Mat
   overrides them (pictures are its own objects, removal tokens its own). `CreatePlaceholder` is a blank sheet for a page without a view.
 - `InkCommands`: the edit commands on Windows ink shared by the apps - undo/redo, delete, duplicate (`CopyPicture` for
   pictures), cut/copy/paste through Windows ink's clipboard, select all, `ClearPage`, `SelectAdded`; refused while the
-  selection is dragged or the ink hidden (`Refused`; text `PenToolbarTexts.Refused`). `PasteInk`: null = refused, empty =
+  selection is dragged or the ink hidden (`Refused`; message `PenToolbarTexts.RefusedTitle(command)` + `Refused`, command names in
+  `CommandNames`). `PasteInk`: null = refused, empty =
   nothing pasted. `WireToolbar(clipboard)` (false: an app with its own clipboard format wires cut/copy/duplicate) and
   `AddShortcuts` (hidden accelerator tooltips, not while typing).
 - `InkPage.Paper` (`Model/PaperLines.cs`: `Paper`, `PaperKind` Plain/Graph/Lined, spacing in page units/DIPs, line

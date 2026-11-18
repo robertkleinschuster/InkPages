@@ -58,6 +58,10 @@ public sealed class PenToolbar : UserControl
         {
             throw new ArgumentException($"{nameof(PenToolbarTexts.ShapeKinds)} names each {nameof(InkPages.ShapeKind)} in its order.", nameof(texts));
         }
+        if (texts.CommandNames.Count != Enum.GetValues<InkCommand>().Length)
+        {
+            throw new ArgumentException($"{nameof(PenToolbarTexts.CommandNames)} names each {nameof(InkCommand)} in its order.", nameof(texts));
+        }
         presetTip = texts.PresetTip;
         Ink = new InkToolbar { InitialControls = InkToolbarInitialControls.None, VerticalAlignment = VerticalAlignment.Center };
         // Presets: InkToolbar takes one built-in ballpoint and highlighter button only; any number of custom pen buttons,
