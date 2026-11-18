@@ -53,7 +53,7 @@ public sealed class DemoWindow : Window
         {
             AddPage();
         }
-        ((DemoPage)panel.Children[0]).AddPictures([new DemoPicture(new Rect(60, 420, 160, 100), Colors.SteelBlue)]);
+        ((DemoPage)panel.Children[0]).AddPictures(new object[] { new DemoPicture(new Rect(60, 420, 160, 100), Colors.SteelBlue) });
         // The page in view is known only once the pages are laid out: before, every page lies at 0 and CurrentPage would
         // be the last one - the toolbar (and the ruler, which belongs to its target page) would go to a page out of view.
         // ViewChanged is not raised for the first layout; SizeChanged of the viewport is.
@@ -136,7 +136,7 @@ public sealed class DemoWindow : Window
             adding.AddedStrokes.AddRange(strokes);
             adding.AddedPictures.AddRange(pictures);
             var removal = PageEdit.RemoveSelected(current);
-            return (strokes, pictures, new CombinedEdit([removal, adding]));
+            return (strokes, pictures, new CombinedEdit(new IPageEdit[] { removal, adding }));
         }
         catch (Exception e)
         {

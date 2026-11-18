@@ -163,13 +163,33 @@ public sealed class CombinedEdit(IReadOnlyList<IPageEdit> edits) : IPageEdit
     }
 }
 
-/// <summary>Undo/redo of page edits (the WinUI InkCanvas has no undo of its own).</summary>
+/// <summary>
+/// Undo/redo of page edits (the WinUI InkCanvas has no undo of its own). Every change of the pages' content goes through
+/// it, so it also tells an app whether there is something to save: <see cref="ContentChanged"/> and the save point
+/// (<see cref="MarkSaved"/>, <see cref="IsAtSavePoint"/>).
+/// </summary>
 public sealed class UndoStack
 {
     private readonly Stack<IPageEdit> undo = new();
     private readonly Stack<IPageEdit> redo = new();
+    private readonly SavePoint savePoint = new();
 
+    /// <summary>The history changed (also when it was cleared or a page's history forgotten): enable undo/redo.</summary>
     public event EventHandler? Changed;
+
+    /// <summary>The pages' content changed: an edit was recorded, undone or redone (not when the history is cleared).</summary>
+    public event EventHandler? ContentChanged;
+
+    /// <summary>
+    /// Whether the content is as it was at <see cref="MarkSaved"/> (or at the last <see cref="Clear"/>): false after an
+    /// edit, true again after undoing back to it.
+    /// </summary>
+    public bool IsAtSavePoint => savePoint.IsAt(Top);
+
+    /// <summary>The content as it is now was saved (or loaded).</summary>
+    public void MarkSaved() => savePoint.Mark(Top);
+
+    private IPageEdit? Top => undo.TryPeek(out var top) ? top : null;
 
     public bool CanUndo => undo.Count > 0;
     public bool CanRedo => redo.Count > 0;
@@ -185,12 +205,15 @@ public sealed class UndoStack
         redo.Clear();
         InkLog.Write($"undo: recorded {edit.GetType().Name} ({undo.Count} steps)");
         Changed?.Invoke(this, EventArgs.Empty);
+        ContentChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>No history (other pages are shown): the content as it is now counts as saved.</summary>
     public void Clear()
     {
         undo.Clear();
         redo.Clear();
+        savePoint.Mark(null);
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -202,6 +225,10 @@ public sealed class UndoStack
     {
         Filter(undo, page);
         Filter(redo, page);
+        if (savePoint.Saved is IPageEdit saved && !undo.Contains(saved))
+        {
+            savePoint.Lose(); // that state cannot come back by undo any more
+        }
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -213,6 +240,7 @@ public sealed class UndoStack
             edit.Undo();
             redo.Push(edit);
             Changed?.Invoke(this, EventArgs.Empty);
+            ContentChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -224,6 +252,7 @@ public sealed class UndoStack
             edit.Redo();
             undo.Push(edit);
             Changed?.Invoke(this, EventArgs.Empty);
+            ContentChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 

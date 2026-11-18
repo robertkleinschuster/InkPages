@@ -89,7 +89,7 @@ public sealed class PartialEraser(UndoStack undo, Action<IReadOnlyCollection<Ink
         last = p;
         sampled.Clear();
         Hover(view, p);
-        EraseAt([p]);
+        EraseAt(new[] { p });
     }
 
     /// <summary>

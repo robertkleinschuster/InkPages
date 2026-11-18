@@ -192,7 +192,7 @@ public sealed class InkCommands
             edit.AddedStrokes.AddRange(container.GetStrokes().Where(s => !before.Contains(s.Id)));
             if (edit.AddedStrokes.Count == 0)
             {
-                InkLog.Write("paste ink: the clipboard's ink added no strokes");
+                InkLog.Error("paste ink: the clipboard's ink added no strokes");
                 return null;
             }
             var bounds = Rect.Empty;

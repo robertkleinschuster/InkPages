@@ -153,7 +153,11 @@ xournal-studio-windows' CLAUDE.md on 2026-11-18 so that every embedding app (Mat
   gesture or drag hand-over, shape recognition), `Reset`, `Removing/Removed`, `UndoStep`, `TransferToPage` (the app
   moves a dragged selection's content to another page).
 - `InkWorkspace` also holds `Commands` (`InkCommands`), `CurrentPage`, `Choices`/`ChoicesChanged` (the user's
-  `ToolChoices`) and `InkHidden` (collapse all pages' ink while a dialog lies over them).
+  `ToolChoices`, raised once changes settle), `InkHidden` (collapse all pages' ink while a dialog lies over them, also
+  on pages attached later) and `ResetPage` (a page's ink replaced without undo: load, new task).
+- `UndoStack.ContentChanged` (edit recorded, undone, redone – not on clearing) and the save point (`MarkSaved`,
+  `IsAtSavePoint`, `Model/SavePoint`) tell the apps whether there is something to save. `InkLog.ErrorWriter` takes the
+  errors (exceptions, `InkLog.Error`) apart from the rest.
 - `InkPage`: the abstract page. It holds the app's `UnderInk` layers, the InkCanvas, the `Overlay` and the `Surface`.
   Stroke identity across undo (replaced ids), previews, placements and pictures have defaults for a page with ink only
   (`ClearInk` empties it without undo); an app with data per stroke or pictures overrides them (pictures are its own

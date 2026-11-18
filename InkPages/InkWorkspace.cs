@@ -31,7 +31,7 @@ public sealed class InkWorkspace
         // Moving/scaling the selection: XAML pointer input while the pen hovers over it (before any page is attached).
         Input.Drag = new SelectionDrag(Selection, over => Tools.SelectionTakenOver = over) { AutoScroll = autoScroll };
         Selection.DragChangedPage += Input.FollowDrag;
-        var commands = new SelectionCommands(bar.Copy, [bar.Cut, bar.Duplicate, bar.DeleteSelection]);
+        var commands = new SelectionCommands(bar.Copy, new[] { bar.Cut, bar.Duplicate, bar.DeleteSelection });
         Selection.SelectionChanged += (_, _) =>
         {
             commands.ShowFor(Selection.Current);
@@ -113,23 +113,43 @@ public sealed class InkWorkspace
         RecognizeShapes = bar.RecognizeShapes.IsChecked == true,
     };
 
-    /// <summary>The user changed a tool choice (a preset, the shape, the selection mode, the eraser): save <see cref="Choices"/>.</summary>
+    /// <summary>
+    /// The user changed a tool choice (a preset, the shape, the selection mode, the eraser): save <see cref="Choices"/>.
+    /// Raised once the changes settle (<see cref="ChoicesSettle"/> after the last one: a slider moved by the pen changes
+    /// on every step); an app that closes saves <see cref="Choices"/> itself.
+    /// </summary>
     public event EventHandler? ChoicesChanged;
+
+    /// <summary>How long after the last change <see cref="ChoicesChanged"/> is raised.</summary>
+    public static readonly TimeSpan ChoicesSettle = TimeSpan.FromMilliseconds(400);
+
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? choicesTimer;
 
     private void RaiseChoicesChanged(bool valid = true)
     {
-        if (valid)
+        if (!valid)
         {
-            ChoicesChanged?.Invoke(this, EventArgs.Empty);
+            return;
         }
+        if (choicesTimer == null)
+        {
+            choicesTimer = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().CreateTimer();
+            choicesTimer.Interval = ChoicesSettle;
+            choicesTimer.IsRepeating = false;
+            choicesTimer.Tick += (_, _) => ChoicesChanged?.Invoke(this, EventArgs.Empty);
+        }
+        choicesTimer.Stop();
+        choicesTimer.Start();
     }
 
     private bool inkHidden;
 
     /// <summary>
-    /// Hides the ink of all pages (also of pages shown later) while a dialog or another view lies over them: the
-    /// experimental InkCanvas draws its ink above all XAML laid over it and takes the input there
-    /// (microsoft-ui-xaml #10461/#11928). Remove its use when the Windows App SDK fixes that.
+    /// Hides the ink of all pages (also of pages attached or shown later) while a dialog or another view lies over them:
+    /// the experimental InkCanvas draws its ink above all XAML laid over it and takes the input there
+    /// (microsoft-ui-xaml #10461/#11928); the commands refuse meanwhile. Only the workspace's pages: an app's own
+    /// InkCanvases elsewhere (e.g. answer fields) must be hidden by the app. Remove its use when the Windows App SDK
+    /// fixes that.
     /// </summary>
     public bool InkHidden
     {
@@ -215,6 +235,7 @@ public sealed class InkWorkspace
     /// <summary>Wires a new page: the tools' input, undo of its ink, shape recognition. Once per page.</summary>
     public void Attach(InkPage page)
     {
+        page.InkCanvas.Visibility = inkHidden ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
         var detachInput = Input.Attach(page);
         ToolController.Attach(page);
         var ink = page.Ink;
@@ -271,7 +292,11 @@ public sealed class InkWorkspace
     // Pages with strokes in shape recognition (async): how many collections each.
     private readonly Dictionary<InkPage, int> recognizing = new();
 
-    /// <summary>The page in view: the toolbar drives it (the ruler appears where the user writes).</summary>
+    /// <summary>
+    /// The page in view: the toolbar drives it (the ruler appears where the user writes). Call it after the first layout
+    /// (before it every page lies at y 0). Not needed with one page: <see cref="SetPages"/> makes the first page the
+    /// toolbar's target while none of the shown pages is.
+    /// </summary>
     public void SetCurrentPage(InkPage? page) => Tools.SetCurrentPage(page);
 
     /// <summary>Other pages are shown (another document): drags end, no selection, no history.</summary>
@@ -289,6 +314,32 @@ public sealed class InkWorkspace
         Eraser.ForgetPages();
         Undo.Clear();
     }
+
+    /// <summary>
+    /// Replaces a page's ink without undo (loading saved ink, a new task on the same page): a gesture and a selection on
+    /// it end, a recognition still running for it is dropped, its history goes, and its strokes become
+    /// <paramref name="strokes"/> (new strokes: from <c>InkStrokeBuilder</c>, <c>Clone()</c> or a container's load – a
+    /// stroke belongs to one container). Mark the save point afterwards (<see cref="UndoStack.MarkSaved"/>) when this
+    /// content is what is saved.
+    /// </summary>
+    public void ResetPage(InkPage page, IEnumerable<InkStroke>? strokes = null)
+    {
+        Input.CancelGestureOn(p => p == page);
+        if (Selection.Current?.Page == page)
+        {
+            Selection.Clear();
+        }
+        pageResets[page] = pageResets.GetValueOrDefault(page) + 1;
+        Undo.Forget(page);
+        page.ClearInk();
+        if (strokes != null)
+        {
+            page.Ink.StrokeContainer.AddStrokes(strokes);
+        }
+    }
+
+    // Counts ResetPage per page: a recognition that began before is not recorded.
+    private readonly Dictionary<InkPage, int> pageResets = new();
 
     /// <summary>
     /// A page is about to be removed: a drag ends if <paramref name="affected"/> says its page is concerned (e.g. pages
@@ -376,31 +427,15 @@ public sealed class InkWorkspace
     }
 
     /// <summary>Records new ink for undo; with shape recognition on, hand-drawn shapes become clean ones.</summary>
-    // The pen's real pressures and the widths Windows ink draws from them (diagnostics for the pressure-width mapping).
-    private static void LogPressure(InkStroke stroke)
-    {
-        var a = stroke.DrawingAttributes;
-        var pressures = stroke.GetInkPoints().Select(p => (double)p.Pressure).Order().ToList();
-        if (pressures.Count == 0)
-        {
-            return;
-        }
-        double median = pressures[pressures.Count / 2];
-        InkLog.Write($"stroke collected: {pressures.Count} points, size {a.Size.Width:0.###} (tool width " +
-            $"{InkStrokes.ToolWidth(a):0.###}), pressure min {pressures[0]:0.00} median {median:0.00} max {pressures[^1]:0.00}, " +
-            $"drawn width at median {InkStrokes.DrawnWidth(a, (float)median):0.###}");
-    }
-
     private async void OnStrokesCollected(InkPage page, IReadOnlyList<InkStroke> strokes)
     {
-        int shown = generation;
+        int shown = generation, pageShown = pageResets.GetValueOrDefault(page);
         var edit = new PageEdit(page);
         recognizing[page] = recognizing.GetValueOrDefault(page) + 1; // the page's view stays until it is recorded
         try
         {
             foreach (var stroke in strokes.ToList())
             {
-                LogPressure(stroke);
                 InkStroke? shape = null;
                 if (bar.RecognizeShapes.IsChecked == true && !stroke.DrawingAttributes.DrawAsHighlighter)
                 {
@@ -412,15 +447,15 @@ public sealed class InkWorkspace
                     {
                         InkLog.Write("shape recognition (stroke kept as drawn)", e);
                     }
-                    if (generation != shown || page.Parent == null)
+                    if (generation != shown || pageResets.GetValueOrDefault(page) != pageShown || page.Parent == null)
                     {
-                        return; // other pages are shown meanwhile, or the page was removed: this history is gone
+                        return; // other pages or other ink are shown meanwhile, or the page was removed: this history is gone
                     }
                 }
                 var ink = page.Ink.StrokeContainer;
                 if (shape != null && ink.GetStrokes().Contains(stroke))
                 {
-                    PageEdit.RemoveStrokes(page, [stroke]);
+                    PageEdit.RemoveStrokes(page, new[] { stroke });
                     ink.AddStroke(shape);
                     edit.AddedStrokes.Add(shape);
                 }

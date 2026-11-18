@@ -39,7 +39,7 @@ public sealed class SelectionDrag(SelectionTool selection, Action<bool> takeOver
                         .Select(p => p.Child?.GetType().Name ?? "(empty)"))
                     : "";
                 var at = e.GetCurrentPoint(page!.InkCanvas).Position;
-                InkLog.Write($"selection drag: pointer capture lost at {at.X:0},{at.Y:0} (open popups: {(popups.Length > 0 ? popups : "none")}, " +
+                InkLog.Error($"selection drag: pointer capture lost at {at.X:0},{at.Y:0} (open popups: {(popups.Length > 0 ? popups : "none")}, " +
                     $"source {e.OriginalSource?.GetType().Name}, in contact {e.Pointer.IsInContact}, presenter devices " +
                     $"{page.Ink.InputDeviceTypes} mode {page.Ink.InputProcessingConfiguration.Mode}, " +
                     $"focus {(view.XamlRoot is { } r ? Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(r)?.GetType().Name : null)})");

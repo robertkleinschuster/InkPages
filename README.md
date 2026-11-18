@@ -18,7 +18,7 @@ data per stroke, pictures) and adds its own commands to the toolbar. The toolbar
 resources, so an unpackaged, self-contained app needs no resource merging.
 
 Used by [Xournal Studio for Windows](https://github.com/robertkleinschuster/xournal-studio-windows) (Xournal++
-`.xopp` files).
+`.xopp` files) and by MatheTrainer (a pen-first math exercise trainer).
 
 ## Requirements
 
@@ -79,6 +79,10 @@ ink.Commands.AddShortcuts(root);                  // Ctrl+Z/Y/X/C/V/D/A, Del (no
 ink.Commands.Refused += (_, command) => Say("Let go first");  // a command while the selection is dragged
 bar.Extensions.Add(PenToolbar.Command(icon, "Paste"));  // app commands after the library's buttons
 ink.InkHidden = true;                             // while a dialog is open (the ink would draw over it)
+ink.Undo.ContentChanged += (_, _) => ShowUnsaved(!ink.Undo.IsAtSavePoint);  // ink edited, undone or redone
+ink.Undo.MarkSaved();                             // after saving (or loading)
+ink.ResetPage(page, loadedStrokes);               // a page's ink replaced without undo (load, new task)
+InkLog.Writer = Log; InkLog.ErrorWriter = LogError;  // the library's log; errors (exceptions) apart
 ```
 
 A page that keeps nothing beside its ink derives from `InkPage` and only fills `UnderInk` (e.g. ruled paper): stroke
@@ -92,7 +96,10 @@ Rules the library depends on:
   ink while a `ContentDialog` is open.
 - Root-level keyboard accelerators need `KeyboardAcceleratorPlacementMode.Hidden`. Their tooltip is a windowed popup
   that breaks pen drags.
-- Call `SetCurrentPage` with the page in view only after the first layout. The ruler belongs to that page.
+- Call `SetCurrentPage` with the page in view only after the first layout. The ruler belongs to that page. With one
+  page it is not needed (`SetPages` makes it the toolbar's target).
+- `InkHidden` covers the workspace's pages only: hide other `InkCanvas`es of the app (e.g. answer fields) yourself.
+- `ChoicesChanged` comes once the changes settle (0.4 s after the last): save `Choices` on closing too.
 
 ## Repository
 
