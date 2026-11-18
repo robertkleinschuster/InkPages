@@ -46,9 +46,16 @@ public sealed class InkCommands
 
     private SelectionTool Selection => ink.Selection;
 
-    /// <summary>True (and <see cref="Refused"/> raised) while the selection is being moved or scaled.</summary>
+    /// <summary>
+    /// True while the selection is being moved or scaled (<see cref="Refused"/> raised), and while the ink is hidden
+    /// (<see cref="InkWorkspace.InkHidden"/>: nothing changes ink the user cannot see; nothing to say then).
+    /// </summary>
     public bool Refuses(InkCommand command)
     {
+        if (ink.InkHidden)
+        {
+            return true;
+        }
         if (!Selection.IsDragging)
         {
             return false;
@@ -190,10 +197,14 @@ public sealed class InkCommands
             }
             var bounds = Rect.Empty;
             edit.AddedStrokes.ForEach(s => bounds.Union(s.BoundingRect));
-            if (bounds.Bottom > page.Height)
+            // Its size is only known now: ink reaching beyond the page goes back onto it (to the top, or left so that its
+            // right edge is inside; wider than the page: to the left margin).
+            double dx = bounds.Right > page.Width - margin ? Math.Max(margin, page.Width - margin - bounds.Width) - bounds.Left : 0;
+            double dy = bounds.Bottom > page.Height ? margin - bounds.Top : 0;
+            if (dx != 0 || dy != 0)
             {
-                var up = Matrix3x2.CreateTranslation(0, (float)(margin - bounds.Top));
-                edit.AddedStrokes.ForEach(s => s.PointTransform *= up);
+                var back = Matrix3x2.CreateTranslation((float)dx, (float)dy);
+                edit.AddedStrokes.ForEach(s => s.PointTransform *= back);
             }
             edit.AddedStrokes.ForEach(s => s.Selected = false);
         }
@@ -260,13 +271,13 @@ public sealed class InkCommands
     /// <summary>Removes all strokes and pictures of the page as one undo step. False: the page was empty.</summary>
     public bool ClearPage(InkPage page)
     {
-        if (Refuses(InkCommand.ClearPage))
+        var strokes = page.Ink.StrokeContainer.GetStrokes().ToList();
+        if ((strokes.Count == 0 && !page.Pictures.Any()) || Refuses(InkCommand.ClearPage))
         {
-            return false;
+            return false; // an empty page stays as it is (also its selection state)
         }
         Selection.Clear();
         var edit = new PageEdit(page);
-        var strokes = page.Ink.StrokeContainer.GetStrokes().ToList();
         PageEdit.RemoveStrokes(page, strokes);
         edit.RemovedStrokes.AddRange(strokes);
         edit.RemovePictures(page.Pictures.ToList());
