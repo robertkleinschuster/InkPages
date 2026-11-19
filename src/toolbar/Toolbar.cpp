@@ -3,11 +3,12 @@
 #include <commctrl.h>
 
 #include <algorithm>
-#include <cmath>
 #include <format>
 
-#include "toolbar/Icons.h"
 #include "inkpages/Log.h"
+#include "toolbar/Icons.h"
+#include "toolbar/ToolbarMenus.h"
+#include "toolbar/ToolbarModel.h"
 
 namespace inkpages
 {
@@ -16,13 +17,9 @@ namespace inkpages
         using namespace detail;
 
         constexpr wchar_t ClassName[] = L"InkPagesToolbar";
-        constexpr int UndoId = 100, RedoId = 101, PenId = 200, HighlighterId = 300, EraserId = 400, WholeId = 401,
-            ExtensionId = 1000;
-        constexpr wchar_t UndoGlyph = 0xE7A7, RedoGlyph = 0xE7A6, PenGlyph = 0xE76D, HighlighterGlyph = 0xE7E6,
-            EraserGlyph = 0xE75C, WholeGlyph = 0xED62;
         constexpr Color Dark{ 0xFF, 0x20, 0x20, 0x20 };
-        constexpr std::array<float, 9> Radii{ 1, 2, 3, 4, 6, 8, 12, 16, 20 };
 
+        // The comctl32 toolbar in a container window of the library's own (its notifications stay in the library).
         class Bar final : public Toolbar
         {
         public:
@@ -33,12 +30,7 @@ namespace inkpages
             HWND Window() const override { return container; }
             int Height() const override;
             ToolChoices const& Choices() const override { return choices; }
-            void Choose(ToolChoices next) override
-            {
-                choices = std::move(next);
-                Build();
-                Apply(true);
-            }
+            void Choose(ToolChoices next) override;
             void EnableButton(int id, bool enabled) override;
 
             static LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wp, LPARAM lp);
@@ -48,11 +40,9 @@ namespace inkpages
             void Build();
             void Click(int id);
             void Menu(int id);
-            void PresetMenu(Tool tool, int index);
-            void RadiusMenu();
             void Apply(bool changed);
             void UpdateStates();
-            std::wstring Tip(int id) const;
+            SurfaceStatus Status() const;
             RECT ButtonRect(int id) const;
 
             WritingSurface& surface;
@@ -60,9 +50,9 @@ namespace inkpages
             ToolbarTexts texts;
             std::function<UINT(Tool, PenPreset const&)> cursorFor;
             std::vector<ToolbarButton> extensions;
+            StencilChoice stencils;
             HWND container = nullptr, bar = nullptr;
             HIMAGELIST images = nullptr;
-            int iconSize = 24;
         };
 
         Bar::Bar(HWND parent, WritingSurface& surface, ToolChoices choices, ToolbarTexts texts,
@@ -91,13 +81,14 @@ namespace inkpages
             SendMessageW(bar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
             SendMessageW(bar, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_DRAWDDARROWS);
             Build();
-
-            // Undo/redo follow the history (chained after the app's own handler).
-            auto previous = std::move(surface.historyChanged);
-            surface.historyChanged = [this, previous] {
-                UpdateStates();
-                if (previous) previous();
-            };
+            // Undo/redo and the selection's commands follow the surface (after the app's own handlers).
+            for (auto* handler : { &surface.historyChanged, &surface.selectionChanged })
+            {
+                *handler = [this, previous = std::move(*handler)] {
+                    UpdateStates();
+                    if (previous) previous();
+                };
+            }
             Apply(false);
         }
 
@@ -113,57 +104,29 @@ namespace inkpages
 
         void Bar::Build()
         {
-            UINT dpi = GetDpiForWindow(container);
-            iconSize = MulDiv(16, dpi, 96); // normal mouse size (the pen operates it)
+            int size = MulDiv(16, GetDpiForWindow(container), 96); // normal mouse size (the pen operates it)
             if (images) ImageList_Destroy(images);
-            images = ImageList_Create(iconSize, iconSize, ILC_COLOR32, 16, 4);
-            auto add = [this](HBITMAP bitmap) {
-                int index = ImageList_Add(images, bitmap, nullptr);
-                DeleteObject(bitmap);
-                return index;
-            };
+            images = ImageList_Create(size, size, ILC_COLOR32, 24, 4);
             while (SendMessageW(bar, TB_BUTTONCOUNT, 0, 0) > 0) SendMessageW(bar, TB_DELETEBUTTON, 0, 0);
             SendMessageW(bar, TB_SETIMAGELIST, 0, reinterpret_cast<LPARAM>(images));
-
             std::vector<TBBUTTON> buttons;
-            auto button = [&](int id, int image, BYTE style) {
+            for (ButtonSpec const& spec : ToolbarButtons(choices, extensions))
+            {
+                if (spec.groupStart)
+                {
+                    TBBUTTON separator{};
+                    separator.fsStyle = BTNS_SEP;
+                    buttons.push_back(separator);
+                }
+                HBITMAP icon = GlyphIcon(spec.glyph, Dark, spec.bar, size);
                 TBBUTTON b{};
-                b.iBitmap = image;
-                b.idCommand = id;
+                b.iBitmap = ImageList_Add(images, icon, nullptr);
+                DeleteObject(icon);
+                b.idCommand = spec.id;
                 b.fsState = TBSTATE_ENABLED;
-                b.fsStyle = style;
+                b.fsStyle = static_cast<BYTE>(spec.kind == ButtonKind::Command ? BTNS_BUTTON
+                    : spec.kind == ButtonKind::Check ? BTNS_CHECK : BTNS_CHECK | BTNS_DROPDOWN);
                 buttons.push_back(b);
-            };
-            auto separator = [&] {
-                TBBUTTON b{};
-                b.fsStyle = BTNS_SEP;
-                buttons.push_back(b);
-            };
-            button(UndoId, add(GlyphIcon(UndoGlyph, Dark, std::nullopt, iconSize)), BTNS_BUTTON);
-            button(RedoId, add(GlyphIcon(RedoGlyph, Dark, std::nullopt, iconSize)), BTNS_BUTTON);
-            separator();
-            auto pens = choices.PensOrDefault();
-            for (int i = 0; i < static_cast<int>(pens.size()); ++i)
-            {
-                Color c = Palette::Pens[pens[i].color];
-                button(PenId + i, add(GlyphIcon(PenGlyph, Dark, c, iconSize)), BTNS_CHECK | BTNS_DROPDOWN);
-            }
-            separator();
-            auto highlighters = choices.HighlightersOrDefault();
-            for (int i = 0; i < static_cast<int>(highlighters.size()); ++i)
-            {
-                Color c = Palette::Highlighters[highlighters[i].color];
-                button(HighlighterId + i, add(GlyphIcon(HighlighterGlyph, Dark, c, iconSize)), BTNS_CHECK | BTNS_DROPDOWN);
-            }
-            separator();
-            button(EraserId, add(GlyphIcon(EraserGlyph, Dark, std::nullopt, iconSize)), BTNS_CHECK);
-            button(WholeId, add(GlyphIcon(WholeGlyph, Dark, std::nullopt, iconSize)), BTNS_CHECK | BTNS_DROPDOWN);
-            // (Phase 2b/2c: selection, shapes, ruler.)
-            if (!extensions.empty()) separator();
-            for (size_t i = 0; i < extensions.size(); ++i)
-            {
-                button(ExtensionId + static_cast<int>(i), add(GlyphIcon(extensions[i].glyph, Dark, std::nullopt, iconSize)),
-                    BTNS_BUTTON);
             }
             SendMessageW(bar, TB_ADDBUTTONSW, buttons.size(), reinterpret_cast<LPARAM>(buttons.data()));
             SendMessageW(bar, TB_AUTOSIZE, 0, 0);
@@ -181,24 +144,31 @@ namespace inkpages
         {
             for (size_t i = 0; i < extensions.size(); ++i)
             {
-                if (extensions[i].id == id) SendMessageW(bar, TB_ENABLEBUTTON, ExtensionId + i, enabled);
+                if (extensions[i].id == id) SendMessageW(bar, TB_ENABLEBUTTON, ButtonId::Extension + i, enabled);
             }
+        }
+
+        SurfaceStatus Bar::Status() const
+        {
+            return { surface.CanUndo(), surface.CanRedo(), surface.HasSelection(), stencils.ruler, stencils.protractor };
         }
 
         void Bar::UpdateStates()
         {
-            SendMessageW(bar, TB_ENABLEBUTTON, UndoId, surface.CanUndo());
-            SendMessageW(bar, TB_ENABLEBUTTON, RedoId, surface.CanRedo());
-            for (int i = 0; i < static_cast<int>(choices.PensOrDefault().size()); ++i)
+            SurfaceStatus status = Status();
+            for (ButtonSpec const& spec : ToolbarButtons(choices, extensions))
             {
-                SendMessageW(bar, TB_CHECKBUTTON, PenId + i, choices.tool == Tool::Pen && choices.preset == i);
+                if (spec.id >= ButtonId::Extension) continue; // the app enables its own
+                SendMessageW(bar, TB_ENABLEBUTTON, spec.id, IsEnabled(spec.id, status));
+                SendMessageW(bar, TB_CHECKBUTTON, spec.id, IsChecked(spec.id, choices, status));
             }
-            for (int i = 0; i < static_cast<int>(choices.HighlightersOrDefault().size()); ++i)
-            {
-                SendMessageW(bar, TB_CHECKBUTTON, HighlighterId + i, choices.tool == Tool::Highlighter && choices.preset == i);
-            }
-            SendMessageW(bar, TB_CHECKBUTTON, EraserId, choices.tool == Tool::Eraser);
-            SendMessageW(bar, TB_CHECKBUTTON, WholeId, choices.wholeStrokeErasing);
+        }
+
+        void Bar::Choose(ToolChoices next)
+        {
+            choices = std::move(next);
+            Build();
+            Apply(true);
         }
 
         // The surface gets the tool the choices describe; `changed`: tell the app.
@@ -208,16 +178,19 @@ namespace inkpages
             state.tool = choices.tool;
             state.wholeStrokeErasing = choices.wholeStrokeErasing;
             state.eraserRadius = choices.eraserRadius;
-            PenPreset preset{};
-            if (choices.tool != Tool::Eraser)
-            {
-                auto presets = choices.tool == Tool::Pen ? choices.PensOrDefault() : choices.HighlightersOrDefault();
-                choices.preset = std::clamp(choices.preset, 0, static_cast<int>(presets.size()) - 1);
-                preset = presets[choices.preset];
-                state.color = choices.tool == Tool::Pen ? Palette::Pens[preset.color] : Palette::Highlighters[preset.color];
-                state.width = preset.width;
-            }
-            state.cursor = cursorFor ? cursorFor(choices.tool, preset) : 0;
+            state.selectMode = choices.selectMode;
+            state.shape = choices.shape;
+            state.recognizeShapes = choices.recognizeShapes;
+            // Shapes and recognition draw with the last pen preset's look.
+            Tool look = choices.tool == Tool::Highlighter ? Tool::Highlighter : Tool::Pen;
+            auto presets = look == Tool::Pen ? choices.PensOrDefault() : choices.HighlightersOrDefault();
+            int index = choices.tool == Tool::Pen || choices.tool == Tool::Highlighter ? choices.preset : 0;
+            index = std::clamp(index, 0, static_cast<int>(presets.size()) - 1);
+            PenPreset preset = presets[index];
+            state.color = look == Tool::Pen ? Palette::Pens[preset.color] : Palette::Highlighters[preset.color];
+            state.width = preset.width;
+            bool pens = choices.tool == Tool::Pen || choices.tool == Tool::Highlighter;
+            state.cursor = cursorFor && pens ? cursorFor(choices.tool, preset) : 0;
             surface.SetTool(state);
             UpdateStates();
             Log(std::format("toolbar: {}", choices.Serialize()));
@@ -226,35 +199,49 @@ namespace inkpages
 
         void Bar::Click(int id)
         {
-            if (id == UndoId) surface.Undo();
-            else if (id == RedoId) surface.Redo();
-            else if (id >= PenId && id < PenId + 20)
-            {
-                if (choices.tool == Tool::Pen && choices.preset == id - PenId) return Menu(id); // a second tap: options
-                choices.tool = Tool::Pen;
-                choices.preset = id - PenId;
+            auto choose = [this](Tool tool, int preset) {
+                choices.tool = tool;
+                choices.preset = preset;
                 Apply(true);
-            }
-            else if (id >= HighlighterId && id < HighlighterId + 20)
+            };
+            if (IsPreset(id, ButtonId::Pen))
             {
-                if (choices.tool == Tool::Highlighter && choices.preset == id - HighlighterId) return Menu(id);
-                choices.tool = Tool::Highlighter;
-                choices.preset = id - HighlighterId;
-                Apply(true);
+                if (IsChecked(id, choices, Status())) return Menu(id); // a second tap: its options
+                return choose(Tool::Pen, id - ButtonId::Pen);
             }
-            else if (id == EraserId)
+            if (IsPreset(id, ButtonId::Highlighter))
             {
-                choices.tool = Tool::Eraser;
-                Apply(true);
+                if (IsChecked(id, choices, Status())) return Menu(id);
+                return choose(Tool::Highlighter, id - ButtonId::Highlighter);
             }
-            else if (id == WholeId)
+            if (id >= ButtonId::Extension)
             {
+                size_t i = static_cast<size_t>(id - ButtonId::Extension);
+                if (i < extensions.size() && extensions[i].click) extensions[i].click();
+                return;
+            }
+            switch (id)
+            {
+            case ButtonId::Undo: surface.Undo(); break;
+            case ButtonId::Redo: surface.Redo(); break;
+            case ButtonId::Eraser: choose(Tool::Eraser, choices.preset); break;
+            case ButtonId::WholeStrokes:
                 choices.wholeStrokeErasing = !choices.wholeStrokeErasing; // a toggle: the tool stays
                 Apply(true);
-            }
-            else if (id >= ExtensionId && id < ExtensionId + static_cast<int>(extensions.size()))
-            {
-                if (auto& click = extensions[id - ExtensionId].click) click();
+                break;
+            case ButtonId::Select: choose(Tool::Select, choices.preset); break;
+            case ButtonId::Shape: choose(Tool::Shape, choices.preset); break;
+            case ButtonId::Ruler:
+                stencils.ruler = !stencils.ruler;
+                surface.SetRuler(stencils.ruler);
+                break;
+            case ButtonId::Cut: surface.Cut(); break;
+            case ButtonId::Copy: surface.Copy(); break;
+            case ButtonId::Paste: surface.Paste(); break;
+            case ButtonId::Duplicate: surface.Duplicate(); break;
+            case ButtonId::Delete: surface.DeleteSelection(); break;
+            case ButtonId::SelectAll: surface.SelectAll(); break;
+            default: break;
             }
             UpdateStates();
         }
@@ -269,95 +256,25 @@ namespace inkpages
 
         void Bar::Menu(int id)
         {
-            if (id >= PenId && id < PenId + 20) PresetMenu(Tool::Pen, id - PenId);
-            else if (id >= HighlighterId && id < HighlighterId + 20) PresetMenu(Tool::Highlighter, id - HighlighterId);
-            else if (id == WholeId) RadiusMenu();
-        }
-
-        // A preset's options: its color (the palette) and width - a native popup menu below its button.
-        void Bar::PresetMenu(Tool tool, int index)
-        {
-            bool pen = tool == Tool::Pen;
-            auto presets = pen ? choices.PensOrDefault() : choices.HighlightersOrDefault();
-            PenPreset& preset = presets[index];
-            HMENU menu = CreatePopupMenu();
-            std::vector<HBITMAP> swatches;
-            int swatchSize = GetSystemMetricsForDpi(SM_CYMENUCHECK, GetDpiForWindow(container));
-            size_t colors = pen ? Palette::Pens.size() : Palette::Highlighters.size();
-            for (size_t i = 0; i < colors; ++i)
+            RECT anchor = ButtonRect(id);
+            std::optional<ToolChoices> next;
+            if (IsPreset(id, ButtonId::Pen)) next = PresetMenu(container, anchor, choices, Tool::Pen, id - ButtonId::Pen, texts);
+            else if (IsPreset(id, ButtonId::Highlighter)) next = PresetMenu(container, anchor, choices, Tool::Highlighter, id - ButtonId::Highlighter, texts);
+            else if (id == ButtonId::WholeStrokes) next = RadiusMenu(container, anchor, choices, texts);
+            else if (id == ButtonId::Select) next = SelectModeMenu(container, anchor, choices, texts);
+            else if (id == ButtonId::Shape) next = ShapeMenu(container, anchor, choices, texts);
+            else if (id == ButtonId::Ruler)
             {
-                std::wstring name = pen ? texts.penColors[i] : texts.highlighterColors[i];
-                AppendMenuW(menu, MF_STRING | (static_cast<int>(i) == preset.color ? MF_CHECKED : 0), 1 + i, name.c_str());
-                HBITMAP swatch = Swatch(pen ? Palette::Pens[i] : Palette::Highlighters[i], swatchSize);
-                swatches.push_back(swatch);
-                MENUITEMINFOW info{ sizeof(info) };
-                info.fMask = MIIM_BITMAP | MIIM_STATE;
-                info.hbmpItem = swatch;
-                // The swatch takes the check mark's place: the current color is shown in bold.
-                info.fState = static_cast<int>(i) == preset.color ? MFS_CHECKED | MFS_DEFAULT : 0;
-                SetMenuItemInfoW(menu, static_cast<UINT>(1 + i), FALSE, &info);
+                if (auto chosen = StencilMenu(container, anchor, stencils, texts))
+                {
+                    if (chosen->ruler != stencils.ruler) surface.SetRuler(chosen->ruler);
+                    if (chosen->protractor != stencils.protractor) surface.SetProtractor(chosen->protractor);
+                    stencils = *chosen;
+                    UpdateStates();
+                }
+                return;
             }
-            AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-            std::vector<float> widths = pen ? std::vector<float>(PenWidths::Steps.begin(), PenWidths::Steps.end())
-                                            : std::vector<float>(HighlighterWidths::Steps.begin(), HighlighterWidths::Steps.end());
-            int current = pen ? PenWidths::StepOf(preset.width) : HighlighterWidths::StepOf(preset.width);
-            for (size_t i = 0; i < widths.size(); ++i)
-            {
-                std::wstring label = std::vformat(texts.widthFormat, std::make_wformat_args(widths[i]));
-                AppendMenuW(menu, MF_STRING | (static_cast<int>(i) == current ? MF_CHECKED : 0), 100 + i, label.c_str());
-            }
-            RECT r = ButtonRect((pen ? PenId : HighlighterId) + index);
-            UINT chosen = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN, r.left, r.bottom, container, nullptr);
-            DestroyMenu(menu);
-            for (HBITMAP b : swatches) DeleteObject(b);
-            if (chosen == 0) return;
-            if (chosen < 100) preset.color = static_cast<int>(chosen - 1);
-            else preset.width = widths[chosen - 100];
-            (pen ? choices.pens : choices.highlighters) = presets;
-            choices.tool = tool;
-            choices.preset = index;
-            Build(); // the preset's icon shows its color
-            Apply(true);
-        }
-
-        // The exact eraser's circle size (page points).
-        void Bar::RadiusMenu()
-        {
-            HMENU menu = CreatePopupMenu();
-            for (size_t i = 0; i < Radii.size(); ++i)
-            {
-                std::wstring label = std::vformat(texts.widthFormat, std::make_wformat_args(Radii[i]));
-                AppendMenuW(menu, MF_STRING | (Radii[i] == choices.eraserRadius ? MF_CHECKED : 0), 1 + i, label.c_str());
-            }
-            RECT r = ButtonRect(WholeId);
-            UINT chosen = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN, r.left, r.bottom, container, nullptr);
-            DestroyMenu(menu);
-            if (chosen == 0) return;
-            choices.eraserRadius = Radii[chosen - 1];
-            Apply(true);
-        }
-
-        std::wstring Bar::Tip(int id) const
-        {
-            auto presetTip = [&](std::wstring const& kind, std::wstring const& color) {
-                return std::format(L"{} – {} ({})", kind, color, texts.presetTip);
-            };
-            if (id == UndoId) return texts.undo;
-            if (id == RedoId) return texts.redo;
-            if (id >= PenId && id < PenId + 20)
-            {
-                auto pens = choices.PensOrDefault();
-                return presetTip(texts.pen, texts.penColors[pens[id - PenId].color]);
-            }
-            if (id >= HighlighterId && id < HighlighterId + 20)
-            {
-                auto hl = choices.HighlightersOrDefault();
-                return presetTip(texts.highlighter, texts.highlighterColors[hl[id - HighlighterId].color]);
-            }
-            if (id == EraserId) return texts.eraserTip;
-            if (id == WholeId) return texts.wholeStrokeEraseTip;
-            if (id >= ExtensionId && id < ExtensionId + static_cast<int>(extensions.size())) return extensions[id - ExtensionId].tip;
-            return {};
+            if (next) Choose(*next); // icons show the presets' colors
         }
 
         LRESULT CALLBACK Bar::WindowProc(HWND window, UINT message, WPARAM wp, LPARAM lp)
@@ -401,7 +318,7 @@ namespace inkpages
                 if (header->code == TBN_GETINFOTIPW)
                 {
                     auto tip = reinterpret_cast<NMTBGETINFOTIPW*>(lp);
-                    std::wstring text = Tip(tip->iItem);
+                    std::wstring text = TipOf(tip->iItem, choices, texts, extensions);
                     wcsncpy_s(tip->pszText, tip->cchTextMax, text.c_str(), _TRUNCATE);
                     return 0;
                 }

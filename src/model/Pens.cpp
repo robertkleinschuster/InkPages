@@ -69,8 +69,9 @@ namespace inkpages
 
     std::string ToolChoices::Serialize() const
     {
-        return std::format("pens={};highlighters={};eraser={};whole={};tool={};preset={}", Presets(pens),
-            Presets(highlighters), eraserRadius, wholeStrokeErasing ? 1 : 0, static_cast<int>(tool), preset);
+        return std::format("pens={};highlighters={};eraser={};whole={};tool={};preset={};select={};shape={};recognize={}",
+            Presets(pens), Presets(highlighters), eraserRadius, wholeStrokeErasing ? 1 : 0, static_cast<int>(tool), preset,
+            static_cast<int>(selectMode), static_cast<int>(shape), recognizeShapes ? 1 : 0);
     }
 
     ToolChoices ToolChoices::Parse(std::string const& text)
@@ -89,7 +90,10 @@ namespace inkpages
             else if (key == "highlighters") c.highlighters = ParsePresets(value, Palette::Highlighters.size());
             else if (key == "eraser" && Number(value, f)) c.eraserRadius = std::clamp(f, 1.f, 20.f);
             else if (key == "whole" && Number(value, i)) c.wholeStrokeErasing = i != 0;
-            else if (key == "tool" && Number(value, i) && i >= 0 && i <= 2) c.tool = static_cast<Tool>(i);
+            else if (key == "tool" && Number(value, i) && i >= 0 && i <= 4) c.tool = static_cast<Tool>(i);
+            else if (key == "select" && Number(value, i) && i >= 0 && i <= 1) c.selectMode = static_cast<SelectMode>(i);
+            else if (key == "shape" && Number(value, i) && i >= 0 && i <= 3) c.shape = static_cast<ShapeKind>(i);
+            else if (key == "recognize" && Number(value, i)) c.recognizeShapes = i != 0;
             else if (key == "preset" && Number(value, i) && i >= 0) c.preset = i;
         }
         return c;

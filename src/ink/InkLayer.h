@@ -1,109 +1,83 @@
 #pragma once
 
-// The ink: one Windows ink presenter (IInkDesktopHost / IInkPresenterDesktop) over the whole document, its visual inside
-// the manipulated content (it follows DirectManipulation's transform for drawing and input by itself). Windows runs the
-// presenter on the host's own thread ("ink thread"): every presenter call and all ink state live there; other threads
-// queue work items (IInkDesktopHost::QueueWorkItem). The presenter's input events (CoreInkIndependentInputSource) come on
-// Windows' internal ink thread and are handed over the same way.
-//
-// Tools: pen and highlighter ink (presenter mode Inking); the whole-stroke eraser is Windows ink's (mode Erasing, and the
-// pen's eraser end in mode Inking); the exact eraser runs on unprocessed input (mode None) - with the eraser tool, and
-// for the pen's eraser end, taken on its inverted hover before it touches. Every change goes into one undo history.
-// Pages: each stroke belongs to the page nearest to its first point; lazy pages hand their strokes to `store` and get
-// them back from `load` (page coordinates).
+// The ink presenter: one Windows ink presenter (IInkDesktopHost / IInkPresenterDesktop) over the whole document, its
+// visual inside DirectManipulation's content (it follows the transform for drawing and input by itself). It records
+// what the presenter collects and erases into the history (strokes cut at the pages' edges first), sets the pens'
+// drawing attributes, the processing mode and the pen cursor. Constructor and destructor on the UI thread; everything
+// else on the ink thread (InkHost::Post).
 
-#include <windows.h>
 #include <dcomp.h>
-#include <inkpresenterdesktop.h>
 
 #include <atomic>
 #include <functional>
-#include <memory>
-#include <mutex>
-#include <set>
-#include <vector>
 
 #include <winrt/Windows.UI.Input.Inking.Core.h>
 
+#include "ink/History.h"
+#include "ink/InkHost.h"
 #include "ink/InkState.h"
-#include "inkpages/model/UndoHistory.h"
-#include "inkpages/WritingSurface.h"
+#include "inkpages/model/Pens.h"
 
 namespace inkpages::detail
 {
-    class PartialEraser;
+    using winrt::Windows::UI::Input::Inking::InkInputProcessingMode;
+    using winrt::Windows::UI::Input::Inking::InkPresenter;
+    using winrt::Windows::UI::Input::Inking::Core::CoreInkIndependentInputSource;
 
-    struct InkMessages
+    struct PenLook
     {
-        UINT commit;   // the presenter asks for a DirectComposition commit
-        UINT ready;    // the presenter exists
-        UINT history;  // the history changed (read History())
-        UINT circle;   // the exact eraser's circle: wp = document point (two floats), lp = 1 shown / 0 hidden
-    };
-
-    struct HistoryState
-    {
-        bool canUndo = false, canRedo = false, atSavePoint = true;
-        std::set<int> pages; // pages with history: their ink must stay
+        Tool tool = Tool::Pen;      // Pen or Highlighter
+        Color color{ 0xFF, 0, 0, 0 };
+        float width = ToolChoices::DefaultPenWidth;
+        friend bool operator==(PenLook const&, PenLook const&) = default;
     };
 
     class InkLayer
     {
     public:
-        InkLayer(HWND window, InkMessages messages, IDCompositionVisual* root, bool mouseInks);
+        /// `ready` and `commit` run on the ink thread (the owner hands them to the UI thread).
+        InkLayer(InkHost& host, IDCompositionVisual* root, bool mouseInks, std::function<void()> ready,
+            std::function<void()> commit);
         ~InkLayer();
         InkLayer(InkLayer const&) = delete;
         InkLayer& operator=(InkLayer const&) = delete;
 
+        InkPresenter const& Presenter() const { return presenter; }
+        CoreInkIndependentInputSource const& Input() const { return input; }
+        InkState& State() { return ink; }
+        History& Edits() { return history; }
+        InkHost& Host() { return host; }
+
         void SetLayout(PageLayout layout);
-        void SetTool(ToolState tool);
-        void SetLivePages(std::set<int> const& live);
-        void Undo();
-        void Redo();
-        void MarkSaved();
-        HistoryState History() const;
+        void SetPen(PenLook look);
+        void SetMode(InkInputProcessingMode mode);
+        /// The pen leaves the presenter (its input goes to the window: the selection is moved there) or comes back.
+        void SetPenTaken(bool taken);
+        /// The pen cursor (resource id in the app's exe, 0: Windows'), set once the presenter's input is active.
+        void SetCursor(UINT resourceId);
 
-        static PointF UnpackPoint(WPARAM wp);
-
-        std::function<std::vector<InkStroke>(int page)> load;                 // ink thread, page coordinates
-        std::function<void(int page, std::vector<InkStroke> strokes)> store;  // ink thread, page coordinates
-        std::function<void(int page, InkStroke const& stroke)> collected;     // ink thread, document coordinates
+        /// Asked for every collected stroke before it is recorded: true drops it (a tap beside the selection).
+        std::function<bool(InkStroke const&)> drop;
+        /// After strokes were collected and recorded (their pieces on the pages).
+        std::function<void(std::vector<Placed> const&)> collected;
 
     private:
-        void OnInkThread(char const* name, std::function<void()> work);
-        void Create(IDCompositionVisual* root, bool mouseInks);
+        void Create(IDCompositionVisual* root);
         void Subscribe();
-        void ApplyMode();
-        void ApplyAttributes();
+        void ApplyDevices();
         void ApplyCursor();
-        void Push(std::shared_ptr<Edit> edit);
-        void Release(int page);
-        void Restore(int page);
-        void Circle(PointF at, bool shown);
 
-        HWND window;
-        InkMessages messages;
-        winrt::com_ptr<IInkDesktopHost> host;
-        DWORD hostThread = 0;
-
-        // ink thread only:
+        InkHost& host;
+        bool mouseInks;
+        std::function<void()> ready, commit;
         winrt::com_ptr<IInkPresenterDesktop> desktop;
-        winrt::Windows::UI::Input::Inking::InkPresenter presenter{ nullptr };
-        winrt::Windows::UI::Input::Inking::Core::CoreInkIndependentInputSource input{ nullptr };
+        InkPresenter presenter{ nullptr };
+        CoreInkIndependentInputSource input{ nullptr };
         InkState ink;
-        UndoHistory history;
-        std::unique_ptr<PartialEraser> eraser;
-        std::set<int> live;
-        ToolState tool;
-        bool eraserEndTaken = false;
-
-        // read by Windows' input thread:
-        std::atomic<bool> cursorActive = false; // the presenter's input is active (its first pointer event came)
-        std::atomic<UINT> cursor = 0;
-        std::atomic<bool> partialTool = false;  // the eraser tool erases exactly
-        std::atomic<bool> partialEnd = true;    // the pen's eraser end erases exactly
-
-        mutable std::mutex historyLock;
-        HistoryState historyState;
+        History history;
+        PenLook pen;
+        bool penTaken = false;
+        UINT cursor = 0;
+        std::atomic<bool> inputActive = false; // the presenter's first pointer event came (Windows' input thread)
     };
 }

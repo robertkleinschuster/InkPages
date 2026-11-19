@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "inkpages/model/Geometry.h"
 #include "inkpages/model/Paper.h"
 
 namespace inkpages
@@ -72,7 +73,9 @@ namespace inkpages
         friend bool operator==(PenPreset const&, PenPreset const&) = default;
     };
 
-    enum class Tool { Pen, Highlighter, Eraser };
+    enum class Tool { Pen, Highlighter, Eraser, Select, Shape };
+
+    enum class SelectMode { Lasso, Rectangle };
 
     /// What the user chose in the toolbar and keeps across sessions. The app stores it (e.g. with `Serialize`) where it
     /// keeps its settings, creates the toolbar from it and saves it when the toolbar says it changed.
@@ -87,6 +90,9 @@ namespace inkpages
         float eraserRadius = DefaultEraserRadius; // the exact eraser's circle radius (page points, 1..20)
         bool wholeStrokeErasing = false;      // the eraser erases whole strokes (Windows ink's eraser) instead of the circle
         Tool tool = Tool::Pen;                // the active tool
+        SelectMode selectMode = SelectMode::Lasso;
+        ShapeKind shape = ShapeKind::Line;
+        bool recognizeShapes = false;         // shapes drawn freehand with the pen become clean ones
         int preset = 0;                       // the active pen or highlighter preset
 
         static std::vector<PenPreset> DefaultPens() { return { { 0, DefaultPenWidth }, { 1, DefaultPenWidth }, { 2, DefaultPenWidth } }; }
@@ -94,7 +100,8 @@ namespace inkpages
         std::vector<PenPreset> PensOrDefault() const { return pens.empty() ? DefaultPens() : pens; }
         std::vector<PenPreset> HighlightersOrDefault() const { return highlighters.empty() ? DefaultHighlighters() : highlighters; }
 
-        /// One line of text ("pens=0:1.41,1:1.41;highlighters=...;eraser=4;whole=0;tool=0;preset=0"); `Parse` reads it
+        /// One line of text ("pens=0:1.41,1:1.41;highlighters=...;eraser=4;whole=0;tool=0;preset=0;select=0;shape=0;
+        /// recognize=0"); `Parse` reads it
         /// back - what it does not understand keeps its default.
         std::string Serialize() const;
         static ToolChoices Parse(std::string const& text);

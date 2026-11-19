@@ -21,13 +21,28 @@ namespace inkpages
         virtual void Redo() = 0;
     };
 
+    /// Several edits as one step (a drag: strokes and the app's pictures moved, maybe onto another page).
+    class CompositeEdit final : public Edit
+    {
+    public:
+        void Add(std::shared_ptr<Edit> edit) { if (edit && !edit->Empty()) edits.push_back(std::move(edit)); }
+        std::set<int> Pages() const override;
+        bool Empty() const override { return edits.empty(); }
+        void Undo() override;
+        void Redo() override;
+
+    private:
+        std::vector<std::shared_ptr<Edit>> edits;
+    };
+
     class UndoHistory
     {
     public:
         /// Records an edit that has already been made (empty edits are dropped). Redo is gone.
         void Push(std::shared_ptr<Edit> edit);
-        bool Undo();
-        bool Redo();
+        /// `pages`: the pages the undone/redone edit changes.
+        bool Undo(std::set<int>* pages = nullptr);
+        bool Redo(std::set<int>* pages = nullptr);
         bool CanUndo() const { return !undo.empty(); }
         bool CanRedo() const { return !redo.empty(); }
 

@@ -1,0 +1,342 @@
+#include "surface/SelectionController.h"
+
+#include <windowsx.h>
+
+#include <algorithm>
+#include <cmath>
+#include <format>
+
+#include "ink/InkLayer.h"
+#include "inkpages/Log.h"
+#include "tools/PictureEdit.h"
+#include "tools/ToolInput.h"
+
+namespace inkpages::detail
+{
+    namespace
+    {
+        constexpr UINT_PTR ScrollTimer = 3;
+        constexpr UINT ScrollIntervalMs = 16;     // one frame: the scroll moves with the screen
+        constexpr float EdgeDip = 32;              // auto-scroll band at the view's edges
+        constexpr float DuplicateOffset = 16;      // a duplicate lands beside its original (page units)
+    }
+
+    PointF SelectionController::ToDocument(POINT client) const
+    {
+        return ViewportToDocument({ static_cast<float>(client.x), static_cast<float>(client.y) }, c.viewport->Current(), c.scale());
+    }
+
+    std::set<int> SelectionController::PicturePages(std::vector<PictureId> const& ids) const
+    {
+        std::set<int> pages;
+        if (PictureHost* host = c.pictures())
+        {
+            for (PictureId id : ids)
+            {
+                RectF b = host->Bounds(id);
+                if (auto page = c.layout().NearestPage({ (b.left + b.right) / 2, (b.top + b.bottom) / 2 })) pages.insert(*page);
+            }
+        }
+        return pages;
+    }
+
+    std::shared_ptr<Edit> SelectionController::PictureStep(int kind, std::vector<PictureId> ids, Affine m, uint64_t token,
+        std::set<int> pages)
+    {
+        if (ids.empty() || !c.pictures()) return nullptr;
+        if (pages.empty()) pages = PicturePages(ids);
+        return std::make_shared<PictureEdit>(*c.ui, c.pictures, static_cast<PictureEdit::Kind>(kind), std::move(ids), std::move(pages), m, token);
+    }
+
+    void SelectionController::Selected(StrokeSelection const& made, std::vector<PointF> const& polygon)
+    {
+        std::vector<PictureId> picked;
+        if (PictureHost* host = c.pictures(); host && polygon.size() >= 3)
+        {
+            RectF b{ polygon[0].x, polygon[0].y, polygon[0].x, polygon[0].y };
+            for (PointF p : polygon) b = { std::min(b.left, p.x), std::min(b.top, p.y), std::max(b.right, p.x), std::max(b.bottom, p.y) };
+            for (int page : c.layout().PagesIn(b))
+            {
+                auto in = host->PicturesIn(page, polygon);
+                picked.insert(picked.end(), in.begin(), in.end());
+            }
+        }
+        Set(made, std::move(picked));
+    }
+
+    void SelectionController::Set(StrokeSelection const& made, std::vector<PictureId> picked)
+    {
+        strokes = made;
+        pictures = std::move(picked);
+        frame.reset();
+        bool any = !strokes.Empty();
+        RectF b = strokes.bounds;
+        if (PictureHost* host = c.pictures())
+        {
+            for (PictureId id : pictures)
+            {
+                RectF r = host->Bounds(id);
+                b = any ? RectF{ std::min(b.left, r.left), std::min(b.top, r.top), std::max(b.right, r.right), std::max(b.bottom, r.bottom) } : r;
+                any = true;
+            }
+        }
+        if (any)
+        {
+            float zoom = c.viewport->Current().zoom;
+            frame = SelectionFrame{ b, 4 / zoom, 10 / zoom }; // the frame and handles keep their size on the screen
+        }
+        Publish();
+    }
+
+    void SelectionController::Publish()
+    {
+        auto f = frame;
+        c.host->Post("selection frame", [tools = c.tools, f] {
+            if (ToolInput* t = tools()) t->SetFrame(f);
+        });
+        Log(std::format("selection: {} strokes, {} pictures", strokes.ids.size(), pictures.size()));
+        if (c.changed) c.changed();
+    }
+
+    void SelectionController::Cleared()
+    {
+        strokes = {};
+        pictures.clear();
+        frame.reset();
+        drag.reset();
+        Publish();
+    }
+
+    void SelectionController::Clear()
+    {
+        if (!HasSelection()) return;
+        c.host->Post("selection clear", [tools = c.tools] {
+            if (ToolInput* t = tools()) t->Selection().Clear();
+        });
+        Cleared();
+    }
+
+    bool SelectionController::OnPointer(UINT message, WPARAM wp, LPARAM lp)
+    {
+        POINT client{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
+        bool pointer = message == WM_POINTERDOWN || message == WM_POINTERUPDATE || message == WM_POINTERUP;
+        if (pointer) ScreenToClient(c.window, &client); // pointer messages carry screen coordinates
+        bool down = message == WM_POINTERDOWN || message == WM_LBUTTONDOWN;
+        bool up = message == WM_POINTERUP || message == WM_LBUTTONUP;
+        bool contact = pointer ? IS_POINTER_INCONTACT_WPARAM(wp) : (wp & MK_LBUTTON) != 0;
+        if (down)
+        {
+            if (frame && frame->At(ToDocument(client)) != Handle::None)
+            {
+                Press(client);
+                if (!pointer) SetCapture(c.window);
+                return true;
+            }
+            Clear(); // a press beside the selection (the window's pen or the mouse)
+            return false;
+        }
+        if (drag)
+        {
+            if (up)
+            {
+                Release();
+                if (!pointer) ReleaseCapture();
+            }
+            else if (contact) MoveTo(client);
+            return true;
+        }
+        // The window's pen hovering away from the selection goes back to the ink.
+        if (pointer && !contact && (!frame || frame->At(ToDocument(client)) == Handle::None))
+        {
+            c.host->Post("give back pen", [tools = c.tools] {
+                if (ToolInput* t = tools()) t->GiveBackPen();
+            });
+        }
+        return false;
+    }
+
+    void SelectionController::Press(POINT client)
+    {
+        PointF at = ToDocument(client);
+        drag = Drag{ frame->At(at), at, at, client, 0, GetTickCount64(), {} };
+        Log(std::format("selection: drag begins ({})", static_cast<int>(drag->handle)));
+    }
+
+    void SelectionController::MoveTo(POINT client)
+    {
+        PointF at = ToDocument(client);
+        drag->client = client;
+        drag->last = at;
+        drag->farthest = std::max(drag->farthest, std::abs(at.x - drag->start.x) + std::abs(at.y - drag->start.y));
+        drag->m = frame->Drag(drag->handle, drag->start, at);
+        Affine m = drag->m;
+        c.host->Post("selection preview", [tools = c.tools, m] {
+            if (ToolInput* t = tools()) t->Selection().Preview(m);
+        });
+        if (PictureHost* host = c.pictures(); host && !pictures.empty()) host->Preview(pictures, m);
+        // Near the view's edge the pages scroll (per frame) while the pen holds still too.
+        RECT rc;
+        GetClientRect(c.window, &rc);
+        float band = EdgeDip * c.scale();
+        bool edge = client.y < band || client.y > rc.bottom - band || client.x < band || client.x > rc.right - band;
+        if (edge) SetTimer(c.window, ScrollTimer, ScrollIntervalMs, nullptr);
+        else KillTimer(c.window, ScrollTimer);
+    }
+
+    void SelectionController::OnScrollTimer()
+    {
+        if (!drag)
+        {
+            KillTimer(c.window, ScrollTimer);
+            return;
+        }
+        RECT rc;
+        GetClientRect(c.window, &rc);
+        float band = EdgeDip * c.scale();
+        auto speed = [band](float into) { return std::clamp(into / band, 0.f, 1.f) * band / 2; }; // pixels per frame
+        float dx = 0, dy = 0;
+        if (drag->client.y < band) dy = -speed(band - drag->client.y);
+        else if (drag->client.y > rc.bottom - band) dy = speed(drag->client.y - (rc.bottom - band));
+        if (drag->client.x < band) dx = -speed(band - drag->client.x);
+        else if (drag->client.x > rc.right - band) dx = speed(drag->client.x - (rc.right - band));
+        View v = c.viewport->Current();
+        SizeF size{ static_cast<float>(rc.right), static_cast<float>(rc.bottom) };
+        float left = (-v.dx + dx) / v.zoom, top = (-v.dy + dy) / v.zoom;
+        SizeF doc = c.layout().DocumentSize();
+        SizeF content{ doc.width * c.scale(), doc.height * c.scale() };
+        c.viewport->ZoomToRect(KeepOnContent({ left, top, left + size.width / v.zoom, top + size.height / v.zoom }, content), false);
+        MoveTo(drag->client);
+    }
+
+    void SelectionController::Release()
+    {
+        KillTimer(c.window, ScrollTimer);
+        Drag d = *drag;
+        drag.reset();
+        unsigned ms = static_cast<unsigned>(GetTickCount64() - d.began);
+        if (Tap::IsTap(d.farthest, ms))
+        {
+            c.host->Post("selection preview end", [tools = c.tools] {
+                if (ToolInput* t = tools()) t->Selection().Preview({});
+            });
+            if (PictureHost* host = c.pictures(); host && !pictures.empty()) host->Preview(pictures, {});
+            Log("selection: a tap on the selection clears it");
+            Clear();
+            return;
+        }
+        if (PictureHost* host = c.pictures(); host && !pictures.empty())
+        {
+            host->Preview(pictures, {});
+            host->Transform(pictures, d.m);
+        }
+        auto pictureEdit = PictureStep(static_cast<int>(PictureEdit::Kind::Transformed), pictures, d.m, 0, {});
+        Affine m = d.m;
+        PushWith([m](ToolInput& t) { return t.Selection().Commit(m); }, pictureEdit, true);
+    }
+
+    void SelectionController::PushWith(std::function<std::shared_ptr<Edit>(ToolInput&)> strokesStep,
+        std::shared_ptr<Edit> pictureEdit, bool keep)
+    {
+        auto kept = pictures;
+        c.host->Post("selection edit", [this, strokesStep, pictureEdit, keep, kept, ink = c.ink, tools = c.tools, ui = c.ui] {
+            ToolInput* t = tools();
+            InkLayer* layer = ink();
+            if (!t || !layer) return;
+            auto edit = std::make_shared<CompositeEdit>();
+            edit->Add(strokesStep(*t));
+            edit->Add(pictureEdit);
+            layer->Edits().Push(edit);
+            StrokeSelection now = t->Selection().Current();
+            ui->Post([this, now, keep, kept] {
+                if (keep) Set(now, kept);
+                else Cleared();
+            });
+        });
+    }
+
+    void SelectionController::Delete()
+    {
+        if (!HasSelection()) return;
+        std::shared_ptr<Edit> pictureEdit;
+        if (PictureHost* host = c.pictures(); host && !pictures.empty())
+        {
+            auto pages = PicturePages(pictures); // before they leave their pages
+            uint64_t token = host->Remove(pictures);
+            pictureEdit = PictureStep(static_cast<int>(PictureEdit::Kind::Removed), pictures, {}, token, pages);
+        }
+        pictures.clear();
+        PushWith([](ToolInput& t) { return t.Selection().Delete(); }, pictureEdit, false);
+    }
+
+    void SelectionController::Duplicate()
+    {
+        if (!HasSelection()) return;
+        Affine m = Affine::Translation(DuplicateOffset, DuplicateOffset);
+        if (PictureHost* host = c.pictures(); host && !pictures.empty())
+        {
+            pictures = host->Duplicate(pictures, m);
+        }
+        auto pictureEdit = PictureStep(static_cast<int>(PictureEdit::Kind::Added), pictures, {}, 0, {});
+        PushWith([m](ToolInput& t) { return t.Selection().Duplicate(m); }, pictureEdit, true);
+    }
+
+    void SelectionController::Copy()
+    {
+        if (!HasSelection() || !frame) return;
+        if (c.surface && c.surface->copyToClipboard)
+        {
+            RectF bounds = frame->bounds;
+            auto picked = pictures;
+            c.host->Post("selection copy", [this, bounds, picked, tools = c.tools, ui = c.ui] {
+                ToolInput* t = tools();
+                if (!t) return;
+                auto copies = t->Selection().Copies({ bounds.left, bounds.top });
+                ui->Post([this, copies, picked, bounds] {
+                    if (c.surface->copyToClipboard) c.surface->copyToClipboard(Clip{ copies, picked, bounds });
+                });
+            });
+            return;
+        }
+        c.host->Post("selection copy", [tools = c.tools] {
+            if (ToolInput* t = tools()) t->Selection().CopyToClipboard();
+        });
+    }
+
+    void SelectionController::Cut()
+    {
+        Copy();
+        Delete();
+    }
+
+    void SelectionController::Paste()
+    {
+        RECT rc;
+        GetClientRect(c.window, &rc);
+        PointF at = ToDocument({ rc.right / 2, rc.bottom / 2 });
+        Clear();
+        if (c.surface && c.surface->pasteFromClipboard)
+        {
+            auto clip = c.surface->pasteFromClipboard(at);
+            if (!clip) return;
+            pictures = clip->pictures;
+            auto pictureEdit = PictureStep(static_cast<int>(PictureEdit::Kind::Added), pictures, {}, 0, {});
+            auto relative = clip->strokes;
+            PushWith([relative, at](ToolInput& t) { return t.Selection().Add(relative, at); }, pictureEdit, true);
+            return;
+        }
+        PushWith([at](ToolInput& t) { return t.Selection().PasteFromClipboard(at); }, nullptr, true);
+    }
+
+    void SelectionController::SelectAll(int page)
+    {
+        c.host->Post("select all", [this, page, tools = c.tools, ui = c.ui] {
+            ToolInput* t = tools();
+            if (!t) return;
+            StrokeSelection all = t->Selection().SelectAll(page);
+            ui->Post([this, all, page] {
+                PictureHost* host = c.pictures();
+                Set(all, host ? host->PicturesOn(page) : std::vector<PictureId>{});
+            });
+        });
+    }
+}

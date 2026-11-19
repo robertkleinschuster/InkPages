@@ -56,6 +56,9 @@ namespace inkpages::tests
         choices.wholeStrokeErasing = true;
         choices.tool = Tool::Highlighter;
         choices.preset = 1;
+        choices.selectMode = SelectMode::Rectangle;
+        choices.shape = ShapeKind::Ellipse;
+        choices.recognizeShapes = true;
         ToolChoices back = ToolChoices::Parse(choices.Serialize());
         EXPECT_EQ(choices.pens, back.pens);
         EXPECT_EQ(choices.highlighters, back.highlighters);
@@ -63,6 +66,9 @@ namespace inkpages::tests
         EXPECT_TRUE(back.wholeStrokeErasing);
         EXPECT_EQ(Tool::Highlighter, back.tool);
         EXPECT_EQ(1, back.preset);
+        EXPECT_EQ(SelectMode::Rectangle, back.selectMode);
+        EXPECT_EQ(ShapeKind::Ellipse, back.shape);
+        EXPECT_TRUE(back.recognizeShapes);
     }
 
     TEST(ToolChoices, MissingOrDamagedFieldsKeepTheirDefaults)
@@ -71,7 +77,7 @@ namespace inkpages::tests
         EXPECT_TRUE(back.pens.empty());
         EXPECT_EQ(4, back.eraserRadius);
         EXPECT_FALSE(back.wholeStrokeErasing);
-        ToolChoices damaged = ToolChoices::Parse("pens=0:1.41,99:2;eraser=abc;tool=7;whole=1");
+        ToolChoices damaged = ToolChoices::Parse("pens=0:1.41,99:2;eraser=abc;tool=9;whole=1");
         EXPECT_TRUE(damaged.pens.empty()) << "a color outside the palette: the defaults";
         EXPECT_EQ(4, damaged.eraserRadius);
         EXPECT_EQ(Tool::Pen, damaged.tool);

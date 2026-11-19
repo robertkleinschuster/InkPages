@@ -1,24 +1,16 @@
 #include "ink/InkState.h"
 
 #include <winrt/Windows.Foundation.Collections.h>
-#include <winrt/Windows.Foundation.Numerics.h>
 
 namespace inkpages::detail
 {
-    using namespace winrt::Windows::UI::Input::Inking;
-
-    int InkState::PageFor(InkStroke const& stroke) const
+    int InkState::PageOf(InkStroke const& stroke) const
     {
+        if (auto it = owner.find(stroke.Id()); it != owner.end()) return it->second;
         auto points = stroke.GetInkPoints();
         if (points.Size() == 0) return 0;
         auto first = points.GetAt(0).Position();
         return layout.NearestPage({ first.X, first.Y }).value_or(0);
-    }
-
-    int InkState::PageOf(InkStroke const& stroke) const
-    {
-        auto it = owner.find(stroke.Id());
-        return it != owner.end() ? it->second : PageFor(stroke);
     }
 
     void InkState::Add(InkStroke const& stroke, int page)
@@ -32,53 +24,52 @@ namespace inkpages::detail
         if (strokes.empty()) return;
         std::set<uint32_t> ids;
         for (InkStroke const& s : strokes) ids.insert(s.Id());
+        // DeleteSelected is the container's only removal: exactly these strokes are marked, no other stays marked.
         for (InkStroke const& s : container.GetStrokes()) s.Selected(ids.contains(s.Id()));
         container.DeleteSelected();
         for (uint32_t id : ids) owner.erase(id);
     }
 
-    InkStroke MakeStroke(std::vector<InkSample> const& samples, InkDrawingAttributes const& attributes)
+    std::vector<InkStroke> InkState::StrokesOn(int page) const
     {
-        std::vector<InkPoint> points;
-        points.reserve(samples.size());
-        for (InkSample const& s : samples)
+        std::vector<InkStroke> strokes;
+        for (InkStroke const& s : container.GetStrokes())
         {
-            points.emplace_back(winrt::Windows::Foundation::Point{ s.position.x, s.position.y }, s.pressure);
+            if (PageOf(s) == page) strokes.push_back(s);
         }
-        // InkStrokeBuilder is not agile: one per thread.
-        thread_local InkStrokeBuilder builder;
-        builder.SetDefaultDrawingAttributes(attributes);
-        InkStroke stroke = builder.CreateStrokeFromInkPoints(winrt::single_threaded_vector(std::move(points)),
-            winrt::Windows::Foundation::Numerics::float3x2::identity());
-        stroke.DrawingAttributes(attributes);
-        return stroke;
+        return strokes;
     }
 
-    InkStroke Translated(InkStroke const& stroke, float dx, float dy)
+    std::vector<InkStroke> InkState::Find(std::set<uint32_t> const& ids) const
     {
-        std::vector<InkPoint> points;
-        for (InkPoint const& p : stroke.GetInkPoints())
+        std::vector<InkStroke> strokes;
+        for (InkStroke const& s : container.GetStrokes())
         {
-            auto pos = p.Position();
-            points.emplace_back(winrt::Windows::Foundation::Point{ pos.X + dx, pos.Y + dy }, p.Pressure(), p.TiltX(),
-                p.TiltY(), p.Timestamp());
+            if (ids.contains(s.Id())) strokes.push_back(s);
         }
-        thread_local InkStrokeBuilder builder;
-        builder.SetDefaultDrawingAttributes(stroke.DrawingAttributes());
-        InkStroke moved = builder.CreateStrokeFromInkPoints(winrt::single_threaded_vector(std::move(points)),
-            winrt::Windows::Foundation::Numerics::float3x2::identity());
-        moved.DrawingAttributes(stroke.DrawingAttributes());
-        return moved;
+        return strokes;
     }
 
-    std::vector<InkSample> SamplesOf(InkStroke const& stroke)
+    std::vector<Placed> InkState::Split(InkStroke const& stroke) const
     {
-        std::vector<InkSample> samples;
-        for (InkPoint const& p : stroke.GetInkPoints())
+        RectF bounds = BoundsOf(stroke);
+        std::vector<int> pages = layout.PagesIn(bounds);
+        auto samples = SamplesOf(stroke);
+        if (pages.size() == 1)
         {
-            auto pos = p.Position();
-            samples.push_back({ { pos.X, pos.Y }, p.Pressure() });
+            RectF page = layout.Page(pages[0]);
+            bool inside = true;
+            for (InkSample const& s : samples) inside = inside && page.Contains(s.position);
+            if (inside) return { { stroke, pages[0] } };
         }
-        return samples;
+        std::vector<Placed> placed;
+        for (int page : pages)
+        {
+            for (Piece const& piece : ClipToRect(samples, layout.Page(page)))
+            {
+                placed.push_back({ MakeStroke(piece, stroke.DrawingAttributes()), page });
+            }
+        }
+        return placed;
     }
 }

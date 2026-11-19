@@ -3,7 +3,8 @@
 // The pen toolbar: a comctl32 toolbar (visual styles, normal mouse size, left-aligned) the app places above or beside
 // the writing surface. Groups: undo/redo | pen presets (color and width from a dropdown: Xournal's palette and widths;
 // a second tap on the active preset opens it too) | highlighter presets | eraser + "erase whole strokes" toggle (its
-// dropdown: the exact eraser's size) | the app's own buttons. (Selection, shapes and the ruler join in later steps.)
+// dropdown: the exact eraser's size) | select (lasso or rectangle), shapes (kind, recognition), Windows' ruler and
+// protractor | the selection's commands | the app's own buttons.
 // Texts come from the app (English defaults). Tool choices are the app's to keep: `choicesChanged`.
 
 #include <windows.h>
@@ -30,6 +31,24 @@ namespace inkpages
         std::wstring wholeStrokeEraseTip = L"Erase whole strokes: the eraser and the pen's eraser button erase every "
             L"stroke they touch. Off: only what is in the circle. The arrow: the circle's size";
         std::wstring eraserRadius = L"Size";
+        std::wstring select = L"Select";
+        std::wstring selectTip = L"Select: lasso or rectangle (the arrow); drag to move, corners to scale. With the "
+            L"pen, a lasso works with any tool: drag with the barrel button held";
+        std::wstring lasso = L"Lasso";
+        std::wstring rectangle = L"Rectangle";
+        std::wstring shapes = L"Shapes";
+        std::wstring shapesTip = L"Shapes: line, arrow, rectangle, ellipse (the arrow); drawn shapes can be recognized";
+        std::array<std::wstring, 4> shapeKinds{ L"Line", L"Arrow", L"Rectangle", L"Ellipse" };
+        std::wstring recognizeShapes = L"Recognize drawn shapes";
+        std::wstring ruler = L"Ruler";
+        std::wstring protractor = L"Protractor";
+        std::wstring rulerTip = L"Ruler / protractor (the arrow): lines drawn along it come out straight";
+        std::wstring cut = L"Cut selection";
+        std::wstring copy = L"Copy selection";
+        std::wstring paste = L"Paste";
+        std::wstring duplicate = L"Duplicate selection";
+        std::wstring deleteSelection = L"Delete selection";
+        std::wstring selectAll = L"Select all on the page";
         std::wstring undo = L"Undo";
         std::wstring redo = L"Redo";
         std::wstring color = L"Color";
@@ -54,7 +73,7 @@ namespace inkpages
     {
     public:
         /// `cursorFor`: the pen cursor (cursor resource in the app's exe) for a preset; 0 or none: Windows' default.
-        /// The toolbar chains the surface's `historyChanged` (set yours before creating the toolbar).
+        /// The toolbar chains the surface's `historyChanged` and `selectionChanged` (set yours before creating it).
         static std::unique_ptr<Toolbar> Create(HWND parent, WritingSurface& surface, ToolChoices choices,
             ToolbarTexts texts = {}, std::function<UINT(Tool, PenPreset const&)> cursorFor = {},
             std::vector<ToolbarButton> extensions = {});

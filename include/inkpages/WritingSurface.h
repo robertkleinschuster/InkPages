@@ -1,25 +1,30 @@
 #pragma once
 
-// The writing surface: a child window the app places, showing the document's pages stacked vertically on the paper
-// they are printed with, with Windows ink on them.
-//   - Finger: pan with inertia, pinch zoom. Precision touchpad: the same. Mouse wheel scrolls, Ctrl+wheel zooms.
-//     (DirectManipulation.) Pen and mouse buttons never pan.
-//   - Pen: writes (Windows ink presenter) with the active tool - pen, highlighter or eraser (whole strokes: Windows
-//     ink's; exact: the circle at the pen) - and the pen cursor the app chooses (a cursor resource of its exe). The
-//     pen's eraser end erases with any tool. Undo/redo: one history across pages.
-//   - Lazy pages: only pages near the view hold their strokes in the presenter; the app gives and takes them (page
-//     coordinates) through `load`/`store`, and can keep a page's ink (Hold).
-// All methods: UI thread. Callbacks marked "ink thread" run on Windows' ink host thread.
+// The writing surface: a child window the app places, showing the document's pages stacked vertically on their paper,
+// with Windows ink on them and the tools that work on it.
+//   - Finger and precision touchpad: pan with inertia, pinch zoom; mouse wheel scrolls, Ctrl+wheel zooms
+//     (DirectManipulation). Touch never draws; pen and mouse buttons never pan.
+//   - Pen: the active tool (ToolState): pen, highlighter, eraser (whole strokes or exactly the circle), selection
+//     (lasso or rectangle; the barrel button lassos with any tool; the pen over the selection moves and scales it),
+//     shapes (and recognition of drawn shapes). The pen's eraser end erases with any tool. Windows' ruler/protractor.
+//   - One undo history across pages. Strokes belong to pages and never cross one (cut at the page's edge).
+//   - The app's content: page layers below the ink to draw on (PDF pages, pictures), and its pictures in the
+//     selection (PictureHost). Lazy pages: only pages near the view hold their strokes in the ink presenter; the app
+//     gives and takes them through `load`/`store`.
+// All methods and callbacks on the UI thread unless marked "ink thread".
 
 #include <windows.h>
+#include <dcomp.h>
 
 #include <functional>
 #include <memory>
 #include <optional>
+#include <set>
 #include <vector>
 
 #include <winrt/Windows.UI.Input.Inking.h>
 
+#include "inkpages/Pictures.h"
 #include "inkpages/model/PageLayout.h"
 #include "inkpages/model/Paper.h"
 #include "inkpages/model/Pens.h"
@@ -27,6 +32,8 @@
 
 namespace inkpages
 {
+    using InkStroke = winrt::Windows::UI::Input::Inking::InkStroke;
+
     struct PageSpec
     {
         SizeF size{ 595.28f, 841.89f }; // page units (the default: A4 in points, as Xournal++ stores it)
@@ -36,20 +43,31 @@ namespace inkpages
     struct SurfaceOptions
     {
         float minZoom = 0.2f, maxZoom = 6;
-        float gap = 24, margin = 24;          // between pages, around the document (DIPs)
+        float gap = 24, margin = 24;          // between pages, around the document (page units)
         Color background{ 0xFF, 0xE6, 0xE6, 0xE6 };
         bool mouseInks = false;               // the mouse is a pointer; true lets it write (desktop testing)
     };
 
-    /// What the pen does: the active tool with its look (the toolbar makes it from ToolChoices).
+    /// What the pen does (the toolbar makes it from ToolChoices).
     struct ToolState
     {
         Tool tool = Tool::Pen;
         Color color{ 0xFF, 0, 0, 0 };
-        float width = ToolChoices::DefaultPenWidth; // pens: width at full pressure; highlighters: drawn width
+        float width = ToolChoices::DefaultPenWidth; // pens and shapes: width at full pressure; highlighters: drawn width
         UINT cursor = 0;                            // cursor resource in the app's exe (0: Windows' default)
         bool wholeStrokeErasing = false;            // the eraser (and the pen's eraser end) erases whole strokes
         float eraserRadius = ToolChoices::DefaultEraserRadius; // the exact eraser's circle (page units)
+        SelectMode selectMode = SelectMode::Lasso;
+        ShapeKind shape = ShapeKind::Line;
+        bool recognizeShapes = false;
+    };
+
+    /// A selection as the app's clipboard keeps it: strokes relative to the selection's top left, the app's pictures.
+    struct Clip
+    {
+        std::vector<InkStroke> strokes;
+        std::vector<PictureId> pictures;
+        RectF bounds; // where it was (document)
     };
 
     class WritingSurface
@@ -60,42 +78,70 @@ namespace inkpages
 
         virtual HWND Window() const = 0;
 
-        /// The pages, top to bottom. Replaces the document (zoom stays, the view goes to the top).
+        // ---- pages and view
+        /// The pages, top to bottom. Replaces the document (the history is cleared).
         virtual void SetPages(std::vector<PageSpec> pages) = 0;
         virtual PageLayout const& Layout() const = 0;
-
         virtual void ZoomTo(float zoom) = 0;    // around the view's center
         virtual void FitWidth() = 0;
         virtual void ScrollToPage(int page) = 0;
         virtual View CurrentView() const = 0;   // DirectManipulation's transform (pixels)
         virtual float Scale() const = 0;        // pixels per DIP (the window's DPI / 96)
         virtual std::optional<int> PageInView() const = 0;
-        /// The view moved or zoomed (UI thread; while moving too).
-        std::function<void()> viewChanged;
+        std::function<void()> viewChanged;      // moved or zoomed (also while moving)
 
-        /// The active tool (the toolbar sets it).
+        // ---- the app's content below the ink
+        /// A visual for the app's content of a page (PDF page, pictures): page units, origin at the page's top left,
+        /// above the paper, below the ink. Draw with the surface's device; sharpness: `RenderScale`.
+        virtual IDCompositionVisual* PageLayer(int page) = 0;
+        virtual IDCompositionDevice* CompositionDevice() = 0;
+        /// Pixels per page unit at the settled zoom; `renderScaleChanged` when it changes (draw anew then).
+        virtual float RenderScale() const = 0;
+        std::function<void()> renderScaleChanged;
+        /// Commit after drawing into page layers.
+        virtual void Commit() = 0;
+        virtual void SetPictureHost(PictureHost* host) = 0;
+
+        // ---- tools
         virtual void SetTool(ToolState tool) = 0;
+        virtual void SetRuler(bool shown) = 0;       // Windows' ruler (InkPresenterRuler)
+        virtual void SetProtractor(bool shown) = 0;  // Windows' protractor (InkPresenterProtractor)
 
-        /// One history in time order across pages: strokes written, erased (whole or exactly).
+        // ---- selection
+        virtual bool HasSelection() const = 0;
+        std::function<void()> selectionChanged;
+        virtual void Cut() = 0;
+        virtual void Copy() = 0;
+        virtual void Paste() = 0;                // at the view's center, then selected
+        virtual void Duplicate() = 0;
+        virtual void DeleteSelection() = 0;
+        virtual void SelectAll() = 0;            // the page in view
+        virtual void ClearSelection() = 0;
+        /// The app's own clipboard format (unset: Windows ink's clipboard). `pasteFromClipboard` gets the document
+        /// point to paste at; the app adds the clip's pictures there itself and returns their ids with the strokes.
+        std::function<void(Clip const&)> copyToClipboard;
+        std::function<std::optional<Clip>(PointF at)> pasteFromClipboard;
+
+        // ---- history
         virtual void Undo() = 0;
         virtual void Redo() = 0;
         virtual bool CanUndo() const = 0;
         virtual bool CanRedo() const = 0;
-        /// The content as it is now was saved; whether it still (or again, after undoing back) is.
         virtual void MarkSaved() = 0;
         virtual bool AtSavePoint() const = 0;
-        /// The history changed: enable undo/redo, mark the document as changed (UI thread).
         std::function<void()> historyChanged;
+        /// The pages an edit (or its undo/redo) changed: the app's data of them is out of date (StrokesOf).
+        std::function<void(std::set<int> const& pages)> contentChanged;
 
-        /// Keeps a page's ink in the presenter even when it is far from the view. (Pages with undo history are kept by
-        /// the surface itself.)
+        // ---- strokes (the app persists them; InkStroke keeps points with pressure, tilt and time, and its attributes)
+        /// The strokes of a page now, in page coordinates (copies; e.g. to save). Waits for the ink thread. A page whose
+        /// ink is not in the presenter (lazy) gives nothing: the app holds its strokes since `store`.
+        virtual std::vector<InkStroke> StrokesOf(int page) = 0;
+        /// Keeps a page's ink in the presenter even when it is far from the view (pages with history are kept anyway).
         virtual void Hold(int page, bool hold) = 0;
-
-        using InkStroke = winrt::Windows::UI::Input::Inking::InkStroke;
-        /// Lazy pages (ink thread): a page coming near asks for its strokes, a page going far hands them over.
+        /// Lazy pages (ink thread): a page coming near asks for its strokes, a page going far hands them over (page
+        /// coordinates).
         std::function<std::vector<InkStroke>(int page)> load;
         std::function<void(int page, std::vector<InkStroke> strokes)> store;
-        /// A stroke was written (ink thread; document coordinates; the page it belongs to).
-        std::function<void(int page, InkStroke const& stroke)> strokeCollected;
     };
 }

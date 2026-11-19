@@ -4,6 +4,27 @@
 
 namespace inkpages
 {
+    std::set<int> CompositeEdit::Pages() const
+    {
+        std::set<int> pages;
+        for (auto const& e : edits)
+        {
+            auto p = e->Pages();
+            pages.insert(p.begin(), p.end());
+        }
+        return pages;
+    }
+
+    void CompositeEdit::Undo()
+    {
+        for (auto it = edits.rbegin(); it != edits.rend(); ++it) (*it)->Undo();
+    }
+
+    void CompositeEdit::Redo()
+    {
+        for (auto& e : edits) e->Redo();
+    }
+
     void UndoHistory::Push(std::shared_ptr<Edit> edit)
     {
         if (!edit || edit->Empty()) return;
@@ -11,20 +32,22 @@ namespace inkpages
         redo.clear();
     }
 
-    bool UndoHistory::Undo()
+    bool UndoHistory::Undo(std::set<int>* pages)
     {
         if (undo.empty()) return false;
         auto edit = undo.back();
+        if (pages) *pages = edit->Pages();
         undo.pop_back();
         edit->Undo();
         redo.push_back(std::move(edit));
         return true;
     }
 
-    bool UndoHistory::Redo()
+    bool UndoHistory::Redo(std::set<int>* pages)
     {
         if (redo.empty()) return false;
         auto edit = redo.back();
+        if (pages) *pages = edit->Pages();
         redo.pop_back();
         edit->Redo();
         undo.push_back(std::move(edit));

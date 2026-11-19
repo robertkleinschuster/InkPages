@@ -9,7 +9,7 @@
 
 namespace inkpages::detail
 {
-    void PartialEraser::Begin(PointF p)
+    void ExactEraser::Begin(PointF p)
     {
         edit = std::make_shared<StrokeEdit>(ink);
         last = p;
@@ -17,7 +17,7 @@ namespace inkpages::detail
         EraseAt({ p });
     }
 
-    void PartialEraser::MoveAlong(std::vector<PointF> const& path)
+    void ExactEraser::MoveAlong(std::vector<PointF> const& path)
     {
         if (!edit || path.empty()) return;
         std::vector<PointF> centers;
@@ -31,7 +31,7 @@ namespace inkpages::detail
         EraseAt(centers);
     }
 
-    std::shared_ptr<StrokeEdit> PartialEraser::End()
+    std::shared_ptr<StrokeEdit> ExactEraser::End()
     {
         auto done = std::move(edit);
         edit = nullptr;
@@ -39,7 +39,7 @@ namespace inkpages::detail
         return done;
     }
 
-    void PartialEraser::EraseAt(std::vector<PointF> const& centers)
+    void ExactEraser::EraseAt(std::vector<PointF> const& centers)
     {
         if (centers.empty()) return;
         float left = centers[0].x, right = left, top = centers[0].y, bottom = top;

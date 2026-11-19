@@ -12,10 +12,10 @@
 
 namespace inkpages::detail
 {
-    class PartialEraser
+    class ExactEraser
     {
     public:
-        explicit PartialEraser(InkState& ink) : ink(ink) {}
+        explicit ExactEraser(InkState& ink) : ink(ink) {}
 
         float radius = 4; // page units
 
