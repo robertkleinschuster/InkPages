@@ -23,6 +23,10 @@ is specific to them (xournal-studio-windows: .xopp, PDF, explorer, sync; MatheTr
   eraser is the native one. Do not re-implement what a platform feature does, and do not work around framework
   behavior. When an API is broken, find the root cause (issue/PR) and report the options. The partial eraser is an
   agreed exception: Windows ink erases whole strokes only (proposal microsoft-ui-xaml #1530).
+- **Native elements of the framework in use – no Frankenstein** (user, 2026-11-19): the library and its apps use the
+  controls of their main technology (today WinUI 3) in its default look, and do not mix UI frameworks or rebuild
+  controls the framework has. If the main technology changes (a Win32 demo with the Win32 ink presenter and
+  DirectManipulation is being evaluated), the rule applies to the new one.
 - **Never swallow exceptions.** Log type, HResult and message (`InkLog`; handlers on forwarded ink events log
   themselves through `InkLog.Guard`).
 - **No app dependencies.** No file format and no app texts: `PenToolbarTexts` holds English defaults, and apps pass
