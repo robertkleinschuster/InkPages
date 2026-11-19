@@ -86,9 +86,20 @@ toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize(
 
 ## Layout
 
-- `include/inkpages/` public headers, `src/` the library (static), `demo/` the demo app, `tests/` unit tests,
-  `UiTests/` the Windows Sandbox runner with synthetic pen and touch input (`TestKit.ps1`, `Inj.cs`, `Finger.cs`,
-  `CursorShot.cs`), `tools/cursorprobe.cpp` (the pointer as the screen draws it, for the cursor test).
+```
+include/inkpages/        public API (WritingSurface, Toolbar, Pictures, Texts, Log) and model/ (pure data and logic)
+src/<module>/            the library (static): base, model, render, ink, tools, text, surface, toolbar
+demo/                    the demo app (main.cpp, DemoPictures), its cursors (cursors/, tools/make_cursors.py) and its
+                         sandbox UI tests (UiTests/*.ps1)
+tests/                   unit tests (GoogleTest, CTest)
+UiTests/                 the Windows Sandbox kit for embedding apps too: Run-SandboxTest.ps1 (on a hidden desktop),
+                         TestKit.ps1, Inj.cs (synthetic pen, touch, mouse, keys), Finger.cs, CursorShot.cs, HiddenDesktop.cs
+tools/                   test tools: uiaprobe (native UI Automation: find by name, focus, touch keyboard),
+                         cursorprobe (the pointer as the screen draws it)
+build.ps1                CMake (Visual Studio's) Release build + unit tests; .github/workflows/build.yml runs it
+```
+
+The WinUI 3 (C#) version is at the tag `winui-final`.
 
 ## Device checks
 
