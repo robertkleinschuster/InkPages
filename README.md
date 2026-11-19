@@ -15,7 +15,8 @@ them, plus their toolbar – native, lean, modern Win32.
 
 There is no file format inside: the app supplies its document's pages and adds its own commands.
 
-**Status (2026-11-19): the move from WinUI 3 to C++/Win32 has begun (phase 0: project skeleton).** The WinUI 3 version
+**Status (2026-11-19): the move from WinUI 3 to C++/Win32 is under way – phase 1, the writing surface, is in (pages,
+paper, ink, pan/zoom, pen cursor, lazy pages); the tools follow in phase 2.** The WinUI 3 version
 (C#, `InkCanvas`/`InkToolbar`, with its WinUI fork runtime) is tagged
 [`winui-final`](https://github.com/robertkleinschuster/InkPages/tree/winui-final).
 
@@ -31,7 +32,32 @@ Requirements: Windows 11 (x64), Visual Studio 2026 with the C++ desktop workload
 .\build.ps1 -NoTests
 ```
 
+## Embedding (phase 1 API)
+
+```cpp
+#include "inkpages/WritingSurface.h"
+
+auto surface = inkpages::WritingSurface::Create(parentWindow);       // a child window; place it with MoveWindow
+inkpages::PageSpec a4;                                                // 595 x 842 DIP
+a4.paper = { inkpages::PaperKind::Graph, 5 * 96 / 25.4f };            // 5 mm squares, clipped to the sheet
+surface->SetPages(std::vector<inkpages::PageSpec>(3, a4));            // stacked vertically
+surface->SetPen({ 0xFF, 0, 0, 0 }, 2, IDC_MY_PEN_CURSOR);             // color, size (DIPs), cursor resource of the exe
+surface->FitWidth();
+surface->load = [](int page) { /* the page's strokes, page coordinates (ink thread) */ return strokes; };
+surface->store = [](int page, std::vector<InkStroke> strokes) { /* keep them (ink thread) */ };
+surface->viewChanged = [] { /* zoom / page in view changed */ };
+```
+
+- Finger and precision touchpad pan (inertia) and pinch-zoom; the mouse wheel scrolls, Ctrl+wheel zooms
+  (DirectManipulation). Pen and mouse buttons never pan; the pen writes (the mouse too with `mouseInks`).
+- `ZoomTo`, `FitWidth`, `ScrollToPage`, `PageInView`, `CurrentView`, `Layout` (page rectangles, page at a point).
+- Lazy pages: only pages near the view hold their strokes in the ink presenter; the others are handed to `store` and
+  come back through `load`. `Hold(page, true)` keeps a page's ink (e.g. while it has an edit).
+- The pen cursor is a cursor resource in the app's exe (the demo ships dot cursors per color × width,
+  `demo/tools/make_cursors.py`).
+
 ## Layout
 
 - `include/inkpages/` public headers, `src/` the library (static), `demo/` the demo app, `tests/` unit tests,
-  `UiTests/` the Windows Sandbox runner with synthetic pen and touch input (`TestKit.ps1`, `Inj.cs`).
+  `UiTests/` the Windows Sandbox runner with synthetic pen and touch input (`TestKit.ps1`, `Inj.cs`, `Finger.cs`,
+  `CursorShot.cs`), `tools/cursorprobe.cpp` (the pointer as the screen draws it, for the cursor test).

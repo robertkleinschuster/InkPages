@@ -15,6 +15,8 @@ Variante davon"). The WinUI version is tagged **`winui-final`**: MatheTrainer st
 later (a WinUI fix would go on a branch from the tag, announced first); Xournal Studio's C# app stays on its pinned
 submodule commit until its C++ app replaces it. The plan: xournal-studio-windows `docs/CPP-UMZUG.md` (phases 0–5).
 Phase 0 (2026-11-19): project skeleton – library (`Log`), demo window, unit tests, build script, CI.
+Phase 1 (2026-11-19): the writing surface – `WritingSurface` (pages, paper, ink, DirectManipulation pan/zoom, pen
+cursor, lazy pages), demo, unit tests and sandbox tests (see "Writing surface" below). Next: phase 2, the tools.
 
 ## Rules (agreed with the user)
 
@@ -58,6 +60,64 @@ Phase 0 (2026-11-19): project skeleton – library (`Log`), demo window, unit te
   v6, PerMonitorV2); `tests/` – unit tests; `UiTests/` – sandbox runner and TestKit.
 - `Log.h`: `SetLogFile`, `SetErrorSink` (errors also to the app, e.g. its errors.log), `Log`, `LogError`,
   `DescribeHr`, `LogHr`, `LogException`.
+- Pure logic (unit-tested, `tests/GeometryTests.cpp`): `Paper.h` (paper kinds and their lines, ported from
+  `Model/PaperLines.cs`), `PageLayout.h` (vertical page stack, page at/nearest to a point, page in view),
+  `ViewMath.h` (DirectManipulation's transform <-> document DIPs, zoom clamp, fit width, zoom/scroll rectangles kept on
+  the content, `LivePages` = which pages hold their ink).
+- `WritingSurface.h` (public) / `src/WritingSurface.cpp`: the child window; wires `Graphics` (D3D11 + D2D + DComp
+  device), `Viewport` (DirectManipulation), `PaperLayer` (one sheet: D2D into a DComp virtual surface) and `InkLayer`
+  (the ink presenter on Windows' ink host thread, page ownership of strokes, lazy load/store).
+- `demo/`: `main.cpp` (only the public API), `cursors/` + `tools/make_cursors.py` (dot cursors per color × width),
+  `UiTests/SurfaceTest.ps1` (pan/pinch/wheel, ink under the pen, page 2, lazy pages, pen + finger, cursor),
+  `UiTests/BoundaryTest.ps1` (a stroke across the gap). `tools/cursorprobe.cpp`: DXGI Desktop Duplication probe – the
+  pointer as the screen draws it (GetCursorInfo and screenshots cannot show it); `build.ps1` puts it in
+  `.local-build	ools` (pass it with `-Data`).
+
+## Writing surface (phase 1, measured 2026-11-19; sandbox = Windows Sandbox 1514x900 at 150 %)
+
+- **One ink presenter for the whole document, not one per page (decided by measurement).** Numbers (local, 150 %):
+  one presenter over 3 or over 40 or 100 A4 pages: created in ~5 ms (first in a process ~40 ms incl. the host
+  thread), working set unchanged by the document's size (50.1 MB either way – the presenter has no surface of its own
+  size). One presenter per page: 40 in ~100 ms (2.5 ms each), +0.36 MB each (64.5 MB vs 50.1 MB). Decisive:
+  **setting `CoreInkIndependentInputSource.PointerCursor` while Windows still activates a presenter's input context
+  kills the process** – fail-fast 0xC0000409 in Windows.UI.Input.Inking (`CInputContext::_RunOnInkThreadSync` →
+  E_UNEXPECTED; stack with cdb: the internal ink thread was in `CInputContext::Activate` at the same moment). It hit
+  reliably when presenters were created while others already had cursors (the lazy per-page pattern), never when all
+  cursors were set after creation. No event says the activation is done, so per-page presenters with lazy creation
+  would gamble on timing. With one presenter: created once, its cursor set 300 ms later (`CursorDelayMs`), tool changes
+  later are safe. No input switching between presenters either.
+- Strokes still belong to pages (the file format keeps them per page): a stroke belongs to the page nearest to its
+  first point. **A stroke across the gap is one stroke, owned by the page it began on, and drawn over the gap**
+  (`BoundaryTest.ps1`) – the WinUI version cut ink off at the page's edge. Open for phase 2: clip or split.
+- Lazy pages = lazy strokes: memory is in the `InkStroke`s (WinUI fact), so a page far away hands its strokes to the
+  app (`store`, rebuilt in page coordinates with `InkStrokeBuilder.CreateStrokeFromInkPoints`) and they leave the
+  presenter; near again, `load` gives them back (rebuilt at the page's place). Pages within one view height come in,
+  beyond two view heights go, `Hold` keeps a page (`LivePages`). Sandbox: 5 strokes on page 1 released at page 11 and
+  restored at Home.
+- **Ink lands under the pen** at fit width (zoom 1.15), after a finger pan, after a pinch to 3.66x, after Ctrl+wheel /
+  wheel, at zoom 4 and on page 2 after Page Down: the first/last ink point mapped back through DirectManipulation's
+  transform was within 0.3 DIP of the injected pen position every time. Ink is drawn sharp at every zoom (the presenter
+  renders it, no bitmap). The presenter's visual sits inside DirectManipulation's content and follows its transform for
+  drawing and input by itself.
+- Pen + finger at once: the pen keeps writing while a finger pans (the stroke follows the moving paper).
+- Wheel: `SetContact(DIRECTMANIPULATION_MOUSEFOCUS)` + `ProcessInput` (Microsoft's sample): the wheel scrolls,
+  **Ctrl+wheel zooms** (DirectManipulation does both itself; sandbox: 3.66 → 4.79 with two notches). Precision
+  touchpad: `DM_POINTERHITTEST` → `SetContact` – not testable in the sandbox (no synthetic touchpad); check on the
+  device.
+- `ZoomToRect` does not keep the rectangle on the content (zooming out at the top left the document 144 px below the
+  view's top): `KeepOnContent` does.
+- Paper: D2D into a DComp virtual surface per sheet at DPI x zoom, only near the view (`Trim`), redrawn when a zoom
+  settles (READY); while a pinch runs the last drawing scales. Lines are page units, so they get thicker when zoomed,
+  like printed paper. A4 at 6x and 150 % is a 5357x7578 px virtual surface – only the part in view is allocated.
+- Platform setup facts: the presenter needs visuals of a `DCompositionCreateDevice3` device (a `DCompositionCreateDevice`
+  visual: E_NOINTERFACE), DirectManipulation's compositor needs `IDCompositionDevice` – request that interface from
+  `DCompositionCreateDevice3`; create it from the D2D device so surfaces hand out `ID2D1DeviceContext`. The presenter
+  works in the units of its visual (pixels unless a parent scales – the content visual scales DIPs to pixels). Nothing
+  inks before the app commits its DComp device after the presenter exists, and an opaque sibling above the ink visual
+  takes its pen input (`AddVisual(v, FALSE, nullptr)` = on top).
+- Size/start (demo): one exe of ~1 MB, 59 modules (all Windows'), working set ~60–68 MB (D3D/D2D/DComp/DM + ink);
+  window ~0.1 s after start when warm; the very first start of a new exe waited ~14–24 s before the process existed
+  (Defender scanning the new file, as with the WinUI build).
 
 ## Facts learned in the WinUI version (tag `winui-final`; measured on the user's device and in Windows Sandbox, 2026-11-15..19)
 
