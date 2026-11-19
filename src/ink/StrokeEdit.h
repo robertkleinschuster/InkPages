@@ -24,6 +24,8 @@ namespace inkpages::detail
         bool Empty() const override { return removed.empty() && added.empty(); }
         void Undo() override;
         void Redo() override;
+        /// The strokes follow their pages (InkState::relocation holds the pass: shifts and the copies made in it).
+        void RemapPages(PageMap const& map) override;
 
     private:
         struct Entry

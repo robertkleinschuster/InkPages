@@ -185,17 +185,73 @@ namespace inkpages::detail
         Changed(true);
     }
 
-    void Surface::SetPages(std::vector<PageSpec> specs)
+    void Surface::BuildLayout(std::vector<PageSpec> specs, std::vector<Paper>& papers)
     {
         pages = std::move(specs);
         std::vector<SizeF> sizes;
-        std::vector<Paper> papers;
         for (PageSpec const& p : pages)
         {
             sizes.push_back(p.size);
             papers.push_back(p.paper);
         }
         layout = PageLayout(sizes, options.gap, options.margin);
+    }
+
+    void Surface::InsertPages(int index, std::vector<PageSpec> added)
+    {
+        index = std::clamp(index, 0, static_cast<int>(pages.size()));
+        auto specs = pages;
+        specs.insert(specs.begin() + index, added.begin(), added.end());
+        Rearrange(std::move(specs), PageMap::Insert(static_cast<int>(pages.size()), index, static_cast<int>(added.size())));
+    }
+
+    void Surface::RemovePage(int index)
+    {
+        if (index < 0 || index >= static_cast<int>(pages.size())) return;
+        auto specs = pages;
+        specs.erase(specs.begin() + index);
+        Rearrange(std::move(specs), PageMap::Remove(static_cast<int>(pages.size()), index));
+    }
+
+    void Surface::MovePage(int from, int to)
+    {
+        int count = static_cast<int>(pages.size());
+        if (from < 0 || from >= count || to < 0 || to >= count || from == to) return;
+        auto specs = pages;
+        PageSpec moving = specs[from];
+        specs.erase(specs.begin() + from);
+        specs.insert(specs.begin() + to, moving);
+        Rearrange(std::move(specs), PageMap::Move(count, from, to));
+    }
+
+    void Surface::Rearrange(std::vector<PageSpec> specs, PageMap const& map)
+    {
+        selection->Clear();
+        std::vector<Paper> papers;
+        BuildLayout(std::move(specs), papers);
+        held = map.Apply(held);
+        live = map.Apply(live);
+        host.Post("rearrange pages", [this, map, layout = layout] {
+            auto& state = ink->State();
+            state.BeginRelocation(map, layout);
+            ink->Edits().RemapPages(map);
+            state.EndRelocation();
+            if (pageStore) pageStore->Remap(map);
+            ink->SetLayout(layout);
+        });
+        composition->Rearrange(layout, papers, map, [this](int page, ID2D1DeviceContext* dc, RectF area) {
+            if (drawUnderlay) drawUnderlay(page, dc, area);
+        });
+        sheetScale = 0;
+        SetScale();
+        Log(std::format("surface: pages rearranged, {} pages", layout.Count()));
+        Changed(true);
+    }
+
+    void Surface::SetPages(std::vector<PageSpec> specs)
+    {
+        std::vector<Paper> papers;
+        BuildLayout(std::move(specs), papers);
         selection->Clear();
         live.clear();
         held.clear();

@@ -9,6 +9,8 @@
 #include <set>
 #include <vector>
 
+#include "inkpages/model/PageMap.h"
+
 namespace inkpages
 {
     class Edit
@@ -19,6 +21,8 @@ namespace inkpages
         virtual bool Empty() const = 0;
         virtual void Undo() = 0;
         virtual void Redo() = 0;
+        /// Pages were inserted, removed or moved: the edit follows its pages (it never touches a removed one).
+        virtual void RemapPages(PageMap const& map) = 0;
     };
 
     /// Several edits as one step (a drag: strokes and the app's pictures moved, maybe onto another page).
@@ -30,6 +34,7 @@ namespace inkpages
         bool Empty() const override { return edits.empty(); }
         void Undo() override;
         void Redo() override;
+        void RemapPages(PageMap const& map) override;
 
     private:
         std::vector<std::shared_ptr<Edit>> edits;
@@ -50,6 +55,8 @@ namespace inkpages
         void Clear();
         /// Forgets the edits of a removed page; a save point among them cannot be reached any more.
         void Forget(int page);
+        /// Pages were inserted, removed or moved: edits of removed pages are forgotten, the others follow their pages.
+        void RemapPages(PageMap const& map);
 
         /// The pages any edit to undo or redo changes.
         std::set<int> Pages() const;

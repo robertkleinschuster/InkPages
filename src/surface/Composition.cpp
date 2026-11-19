@@ -64,6 +64,24 @@ namespace inkpages::detail
         }
     }
 
+    void Composition::Rearrange(PageLayout const& newLayout, std::vector<Paper> const& paper, PageMap const& map,
+        std::function<void(int, ID2D1DeviceContext*, RectF)> underlay)
+    {
+        auto oldLayers = std::move(pageLayers);
+        SetPages(newLayout, paper, std::move(underlay)); // new sheets and empty layers
+        std::vector<int> old = map.OldIndex();
+        for (int i = 0; i < newLayout.Count(); ++i)
+        {
+            if (old[i] < 0 || old[i] >= static_cast<int>(oldLayers.size())) continue;
+            // The page's own layer (with the app's content) takes the new empty one's place.
+            winrt::check_hresult(layers->RemoveVisual(pageLayers[i].get()));
+            pageLayers[i] = oldLayers[old[i]];
+            winrt::check_hresult(pageLayers[i]->SetOffsetX(newLayout.Page(i).left));
+            winrt::check_hresult(pageLayers[i]->SetOffsetY(newLayout.Page(i).top));
+            winrt::check_hresult(layers->AddVisual(pageLayers[i].get(), FALSE, nullptr));
+        }
+    }
+
     void Composition::UpdateSheets(RectF visible, float renderScale)
     {
         float h = visible.Height();

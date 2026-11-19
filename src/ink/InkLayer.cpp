@@ -130,7 +130,7 @@ namespace inkpages::detail
 
     void InkLayer::SetLayout(PageLayout layout)
     {
-        ink.layout = std::move(layout);
+        ink.layout = std::move(layout); // (after a relocation it is the same)
         LogHr("IInkPresenterDesktop::SetSize", desktop->SetSize(ink.layout.DocumentSize().width, ink.layout.DocumentSize().height));
         commit();
     }

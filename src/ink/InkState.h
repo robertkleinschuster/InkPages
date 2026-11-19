@@ -5,12 +5,14 @@
 // keeps strokes per page; pieces in the gap between pages are dropped).
 
 #include <map>
+#include <optional>
 #include <set>
 #include <utility>
 #include <vector>
 
 #include "ink/Strokes.h"
 #include "inkpages/model/PageLayout.h"
+#include "inkpages/model/PageMap.h"
 #include "inkpages/model/StrokeKeys.h"
 
 namespace inkpages::detail
@@ -32,6 +34,13 @@ namespace inkpages::detail
 
         PointF Origin(int page) const { return { layout.Page(page).left, layout.Page(page).top }; }
 
+        /// Pages were inserted, removed or moved (`next` is the new layout): strokes of removed pages leave, strokes of
+        /// moved pages are rebuilt at their page's new place (their keys follow), the page owners follow the map. Strokes
+        /// that edits still refer to are moved by `Relocated` during the same pass (EndRelocation ends it).
+        void BeginRelocation(PageMap const& map, PageLayout next);
+        InkStroke Relocated(InkStroke const& stroke, int oldPage);
+        void EndRelocation() { relocation.reset(); }
+
         int PageOf(InkStroke const& stroke) const;
         void Add(InkStroke const& stroke, int page);
         /// Removes exactly these strokes from the container (by id).
@@ -42,5 +51,13 @@ namespace inkpages::detail
         /// The stroke as it goes onto the pages: itself when it lies on one page, else its pieces cut at the pages'
         /// edges (each on its page; nothing of it in the gaps).
         std::vector<Placed> Split(InkStroke const& stroke) const;
+
+    private:
+        struct Relocation
+        {
+            std::vector<PointF> shift;            // by old page
+            std::map<uint32_t, InkStroke> copies; // stroke id -> its copy at the new place
+        };
+        std::optional<Relocation> relocation;
     };
 }

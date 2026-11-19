@@ -42,6 +42,12 @@ namespace inkpages::detail
         Publish({});
     }
 
+    void History::RemapPages(PageMap const& map)
+    {
+        history.RemapPages(map);
+        Publish({});
+    }
+
     HistoryState History::State() const
     {
         std::scoped_lock guard(lock);

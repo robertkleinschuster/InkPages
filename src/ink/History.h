@@ -30,6 +30,7 @@ namespace inkpages::detail
         void Redo();
         void MarkSaved();
         void Clear();
+        void RemapPages(PageMap const& map);
         bool Holds(int page) const { return history.Pages().contains(page); }
 
         HistoryState State() const;

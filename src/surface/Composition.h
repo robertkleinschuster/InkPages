@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "inkpages/model/PageLayout.h"
+#include "inkpages/model/PageMap.h"
 #include "inkpages/model/Paper.h"
 #include "render/Graphics.h"
 #include "render/Overlay.h"
@@ -33,6 +34,9 @@ namespace inkpages::detail
         void SetClip(SIZE pixels);
         /// `underlay(page, dc, area)`: the app's drawing under the ink of a page (page coordinates).
         void SetPages(PageLayout const& layout, std::vector<Paper> const& papers,
+            std::function<void(int, ID2D1DeviceContext*, RectF)> underlay);
+        /// Pages were inserted, removed or moved: new sheets; the page layers (the app's content) go with their pages.
+        void Rearrange(PageLayout const& layout, std::vector<Paper> const& papers, PageMap const& map,
             std::function<void(int, ID2D1DeviceContext*, RectF)> underlay);
         /// A page's underlay changed: drawn anew at the next UpdateSheets.
         void Invalidate(int page);

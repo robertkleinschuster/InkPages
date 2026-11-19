@@ -28,6 +28,8 @@ namespace inkpages::detail
         /// them since its `store`).
         std::vector<KeyedStroke> Snapshot(int page) const;
         bool IsLive(int page) const { return live.contains(page); }
+        /// Pages were inserted, removed or moved: the live pages follow (a removed page's strokes are gone).
+        void Remap(PageMap const& map) { live = map.Apply(live); }
 
     private:
         void Release(int page);

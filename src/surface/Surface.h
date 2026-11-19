@@ -29,6 +29,9 @@ namespace inkpages::detail
 
         HWND Window() const override { return window; }
         void SetPages(std::vector<PageSpec> pages) override;
+        void InsertPages(int index, std::vector<PageSpec> added) override;
+        void RemovePage(int index) override;
+        void MovePage(int from, int to) override;
         PageLayout const& Layout() const override { return layout; }
         void ZoomTo(float zoom) override;
         void FitWidth() override;
@@ -80,6 +83,8 @@ namespace inkpages::detail
         void DrawOverlay();
         void WhenReady(std::function<void()> action);
         void ZoomToRect(RectF content);
+        void Rearrange(std::vector<PageSpec> specs, PageMap const& map);
+        void BuildLayout(std::vector<PageSpec> specs, std::vector<Paper>& papers);
 
         SurfaceOptions options;
         HWND window = nullptr;

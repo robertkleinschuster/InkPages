@@ -27,6 +27,7 @@ namespace inkpages::detail
         bool Empty() const override { return pictures.empty(); }
         void Undo() override;
         void Redo() override;
+        void RemapPages(PageMap const& map) override { pages = map.Apply(pages); }
 
     private:
         void Run(bool undo);

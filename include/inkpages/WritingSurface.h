@@ -93,6 +93,12 @@ namespace inkpages
         // ---- pages and view
         /// The pages, top to bottom. Replaces the document (the history is cleared).
         virtual void SetPages(std::vector<PageSpec> pages) = 0;
+        /// Page operations that keep the history: edits of other pages follow them; edits of a removed page are dropped
+        /// (removing a page cannot be undone - ask first). Strokes, stroke keys, lazy pages and page layers follow too;
+        /// the app changes its own pages the same way (indices of later pages shift).
+        virtual void InsertPages(int index, std::vector<PageSpec> pages) = 0;
+        virtual void RemovePage(int index) = 0;
+        virtual void MovePage(int from, int to) = 0;
         virtual PageLayout const& Layout() const = 0;
         virtual void ZoomTo(float zoom) = 0;    // around the view's center
         virtual void FitWidth() = 0;

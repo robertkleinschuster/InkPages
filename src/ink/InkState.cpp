@@ -50,6 +50,55 @@ namespace inkpages::detail
         return strokes;
     }
 
+    void InkState::BeginRelocation(PageMap const& map, PageLayout next)
+    {
+        Relocation r;
+        for (int page = 0; page < layout.Count(); ++page)
+        {
+            int to = map(page);
+            r.shift.push_back(to < 0 ? PointF{} : PointF{ next.Page(to).left - layout.Page(page).left, next.Page(to).top - layout.Page(page).top });
+        }
+        relocation = std::move(r);
+        std::vector<InkStroke> leaving; // strokes of removed pages, and the originals of moved strokes
+        std::vector<Placed> moved;
+        std::map<uint32_t, int> owners;
+        for (InkStroke const& s : container.GetStrokes())
+        {
+            int page = PageOf(s);
+            int to = map(page);
+            if (to < 0)
+            {
+                keys.Forget(s.Id());
+                leaving.push_back(s);
+                continue;
+            }
+            InkStroke at = Relocated(s, page);
+            if (at != s)
+            {
+                leaving.push_back(s);
+                moved.push_back({ at, to });
+            }
+            else owners[s.Id()] = to;
+        }
+        Remove(leaving);
+        owner = std::move(owners);
+        for (Placed const& p : moved) Add(p.stroke, p.page);
+        layout = std::move(next);
+    }
+
+    InkStroke InkState::Relocated(InkStroke const& stroke, int oldPage)
+    {
+        if (!relocation || oldPage < 0 || oldPage >= static_cast<int>(relocation->shift.size())) return stroke;
+        if (auto it = relocation->copies.find(stroke.Id()); it != relocation->copies.end()) return it->second;
+        PointF d = relocation->shift[oldPage];
+        if (d.x == 0 && d.y == 0) return stroke;
+        Affine m = Affine::Translation(d.x, d.y);
+        InkStroke copy = Transformed(stroke, m);
+        keys.Moved(stroke.Id(), copy.Id(), m); // the app's key follows (its page coordinates stay the same)
+        relocation->copies.emplace(stroke.Id(), copy);
+        return copy;
+    }
+
     std::vector<Placed> InkState::Split(InkStroke const& stroke) const
     {
         RectF bounds = BoundsOf(stroke);

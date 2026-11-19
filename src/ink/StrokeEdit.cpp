@@ -34,6 +34,18 @@ namespace inkpages::detail
         }
     }
 
+    void StrokeEdit::RemapPages(PageMap const& map)
+    {
+        for (auto* list : { &removed, &added })
+        {
+            for (auto& e : *list)
+            {
+                e.stroke = ink.Relocated(e.stroke, e.page);
+                e.page = map(e.page);
+            }
+        }
+    }
+
     void StrokeEdit::Undo() { Swap(ink, added, removed); }
 
     void StrokeEdit::Redo() { Swap(ink, removed, added); }

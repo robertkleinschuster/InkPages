@@ -113,6 +113,7 @@ namespace inkpages::tests
             bool Empty() const override { return false; }
             void Undo() override { log->push_back("undo " + name); }
             void Redo() override { log->push_back("redo " + name); }
+            void RemapPages(PageMap const& map) override { page = map(page); }
             std::vector<std::string>* log;
             std::string name;
             int page;

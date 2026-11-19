@@ -25,6 +25,11 @@ namespace inkpages
         for (auto& e : edits) e->Redo();
     }
 
+    void CompositeEdit::RemapPages(PageMap const& map)
+    {
+        for (auto& e : edits) e->RemapPages(map);
+    }
+
     void UndoHistory::Push(std::shared_ptr<Edit> edit)
     {
         if (!edit || edit->Empty()) return;
@@ -60,6 +65,18 @@ namespace inkpages
         redo.clear();
         saved = nullptr;
         reachable = true;
+    }
+
+    void UndoHistory::RemapPages(PageMap const& map)
+    {
+        for (int page = 0; page < static_cast<int>(map.newIndex.size()); ++page)
+        {
+            if (map.Removes(page)) Forget(page);
+        }
+        for (auto const* list : { &undo, &redo })
+        {
+            for (auto const& e : *list) e->RemapPages(map);
+        }
     }
 
     void UndoHistory::Forget(int page)
