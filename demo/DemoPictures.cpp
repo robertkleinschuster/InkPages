@@ -87,6 +87,17 @@ RectF DemoPictures::Bounds(PictureId picture)
     return it != cards.end() ? it->second.bounds : RectF{};
 }
 
+std::optional<PictureId> DemoPictures::PictureAt(PointF point)
+{
+    std::optional<PictureId> top; // the last added lies on top
+    for (auto& [id, card] : cards)
+    {
+        RectF b = card.bounds;
+        if (card.shown && point.x >= b.left && point.x <= b.right && point.y >= b.top && point.y <= b.bottom) top = id;
+    }
+    return top;
+}
+
 void DemoPictures::Preview(std::vector<PictureId> const& pictures, Affine const& m)
 {
     for (PictureId id : pictures)

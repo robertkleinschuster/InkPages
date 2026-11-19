@@ -51,14 +51,23 @@ namespace inkpages::detail
     void SelectionController::Selected(StrokeSelection const& made, std::vector<PointF> const& polygon)
     {
         std::vector<PictureId> picked;
-        if (PictureHost* host = c.pictures(); host && polygon.size() >= 3)
+        PictureHost* host = c.pictures();
+        if (host && !polygon.empty())
         {
             RectF b{ polygon[0].x, polygon[0].y, polygon[0].x, polygon[0].y };
             for (PointF p : polygon) b = { std::min(b.left, p.x), std::min(b.top, p.y), std::max(b.right, p.x), std::max(b.bottom, p.y) };
-            for (int page : c.layout().PagesIn(b))
+            if (made.Empty() && b.Width() + b.Height() < Tap::MaxDistance)
             {
-                auto in = host->PicturesIn(page, polygon);
-                picked.insert(picked.end(), in.begin(), in.end());
+                // A tap (with the selection tool or the barrel) on no stroke selects the picture under the pen.
+                if (auto picture = host->PictureAt({ (b.left + b.right) / 2, (b.top + b.bottom) / 2 })) picked.push_back(*picture);
+            }
+            else if (polygon.size() >= 3)
+            {
+                for (int page : c.layout().PagesIn(b))
+                {
+                    auto in = host->PicturesIn(page, polygon);
+                    picked.insert(picked.end(), in.begin(), in.end());
+                }
             }
         }
         Set(made, std::move(picked));
@@ -80,20 +89,33 @@ namespace inkpages::detail
                 any = true;
             }
         }
-        if (any)
-        {
-            float zoom = c.viewport->Current().zoom;
-            frame = SelectionFrame{ b, 4 / zoom, 10 / zoom }; // the frame and handles keep their size on the screen
-        }
+        if (any) frame = FrameAround(b);
         Publish();
     }
 
-    void SelectionController::Publish()
+    // The frame and its handles keep their size on the screen: page units = DIPs / zoom.
+    std::optional<SelectionFrame> SelectionController::FrameAround(RectF bounds) const
+    {
+        float zoom = c.viewport->Current().zoom;
+        return SelectionFrame{ bounds, 4 / zoom, 10 / zoom };
+    }
+
+    void SelectionController::Zoomed()
+    {
+        float zoom = c.viewport->Current().zoom;
+        if (!frame || drag || zoom == frameZoom) return;
+        frame = FrameAround(frame->bounds);
+        Publish(false);
+    }
+
+    void SelectionController::Publish(bool log)
     {
         auto f = frame;
+        frameZoom = c.viewport->Current().zoom;
         c.host->Post("selection frame", [tools = c.tools, f] {
             if (ToolInput* t = tools()) t->SetFrame(f);
         });
+        if (!log) return;
         Log(std::format("selection: {} strokes, {} pictures", strokes.ids.size(), pictures.size()));
         if (c.changed) c.changed();
     }

@@ -20,6 +20,7 @@ public:
     std::vector<inkpages::PictureId> PicturesIn(int page, std::vector<inkpages::PointF> const& polygon) override;
     std::vector<inkpages::PictureId> PicturesOn(int page) override;
     inkpages::RectF Bounds(inkpages::PictureId picture) override;
+    std::optional<inkpages::PictureId> PictureAt(inkpages::PointF point) override;
     void Preview(std::vector<inkpages::PictureId> const& pictures, inkpages::Affine const& m) override;
     void Transform(std::vector<inkpages::PictureId> const& pictures, inkpages::Affine const& m) override;
     uint64_t Remove(std::vector<inkpages::PictureId> const& pictures) override;

@@ -24,6 +24,8 @@ namespace inkpages
         /// All pictures of a page (select all).
         virtual std::vector<PictureId> PicturesOn(int page) = 0;
         virtual RectF Bounds(PictureId picture) = 0;
+        /// The topmost picture under a point (a tap with the selection tool or the barrel selects it), if any.
+        virtual std::optional<PictureId> PictureAt(PointF point) { (void)point; return std::nullopt; }
 
         /// While a selection is dragged: show the pictures transformed by `m` (identity: as they are).
         virtual void Preview(std::vector<PictureId> const& pictures, Affine const& m) = 0;

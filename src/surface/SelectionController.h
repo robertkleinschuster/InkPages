@@ -43,6 +43,8 @@ namespace inkpages::detail
         explicit SelectionController(SelectionContext context) : c(std::move(context)) {}
 
         bool HasSelection() const { return !strokes.Empty() || !pictures.empty(); }
+        /// The view zoomed: the frame and its handles keep their size on the screen.
+        void Zoomed();
 
         // From the ink thread's tools (handed to the UI thread):
         void Selected(StrokeSelection const& made, std::vector<PointF> const& polygon);
@@ -77,7 +79,8 @@ namespace inkpages::detail
         void MoveTo(POINT client);
         void Release();
         void Set(StrokeSelection const& made, std::vector<PictureId> picked);
-        void Publish();
+        void Publish(bool log = true);
+        std::optional<SelectionFrame> FrameAround(RectF bounds) const;
         void PushWith(std::function<std::shared_ptr<Edit>(ToolInput&)> strokes, std::shared_ptr<Edit> pictureEdit,
             bool keep);
         std::shared_ptr<Edit> PictureStep(int kind, std::vector<PictureId> ids, Affine m, uint64_t token, std::set<int> pages);
@@ -87,6 +90,7 @@ namespace inkpages::detail
         StrokeSelection strokes;
         std::vector<PictureId> pictures;
         std::optional<SelectionFrame> frame;
+        float frameZoom = 0; // the zoom the frame was laid out for
         std::optional<Drag> drag;
     };
 }

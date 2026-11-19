@@ -55,6 +55,7 @@ namespace inkpages::detail
                 inkView = view;
             }
             if (!viewport->Moving()) Changed(true);
+            selection->Zoomed();
             if (viewChanged) viewChanged();
         };
         viewport->onStatus = [this](bool settled) {
