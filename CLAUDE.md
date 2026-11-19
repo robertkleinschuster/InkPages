@@ -39,7 +39,7 @@ modules (see "Structure").
 - **No app dependencies.** No file format, no app texts (apps pass their language). Small classes with one job; logic
   without UI is unit-tested.
 - Windows 11 (26200) only, x64. Right-handed: nothing interactive at the right edge. Touch and touchpad never draw: they
-  pan and zoom the sheet; the pen writes; the mouse is a pointer.
+  pan and zoom the sheet; the pen writes; the mouse never writes (user, 2026-11-19): it selects and taps links.
 - Code, comments and commits in English. Breaking API changes: update Xournal Studio in the same session.
 - Coordinate with the MatheTrainer session: announce before editing this repository; one Windows Sandbox at a time
   (`wsb list` empty, lock file xournal-studio-windows `.local-build\sandbox.lock`).
@@ -223,6 +223,17 @@ toolbar  ->  surface  ->  tools  ->  ink  ->  render  ->  model        (base: Lo
   per-monitor DPI aware - unaware it returns coordinates scaled to 96 DPI): pass it with `-Data .local-build\tools\uiaprobe.exe`.
 - **Path icons:** app buttons may bring XAML/SVG path data (`F0`/`F1`, M L H V C A Z, absolute/relative; `model/PathData`,
   unit-tested), drawn with D2D into the button's bitmap in the font glyphs' color and size.
+- **Mouse and taps** (2026-11-19, sandbox `MouseTest.ps1`): the presenter takes only the pen (`InputDeviceTypes` =
+  Pen, set once at creation - no rewrite during a hover; `SurfaceOptions::mouseInks` is gone). The mouse comes to the
+  window as WM_LBUTTON*/WM_MOUSEMOVE (mouse messages Windows makes from pen/touch carry the 0xFF515700 signature in
+  `GetMessageExtraInfo` [doc] and are ignored). `SelectionController` gets the press first (move/scale on the frame,
+  a press beside clears); otherwise `MouseSelect` runs: a drag that leaves the tap distance becomes ToolInput's lasso or
+  rectangle (`MouseSelect*`, the select mode, any tool; the pen's press takes over), a click selects the picture under
+  it, else it is the app's `tapped`. `TapGesture` (model, unit-tested) tells taps: Tap's rules, one pointer, not
+  cancelled. Finger: [measured] after `SetContact` the window still gets WM_POINTERUPDATE/UP of the contact, and a tap
+  leaves DirectManipulation READY; a pan goes RUNNING within ~40 ms of the down, which cancels the tap (`TouchTaps`;
+  WM_POINTERCAPTURECHANGED cancels too). Measured: mouse drag with the pen tool = no ink, lasso; click on the card
+  selects it; click beside clears (no tap); click on nothing, finger tap = `tapped`; a finger pan = no tap, still pans.
 - **Underlay:** the app draws under the ink with D2D (`drawUnderlay(page, dc, area)`, page coordinates) into the
   sheet's virtual surface, over the Paper; `InvalidatePage` redraws it; page layers (`PageLayer`) are DComp visuals for
   live content (pictures dragged by the selection).

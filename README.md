@@ -56,6 +56,10 @@ toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize(
   strokes, stroke keys and page layers follow; edits of a removed page are dropped; remap your own per-page data with
   `model/PageMap.h`), `ZoomTo`, `FitWidth`, `ScrollToPage`, `PageInView`, `Layout`, `viewChanged`.
   Finger/touchpad pan and pinch, wheel scrolls, Ctrl+wheel zooms; pen and mouse buttons never pan.
+- **Input:** only the pen writes. The mouse (and touchpad clicks) selects with any tool: a drag lassos (or draws the
+  rectangle, by the select mode), on the selection moves it, on a corner scales it; a click beside it clears it, on a
+  picture selects it. `tapped(page, point, PointerKind)`: a mouse click or finger tap no selection gesture took (for
+  links); a finger pan is no tap.
 - **Strokes:** `KeyedStroke` = `InkStroke` (points with pressure, tilt, time; drawing attributes) in page
   coordinates + the app's key + the transform since loading. Lazy pages: `load`/`store` (ink thread); `StrokesOf(page)`
   to save live pages; `contentChanged(pages)` after every edit; `Hold(page)`.
