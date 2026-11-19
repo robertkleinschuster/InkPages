@@ -16,7 +16,9 @@ later (a WinUI fix would go on a branch from the tag, announced first); Xournal 
 submodule commit until its C++ app replaces it. The plan: xournal-studio-windows `docs/CPP-UMZUG.md` (phases 0–5).
 Phase 0 (2026-11-19): project skeleton – library (`Log`), demo window, unit tests, build script, CI.
 Phase 1 (2026-11-19): the writing surface – `WritingSurface` (pages, paper, ink, DirectManipulation pan/zoom, pen
-cursor, lazy pages), demo, unit tests and sandbox tests (see "Writing surface" below). Next: phase 2, the tools.
+cursor, lazy pages), demo, unit tests and sandbox tests (see "Writing surface" below).
+Phase 2a (2026-11-19): toolbar, pens, highlighters, eraser (whole strokes and exact), the pen's eraser end, undo/redo
+(see "Tools" below). Next: 2b selection, 2c shapes, recognition, ruler.
 
 ## Rules (agreed with the user)
 
@@ -67,9 +69,18 @@ cursor, lazy pages), demo, unit tests and sandbox tests (see "Writing surface" b
 - `WritingSurface.h` (public) / `src/WritingSurface.cpp`: the child window; wires `Graphics` (D3D11 + D2D + DComp
   device), `Viewport` (DirectManipulation), `PaperLayer` (one sheet: D2D into a DComp virtual surface) and `InkLayer`
   (the ink presenter on Windows' ink host thread, page ownership of strokes, lazy load/store).
-- `demo/`: `main.cpp` (only the public API), `cursors/` + `tools/make_cursors.py` (dot cursors per color × width),
+- Tools (2a): `Pens.h` (PenWidths, HighlighterWidths, InkWidth, Palette, PenPreset, ToolChoices with a text round
+  trip), `StrokeEraser.h` (the exact eraser's geometry), `UndoHistory.h` (one history over an `Edit` interface, save
+  point) - pure, unit-tested (`tests/ToolTests.cpp`). `Toolbar.h` / `src/Toolbar.cpp` (comctl32 toolbar in its own
+  container window; `ToolbarTexts`, app buttons, `Choose`, `choicesChanged`), `src/Icons.cpp` (Segoe Fluent Icons
+  glyphs and swatches drawn at the DPI). Ink side: `src/InkState` (container + stroke -> page + helpers),
+  `src/StrokeEdit` (removed/added strokes; undo re-adds `Clone()`s), `src/PartialEraser` (exact eraser on unprocessed
+  input), `src/CircleLayer` (its circle, a D2D ring below the ink).
+- `demo/`: `main.cpp` (only the public API; German toolbar texts), `cursors/` + `tools/make_cursors.py` (a dot cursor
+  per palette color × width step, 80 cursors, ids 1000/2000 + color × 10 + step),
   `UiTests/SurfaceTest.ps1` (pan/pinch/wheel, ink under the pen, page 2, lazy pages, pen + finger, cursor),
-  `UiTests/BoundaryTest.ps1` (a stroke across the gap). `tools/cursorprobe.cpp`: DXGI Desktop Duplication probe – the
+  `UiTests/BoundaryTest.ps1` (a stroke across the gap), `UiTests/ToolsTest.ps1` (presets, highlighter, eraser exact
+  and whole, the eraser end both ways, a preset's menu, undo/redo across two pages, the cursor on the first hover). `tools/cursorprobe.cpp`: DXGI Desktop Duplication probe – the
   pointer as the screen draws it (GetCursorInfo and screenshots cannot show it); `build.ps1` puts it in
   `.local-build	ools` (pass it with `-Data`).
 
@@ -84,8 +95,15 @@ cursor, lazy pages), demo, unit tests and sandbox tests (see "Writing surface" b
   E_UNEXPECTED; stack with cdb: the internal ink thread was in `CInputContext::Activate` at the same moment). It hit
   reliably when presenters were created while others already had cursors (the lazy per-page pattern), never when all
   cursors were set after creation. No event says the activation is done, so per-page presenters with lazy creation
-  would gamble on timing. With one presenter: created once, its cursor set 300 ms later (`CursorDelayMs`), tool changes
-  later are safe. No input switching between presenters either.
+  would gamble on timing. With one presenter there is one activation, and no input switching between presenters.
+- **When the pen cursor may be set (root cause, 2026-11-19):** the crash is `put_PointerCursor` -> `_RunOnInkThreadSync`
+  failing while `CInputContext::Activate` runs on Windows' internal ink thread (queued when the presenter and its
+  `CoreInkIndependentInputSource` are created; no API reports its end, Microsoft's docs say nothing about it). The
+  observable signal that it is done: the input source's first pointer event (Entering/Hovering/Moving) - input only
+  arrives through an active context. The library sets the cursor there (from that event, on Windows' input thread)
+  and afterwards whenever the tool changes; no timer. Sandbox: the dot showed at the pen on the very first hover
+  (`ToolsTest.ps1`, cursorprobe); 30 starts of a single presenter with the cursor set right after creation (the
+  win32-ink-demo) never crashed either - only several activations at once did.
 - Strokes still belong to pages (the file format keeps them per page): a stroke belongs to the page nearest to its
   first point. **A stroke across the gap is one stroke, owned by the page it began on, and drawn over the gap**
   (`BoundaryTest.ps1`) – the WinUI version cut ink off at the page's edge. Open for phase 2: clip or split.
@@ -118,6 +136,28 @@ cursor, lazy pages), demo, unit tests and sandbox tests (see "Writing surface" b
 - Size/start (demo): one exe of ~1 MB, 59 modules (all Windows'), working set ~60–68 MB (D3D/D2D/DComp/DM + ink);
   window ~0.1 s after start when warm; the very first start of a new exe waited ~14–24 s before the process existed
   (Defender scanning the new file, as with the WinUI build).
+
+## Tools (phase 2a, measured 2026-11-19 in the sandbox, `ToolsTest.ps1`)
+
+- Toolbar: comctl32 toolbar (flat, tooltips via TBN_GETINFOTIP, BTNS_CHECK + BTNS_DROPDOWN, images from Segoe Fluent
+  Icons at 16 px × DPI); preset menus are user32 popup menus (swatch bitmaps; a bitmap replaces the check mark, so the
+  current color is bold) - windowed popups, pen taps reach them. A second tap on the active preset opens its menu too
+  (WinUI behavior). The toolbar lives in its own container window (its notifications stay in the library).
+- Pens: size = Xournal width / 1.75 (`InkWidth::FullPressureFactor`), pressure on, `FitToCurve` off, round tip.
+  Highlighters: `DrawAsHighlighter`, no pressure, size = width. Windows ink draws highlighter strokes below the pens'
+  ink (a black stroke stays visible over a later yellow highlighter).
+- Eraser: whole strokes = presenter mode Erasing (`StrokesErased` -> undo edit); exact = mode None, the presenter's
+  `UnprocessedInput` (Pressed/Moved/Released/Lost; `GetIntermediatePoints` sorted by time) drives `PartialEraser`, one
+  undo step per drag. The pen's eraser end: with whole-stroke erasing Windows ink erases in mode Inking by itself;
+  with exact erasing it is taken on its inverted hover (input source Hovering with `IsInverted`, mode switched to None
+  - only the mode, a hover survives that) and given back when the tip hovers. The circle is a D2D ring below the ink
+  (on the sheets) - above the ink a visual sits in the pen's way.
+- Undo: one `UndoHistory` on the ink thread; edits are removed/added strokes (collected, erased, cut); undo re-adds
+  `Clone()`s (a stroke cannot be added twice) and from then on the edit holds the copies. Pages with history are held
+  (lazy pages never release them). Sandbox: 4 undos restored strokes erased whole, by the eraser end and cut exactly;
+  a stroke on page 1 and one on page 2 undone in time order and redone.
+- Presenter state lives on the host thread: input events (Windows' input thread) and UI calls queue work items
+  (`OnInkThread`, run inline when already on the host thread).
 
 ## Facts learned in the WinUI version (tag `winui-final`; measured on the user's device and in Windows Sandbox, 2026-11-15..19)
 

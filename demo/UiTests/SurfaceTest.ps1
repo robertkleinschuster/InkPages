@@ -95,10 +95,10 @@ Invoke-Test {
     Start-Sleep 2
     Shot '10-pen-and-finger'
 
-    # 9. the pen cursor: blue, large - the screen draws it at the pen
-    Key 0x32; Key 0x4C
+    # 9. the pen cursor: the blue preset's dot - the screen draws it at the pen
+    Key 0x32
     Hover 300 300; Hover 320 310
-    Snap 'cursor-blue-large'
+    Snap 'cursor-blue'
     [Inj]::PenFrame(320, 310, $UPDATE -bor $PRIMARY, 0, 0)
 
     # 10. pinch out to the minimum: the whole document

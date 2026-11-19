@@ -15,8 +15,9 @@ them, plus their toolbar – native, lean, modern Win32.
 
 There is no file format inside: the app supplies its document's pages and adds its own commands.
 
-**Status (2026-11-19): the move from WinUI 3 to C++/Win32 is under way – phase 1, the writing surface, is in (pages,
-paper, ink, pan/zoom, pen cursor, lazy pages); the tools follow in phase 2.** The WinUI 3 version
+**Status (2026-11-19): the move from WinUI 3 to C++/Win32 is under way – the writing surface (pages, paper, ink,
+pan/zoom, pen cursor, lazy pages) and the first tools (toolbar, pen and highlighter presets, eraser whole/exact, the
+pen's eraser end, undo/redo) are in; selection, shapes and the ruler follow.** The WinUI 3 version
 (C#, `InkCanvas`/`InkToolbar`, with its WinUI fork runtime) is tagged
 [`winui-final`](https://github.com/robertkleinschuster/InkPages/tree/winui-final).
 
@@ -53,6 +54,11 @@ surface->viewChanged = [] { /* zoom / page in view changed */ };
 - `ZoomTo`, `FitWidth`, `ScrollToPage`, `PageInView`, `CurrentView`, `Layout` (page rectangles, page at a point).
 - Lazy pages: only pages near the view hold their strokes in the ink presenter; the others are handed to `store` and
   come back through `load`. `Hold(page, true)` keeps a page's ink (e.g. while it has an edit).
+- Toolbar: `inkpages::Toolbar::Create(parent, *surface, choices, texts, cursorFor)` – undo/redo, pen presets (color
+  and width menus), highlighter presets, eraser and the "erase whole strokes" toggle (its arrow: the circle's size),
+  the app's own buttons. `ToolbarTexts` (English defaults; the app passes its language), `ToolChoices` (the app keeps
+  them: `choicesChanged`, `Serialize`/`Parse`), `Choose` for keyboard shortcuts.
+- Undo/redo: `surface->Undo()`, `Redo()`, `historyChanged`, `MarkSaved()`/`AtSavePoint()` – one history across pages.
 - The pen cursor is a cursor resource in the app's exe (the demo ships dot cursors per color × width,
   `demo/tools/make_cursors.py`).
 

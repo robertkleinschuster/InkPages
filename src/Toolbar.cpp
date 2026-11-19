@@ -291,8 +291,10 @@ namespace inkpages
                 HBITMAP swatch = Swatch(pen ? Palette::Pens[i] : Palette::Highlighters[i], swatchSize);
                 swatches.push_back(swatch);
                 MENUITEMINFOW info{ sizeof(info) };
-                info.fMask = MIIM_BITMAP;
+                info.fMask = MIIM_BITMAP | MIIM_STATE;
                 info.hbmpItem = swatch;
+                // The swatch takes the check mark's place: the current color is shown in bold.
+                info.fState = static_cast<int>(i) == preset.color ? MFS_CHECKED | MFS_DEFAULT : 0;
                 SetMenuItemInfoW(menu, static_cast<UINT>(1 + i), FALSE, &info);
             }
             AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
