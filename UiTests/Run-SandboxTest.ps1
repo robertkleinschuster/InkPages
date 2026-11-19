@@ -1,9 +1,9 @@
 ﻿# UI test in Windows Sandbox with real (synthetic) pen and touch input (the sandbox window opens on the desktop).
-# Copies an app build (-App, e.g. a dotnet publish folder), optional test data and the test script into a shared folder,
+# Copies an app build (-App, e.g. .local-build\demo), optional test data and the test script into a shared folder,
 # starts a sandbox, runs the script in its user session and collects screenshots and logs in <Work>\out.
 # In-sandbox scripts dot-source C:\sbx\TestKit.ps1 (shared helpers: start the app, UI Automation, pen injection).
-# The library's own tests: dotnet publish InkPages.Demo -c Release -o .local-build\demo, then
-#   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test InkPages.Demo\UiTests\ToolsTest.ps1
+# The library's own tests: .\build.ps1 (the demo goes to .local-build\demo), then
+#   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\StartTest.ps1
 # Apps that embed InkPages can use this runner and TestKit.ps1 for their own UI tests.
 param(
     [Parameter(Mandatory)][string]$App,            # folder with the app (copied to C:\sbx\app)

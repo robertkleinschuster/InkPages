@@ -1,0 +1,4 @@
+#include <winres.h>
+
+// The app manifest as a resource: comctl32 v6 (visual styles), PerMonitorV2 DPI awareness, Windows 10/11.
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "app.manifest"

@@ -4,58 +4,67 @@ Guidance for Claude Code in this repository. Keep it current: add what is learne
 
 ## What this is
 
-**InkPages**: the reusable, pen-first writing area for WinUI 3 apps. It holds pages with Windows Ink, the tools
-(selection, shapes, partial eraser, auto-scroll, undo) and the toolbar. It was moved out of
-[xournal-studio-windows](https://github.com/robertkleinschuster/xournal-studio-windows) on 2026-11-18, history included,
-so that other apps can use it too. Xournal Studio for Windows and the MatheTrainer embed it as a git submodule
-(`external/InkPages`). The library has no file format: apps implement `InkPage` and add their commands to the toolbar.
-Public repository. The README is the user-facing documentation (embedding, runtime).
+**InkPages**: the reusable, pen-first writing area for Win32 apps – Windows ink through the Win32 ink presenter
+(`IInkDesktopHost`/`IInkPresenterDesktop`) in DirectComposition, finger/touchpad pan and zoom with DirectManipulation,
+the tools (selection, shapes, partial eraser, auto-scroll, undo) and the toolbar (comctl32). Written in C++20, plain
+Win32 + C++/WinRT, built with CMake. Embedded by Xournal Studio for Windows as the git submodule `external/InkPages`
+(its C++ app in `native/`). Public repository; the README is the user-facing documentation.
 
-Where the knowledge is: platform facts for any WinUI ink app (InkCanvas, InkPresenter input, lifted compositor, XAML
-input) are in the user's global CLAUDE.md; why the tools are built the way they are – and the WinUI fork's fixes – is
-in "Facts learned" below (every embedding app's sessions should read it); the apps' own CLAUDE.md files hold only what
-is specific to them (xournal-studio-windows: .xopp, PDF, explorer, sync; MatheTrainer: exercises, recognition).
+**Since 2026-11-19 InkPages moves from WinUI 3 (C#) to C++/Win32** (user: "nativ, schlank, Win32 – aber die moderne
+Variante davon"). The WinUI version is tagged **`winui-final`**: MatheTrainer stays pinned on it until it moves to C++
+later (a WinUI fix would go on a branch from the tag, announced first); Xournal Studio's C# app stays on its pinned
+submodule commit until its C++ app replaces it. The plan: xournal-studio-windows `docs/CPP-UMZUG.md` (phases 0–5).
+Phase 0 (2026-11-19): project skeleton – library (`Log`), demo window, unit tests, build script, CI.
 
 ## Rules (agreed with the user)
 
-- **Microsoft's APIs do the work; the library only wires them up correctly.** `InkStrokeContainer` selects, moves,
-  deletes and copies ink. Straight lines come from the Windows ruler, shape recognition from `InkAnalyzer`, and the
-  eraser is the native one. Do not re-implement what a platform feature does, and do not work around framework
-  behavior. When an API is broken, find the root cause (issue/PR) and report the options. The partial eraser is an
-  agreed exception: Windows ink erases whole strokes only (proposal microsoft-ui-xaml #1530).
-- **Native elements of the framework in use – no Frankenstein** (user, 2026-11-19): the library and its apps use the
-  controls of their main technology (today WinUI 3) in its default look, and do not mix UI frameworks or rebuild
-  controls the framework has. If the main technology changes (a Win32 demo with the Win32 ink presenter and
-  DirectManipulation is being evaluated), the rule applies to the new one.
-- **Never swallow exceptions.** Log type, HResult and message (`InkLog`; handlers on forwarded ink events log
-  themselves through `InkLog.Guard`).
-- **No app dependencies.** No file format and no app texts: `PenToolbarTexts` holds English defaults, and apps pass
-  their own language. Built in code with no XAML resources, so nothing has to be merged into an app's .pri.
-- Small classes with one job. Logic without UI goes into `Model/` (unit-tested).
-- Windows 11 (26200) only, x64, unpackaged self-contained apps. Right-handed: nothing interactive at the right edge.
-  Touch never draws.
-- Code, comments and commits in English.
-- Breaking API changes affect every embedding app. Update them in the same session, or say what they have to change.
+- **Nativ, schlank, modern Win32.** C++20, plain Win32, C++/WinRT for WinRT APIs (Windows.UI.Input.Inking, InkAnalyzer,
+  Windows.Data.Pdf). comctl32 v6 with visual styles (Windows 11 look, normal mouse sizes – the pen operates them),
+  user32 menus, DirectComposition/Direct2D/DirectWrite/WIC, PerMonitorV2, static CRT. Few dependencies: only where
+  Windows has nothing, statically linked. No UI framework on top, no mix of UI frameworks (no XAML islands) – native
+  elements of the technology in use, no Frankenstein.
+- **Microsoft's APIs do the work; the library only wires them up correctly.** The ink presenter collects, renders,
+  selects, erases ink; DirectManipulation pans and zooms; the Windows ruler draws straight lines; `InkAnalyzer`
+  recognizes shapes. Follow Microsoft's docs and samples (Windows-classic-samples: TouchInputDirectManipulation, ink).
+  When an API is broken, find the root cause and report the options. The partial eraser stays an agreed exception
+  (Windows ink erases whole strokes only).
+- **Never swallow errors.** Log the kind, HRESULT and message (`inkpages::LogHr`, `inkpages::LogException` inside a
+  catch); every boundary (window procedure, callbacks from Windows, threads) catches and logs.
+- **No app dependencies.** No file format, no app texts (apps pass their language). Small classes with one job; logic
+  without UI is unit-tested.
+- Windows 11 (26200) only, x64. Right-handed: nothing interactive at the right edge. Touch and touchpad never draw: they
+  pan and zoom the sheet; the pen writes; the mouse is a pointer.
+- Code, comments and commits in English. Breaking API changes: update Xournal Studio in the same session.
+- Coordinate with the MatheTrainer session: announce before editing this repository; one Windows Sandbox at a time
+  (`wsb list` empty, lock file xournal-studio-windows `.local-build\sandbox.lock`).
 
-## WinUI runtime (2026-11-18)
+## Build, test
 
-- The library compiles against the official `Microsoft.WindowsAppSDK.WinUI` + `.DWrite` **2.6.6-experimental**.
-  `build/WinUIForkRuntime.targets` (imported by every app, including the demo) swaps the package's runtime payload
-  for the **Release (fre)** runtime of the WinUI fork. It does this right after
-  `AddMicrosoftWindowsAppSDKPayloadFilesFromComponents`, so the fork's `Microsoft.UI.Xaml.Controls.pri` templates reach
-  the app's .pri. The fork is robertkleinschuster/microsoft-ui-xaml, branch `fix/ink-runtime-highlighter`: upstream main
-  of 2026-11-16 + PR #12292 + InkToolbar custom tool states + pointer capture across routing + custom pens' drawing
-  attributes.
-- `tools/Get-WinUIRuntime.ps1` fetches it from the fork's release `winui-ink-fix-d3b1bf22` (pinned URL + SHA-256)
-  into `.local-build/winui-fre` of **this** repository, so one pin serves all embedding apps. When an official
-  package ships PR #12292 and the other fixes, reference it and drop the overlay and the script.
-- Never use the chk (Debug) WinUI payload: it stops at internal asserts (0xC0000420). Never compile against the fork's
-  own package (3.0.0-dev): its XAML compiler breaks ScrollView's template.
-- `tools/Build-WinUILocal.ps1 -Source D:\wb` builds the fork's x64fre locally for iterating on WinUI fixes. The first
-  build takes ~57 min.
-- Issues/PRs for the fork's fixes are not opened upstream (public, needs the user's approval).
+```powershell
+.\build.ps1            # CMake (Visual Studio's) Release build + unit tests (CTest); demo -> .local-build\demo
+.\build.ps1 -NoTests
+```
+- Unit tests: GoogleTest (fetched once by CMake at configure time, pinned release; only for tests). Microsoft's
+  CppUnitTest was tried first: vstest.console found no tests in the CMake-built DLL (2026-11-19, not pursued).
+- UI tests in Windows Sandbox (the sandbox window opens on the desktop – tell the user first):
+  `UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\<Test>.ps1`; in-sandbox scripts dot-source
+  `C:\sbx\TestKit.ps1` (start the app, UI Automation, synthetic pen/touch with `Inj.cs`: hover ~100 ms before a press,
+  a sample every ~4 DIPs). The demo logs to `INKPAGES_DEMO_LOG` (TestKit sets `out\demo.log`).
+- Synthetic input fails with ERROR_ACCESS_DENIED while the host session is locked (Win32 demo, 2026-11-19).
 
-## Facts learned (the tools; measured with the user's device and in Windows Sandbox, 2026-11-15..18)
+## Structure
+
+- `include/inkpages/` – the public headers; `src/` – the library (static); `demo/` – the demo app (manifest: comctl32
+  v6, PerMonitorV2); `tests/` – unit tests; `UiTests/` – sandbox runner and TestKit.
+- `Log.h`: `SetLogFile`, `SetErrorSink` (errors also to the app, e.g. its errors.log), `Log`, `LogError`,
+  `DescribeHr`, `LogHr`, `LogException`.
+
+## Facts learned in the WinUI version (tag `winui-final`; measured on the user's device and in Windows Sandbox, 2026-11-15..19)
+
+These describe how the tools must behave (the C++ version keeps the behavior) and what the WinUI 3 platform did. Class
+names refer to the C# sources at `winui-final`. Platform facts of the Win32 route: the user's global CLAUDE.md and
+D:\src\win32-ink-demo.
+
 
 Platform facts that hold for any WinUI ink app are in the user's global CLAUDE.md (InkCanvas/InkPresenter, lifted
 compositor, XAML input, PDF, sandbox); the facts below are why the library's code is the way it is. Moved here from
@@ -150,80 +159,3 @@ xournal-studio-windows' CLAUDE.md on 2026-11-18 so that every embedding app (Mat
   `ContentOrientation="Vertical"` (zoomed content was clipped). `ScrollView.ZoomTo` is asynchronous: act on
   `ZoomCompleted` of the request.
 - `InkAnalyzer` works unpackaged; for ellipses `InkAnalysisInkDrawing.Points` are the ends of both axes (0–2, 1–3).
-
-## Architecture
-
-- `InkWorkspace`: the facade. It wires the toolbar, tools, input, auto-scroll and undo. Members: `Attach(page)`,
-  `SetPages` (the pages that have a view now), `Holds(page)` (the page's view must stay: history, selection, running
-  gesture or drag hand-over, shape recognition), `Reset`, `Removing/Removed`, `UndoStep`.
-- `InkWorkspace` also holds `Commands` (`InkCommands`), `CurrentPage`, `Choices`/`ChoicesChanged` (the user's
-  `ToolChoices`, raised once changes settle), `InkHidden` (collapse all pages' ink while a dialog lies over them, also
-  on pages attached later) and `ResetPage` (a page's ink replaced without undo: load, new task).
-- The page the toolbar drives (`CurrentPage`: ruler, where the user writes) is outlined in the accent color while more
-  than one page is shown (`MarkCurrentPage`: null = by the shown pages; an app with lazy views decides by its
-  document). The outline lies 3 px outside the page (never over the ink; the page's coordinates stay), so the pages'
-  spacing must leave room for it (16 in the apps). Screenshots: `InkPages.Demo/UiTests/CurrentPageMark.ps1`.
-- `UndoStack.ContentChanged` (edit recorded, undone, redone – not on clearing) and the save point (`MarkSaved`,
-  `IsAtSavePoint`, `Model/SavePoint`) tell the apps whether there is something to save. `InkLog.ErrorWriter` takes the
-  errors (exceptions, `InkLog.Error`) apart from the rest.
-- `InkPage`: the abstract page. It holds the app's `UnderInk` layers, the InkCanvas, the `Overlay` and the `Surface`.
-  Stroke identity across undo is the library's (`StrokeReplaced`/`CurrentStrokes`, not virtual; an app with data per
-  stroke follows with `OnStrokeReplaced`). Copying to another page (`CopyTo`), previews, placements and pictures have
-  defaults for a page with ink only (`ClearInk` empties it without undo); an app with data per stroke or pictures
-  overrides them (pictures are its own objects, removal tokens its own). `CreatePlaceholder` is a blank sheet for a page without a view.
-- `InkCommands`: the edit commands on Windows ink shared by the apps - undo/redo, delete, duplicate (`CopyPicture` for
-  pictures), cut/copy/paste through Windows ink's clipboard, select all, `ClearPage`, `SelectAdded`; refused while the
-  selection is dragged or the ink hidden (`Refused`; message `PenToolbarTexts.RefusedTitle(command)` + `Refused`, command names in
-  `CommandNames`). `PasteInk`: null = refused, empty =
-  nothing pasted. `WireToolbar(clipboard)` (false: an app with its own clipboard format wires cut/copy/duplicate) and
-  `AddShortcuts` (hidden accelerator tooltips, not while typing).
-- `InkPage.Paper` (`Model/PaperLines.cs`: `Paper`, `PaperKind` Plain/Graph/Lined, spacing in page units/DIPs, line
-  color and thickness; default color #D6E2F0): ruling drawn below the app's layers and the ink. Null: none (an app with
-  its own background, e.g. Xournal Studio's file ruling or PDF pages). The demo uses it.
-- `PenToolbar.Paste` ("PasteInkButton"): in the row once `InkCommands.WireToolbar` runs. With `clipboard: true` it
-  pastes Windows ink and is enabled while the clipboard holds ink (`RefreshPaste`: on `Clipboard.ContentChanged`, after
-  copy/cut; an app may call it when its window is activated); with `false` (own clipboard format, Xournal Studio) the
-  app wires its Click and IsEnabled.
-  `PenToolbar.Contextual` (opt-in, MatheTrainer): the row swaps with the state – writing: the tools; something selected:
-  select, undo/redo and the selection's commands, the other tools collapsed (the active tool stays active); in both,
-  paste while the clipboard holds ink. Commands that cannot run are collapsed, not disabled (in a CommandBar the app's
-  commands get the room). Default: every button in place, disabled when it cannot run.
-- `PenToolbar.Compact`: 40-wide command buttons (also the app's extensions), no separators, no spacing – for narrow
-  windows (MatheTrainer at ~1280 DIP); names/tooltips/UIA ids stay; the InkToolbar's own buttons keep WinUI's size.
-- `PenToolbar` (+ `PenToolbarTexts` with `German`, `BallpointPen`/`HighlighterPen`, `Extensions` for app buttons,
-  `PenToolbar.Command`). `new PenToolbar(texts, choices)` uses `XournalPalette` and the user's `ToolChoices`
-  (`Model/`, defaults: black/blue/red pens, yellow/green highlighters). The row: undo | pens | highlighters | eraser
-  (+ whole-stroke toggle) | select, shapes, ruler | selection commands | app extensions.
-- `ToolController`: copies the InkToolbar's tool to all pages' presenters. For a custom tool and for hover takeovers
-  it sets processing mode None, and then switches only the mode.
-- `InkTools`: routes the presenters' unprocessed pen/mouse input to `SelectionTool`, `ShapeTool` and
-  `PartialEraser`. A barrel press always goes to the selection. It also handles the hover takeovers (the eraser end,
-  the tip over the selection).
-- `Selection`, `SelectionDrag` and `DragAutoScroll` handle the selection (its commands' state: `PenToolbar.ShowSelection`). A move or scale runs
-  on XAML pointer input on the page's `Surface`, because the presenter that got the press keeps the pen and its
-  coordinates drift once its page scrolls. Auto-scroll runs on `CompositionTarget.Rendering`. **Moves are exact
-  (user, 2026-11-19):** a move or scale is applied however small it is; only a short (< 300 ms), nearly still (< 3
-  units) press on the selection is a tap that clears it (`Model/Tap`; before, every move under 3 units counted as a tap
-  and was lost). A tip tap beside the selection clears it and leaves no dot (`InkWorkspace.OnStrokesCollected` takes the
-  tap's stroke out again: beside a selection the pen inks); writing beside it clears it and keeps the stroke. Sandbox:
-  `InkPages.Demo/UiTests/SmallMoveTest.ps1`.
-- `PartialEraser`, `ShapeTool`, `ShapeRecognition`, `UndoStack` (`IPageEdit`: `PageEdit`, `TransformEdit`,
-  `CombinedEdit`), `InkLog`.
-- `Model/` has no UI: `ToolChoices`/`PenPreset`, `StrokeEraser`, `ShapeGeometry`/`ShapeKind`, `InkStrokes` (drawn width;
-  `FullPressureFactor` = 1.75), `PenWidths` (Xournal's width steps), `SampledStroke`, `SelectMode`.
-
-## Testing
-
-- `dotnet test InkPages.Tests`: unit tests of `Model/`.
-- UI tests run in Windows Sandbox (the sandbox window opens on the desktop, so tell the user first):
-  `dotnet publish InkPages.Demo -c Release -o .local-build\demo`, then
-  `UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test InkPages.Demo\UiTests\ToolsTest.ps1`.
-  `ToolsTest` covers the stroke eraser, eraser end, barrel lasso/move, selection (duplicate, scale, undo), exact
-  erasing, shapes and recognition, and a barrel drag across pages with auto-scroll. Also available: `CrossPageDrag`,
-  `DuplicateScaleUndo`, `HighlighterTest`, `PenWidthTest`, and `ToolbarStates` (screenshots of every toolbar state,
-  light and dark, for design reviews).
-- The demo logs to `INKPAGES_DEMO_LOG` (TestKit sets `out\demo.log`): gesture begin/end and undo steps.
-- Synthetic pen input must hover ~100 ms before a press on the selection, as a real pen does, and needs a sample
-  every ~4 DIPs. Check that the target window is in the foreground before injecting. In-sandbox scripts run in
-  PowerShell 5.1 (Add-Type = C# 5). Never name a function `Erase` (an alias of Remove-Item).
-- After a change, build an embedding app too (xournal-studio-windows: update its submodule and run its tests).

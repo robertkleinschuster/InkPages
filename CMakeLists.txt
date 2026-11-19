@@ -1,0 +1,45 @@
+cmake_minimum_required(VERSION 3.25)
+project(InkPages LANGUAGES CXX RC)
+
+# InkPages: the pen-first writing area for Win32 apps – Windows ink through the Win32 ink presenter
+# (IInkDesktopHost) in DirectComposition, finger/touchpad pan and zoom with DirectManipulation, comctl32 v6 controls.
+# Everything from the Windows SDK and Visual Studio: C++/WinRT headers ship with the SDK, the unit test framework with
+# Visual Studio – nothing is downloaded or restored.
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Static CRT: an app is a single exe (no VC++ runtime DLLs next to it).
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+set(INKPAGES_COMPILE_OPTIONS /W4 /WX /permissive- /EHsc /utf-8)
+set(INKPAGES_DEFINITIONS UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+
+# The library (linked statically into the apps).
+add_library(InkPages STATIC
+    src/Log.cpp
+)
+target_include_directories(InkPages PUBLIC include)
+target_compile_options(InkPages PRIVATE ${INKPAGES_COMPILE_OPTIONS})
+target_compile_definitions(InkPages PUBLIC ${INKPAGES_DEFINITIONS})
+target_link_libraries(InkPages PUBLIC windowsapp)
+
+# The demo and development app (UI tests in Windows Sandbox run against it).
+add_executable(InkPagesDemo WIN32 demo/main.cpp demo/app.rc)
+target_compile_options(InkPagesDemo PRIVATE ${INKPAGES_COMPILE_OPTIONS})
+target_link_options(InkPagesDemo PRIVATE /MANIFEST:NO) # the manifest is a resource (app.manifest)
+target_link_libraries(InkPagesDemo PRIVATE InkPages comctl32)
+
+# Unit tests: GoogleTest (fetched once at configure time, pinned release; only for the tests, never in an app),
+# run by CTest. (Microsoft's CppUnitTest found no tests in a CMake-built DLL under vstest.console – 2026-11-19.)
+include(FetchContent)
+FetchContent_Declare(googletest
+    URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.zip
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+enable_testing()
+add_executable(InkPagesTests tests/LogTests.cpp)
+target_compile_options(InkPagesTests PRIVATE ${INKPAGES_COMPILE_OPTIONS})
+target_link_libraries(InkPagesTests PRIVATE InkPages GTest::gtest_main)
+include(GoogleTest)
+gtest_discover_tests(InkPagesTests)
