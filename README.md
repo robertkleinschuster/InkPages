@@ -54,7 +54,7 @@ toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize(
 
 - **Pages and view:** `SetPages`, `InsertPages(index, specs)`, `RemovePage(index)`, `MovePage(from, to)` (the history,
   strokes, stroke keys and page layers follow; edits of a removed page are dropped; remap your own per-page data with
-  `model/PageMap.h`), `ZoomTo`, `FitWidth`, `ScrollToPage`, `PageInView`, `Layout`, `viewChanged`.
+  `model/PageMap.h`; the strokes you keep for `store`d pages in `pagesRemapped`, ink thread, in order with load/store), `ZoomTo`, `FitWidth`, `ScrollToPage`, `PageInView`, `Layout`, `viewChanged`.
   Finger/touchpad pan and pinch, wheel scrolls, Ctrl+wheel zooms; pen and mouse buttons never pan.
 - **Input:** only the pen writes. The mouse (and touchpad clicks) selects with any tool: a drag lassos (or draws the
   rectangle, by the select mode), on the selection moves it, on a corner scales it; a click beside it clears it, on a
@@ -75,7 +75,7 @@ toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize(
 - **Toolbar:** comctl32, Segoe Fluent icons, menus at the presets (color, width), at the eraser toggle (size), at
   select (lasso/rectangle), shapes (kind, recognition) and the ruler; `ToolbarTexts` in your language; app buttons
   (`ToolbarButton`: a Segoe Fluent glyph or a vector `path` in XAML path syntax, `pathSize` = its box; `name` = the
-  accessible name). Every button has an accessible name (MSAA, so native UI Automation and Narrator find it).
+  accessible name; `groupStart` = a separator before it). Every button has an accessible name (MSAA, so native UI Automation and Narrator find it).
 
 ## Layout
 
