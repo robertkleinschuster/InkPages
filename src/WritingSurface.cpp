@@ -7,6 +7,7 @@
 
 #include <winrt/Windows.Foundation.Collections.h>
 
+#include "CircleLayer.h"
 #include "Graphics.h"
 #include "InkLayer.h"
 #include "PaperLayer.h"
@@ -22,8 +23,9 @@ namespace inkpages
         constexpr wchar_t ClassName[] = L"InkPagesWritingSurface";
         constexpr UINT CommitMessage = WM_APP + 0x101;   // the presenter asks for a DirectComposition commit
         constexpr UINT ReadyMessage = WM_APP + 0x102;    // the presenter exists
-        constexpr UINT_PTR CursorTimer = 1, MotionTimer = 2;
-        constexpr UINT CursorDelayMs = 300;              // see InkLayer::ActivateCursor
+        constexpr UINT HistoryMessage = WM_APP + 0x103;  // the undo history changed
+        constexpr UINT CircleMessage = WM_APP + 0x104;   // the exact eraser's circle moved
+        constexpr UINT_PTR MotionTimer = 2;
         constexpr UINT MotionIntervalMs = 120;           // lazy pages and sheets while the view moves
 
         // The sheets' render scale: quantized, so tiny zoom differences after a gesture do not redraw.
@@ -44,7 +46,13 @@ namespace inkpages
             View CurrentView() const override { return viewport ? viewport->Current() : View{}; }
             float Scale() const override { return scale; }
             std::optional<int> PageInView() const override { return layout.PageInView(Visible()); }
-            void SetPen(Color color, float size, UINT cursorResourceId) override;
+            void SetTool(ToolState state) override;
+            void Undo() override { inkLayer->Undo(); }
+            void Redo() override { inkLayer->Redo(); }
+            bool CanUndo() const override { return inkLayer->History().canUndo; }
+            bool CanRedo() const override { return inkLayer->History().canRedo; }
+            void MarkSaved() override { inkLayer->MarkSaved(); }
+            bool AtSavePoint() const override { return inkLayer->History().atSavePoint; }
             void Hold(int page, bool hold) override;
 
             static LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wp, LPARAM lp);
@@ -65,6 +73,8 @@ namespace inkpages
             Graphics graphics;
             winrt::com_ptr<IDCompositionTarget> target;
             winrt::com_ptr<IDCompositionVisual> root, content, sheets, ink;
+            std::unique_ptr<CircleLayer> circle;
+            ToolState tool;
             std::unique_ptr<Viewport> viewport;
             std::unique_ptr<InkLayer> inkLayer;
             std::vector<std::unique_ptr<PaperLayer>> papers;
@@ -104,7 +114,9 @@ namespace inkpages
             // AddVisual(v, FALSE, nullptr) puts v above its siblings: the ink above the sheets (it must be on top to
             // get the pen - measured: under an opaque sheet it got no input).
             winrt::check_hresult(root->AddVisual(content.get(), FALSE, nullptr));
+            circle = std::make_unique<CircleLayer>(graphics);
             winrt::check_hresult(content->AddVisual(sheets.get(), FALSE, nullptr));
+            winrt::check_hresult(content->AddVisual(circle->Visual(), FALSE, nullptr)); // on the sheets, below the ink
             winrt::check_hresult(content->AddVisual(ink.get(), FALSE, nullptr));
             winrt::check_hresult(target->SetRoot(root.get()));
             SetScale();
@@ -130,7 +142,8 @@ namespace inkpages
                 }
             };
 
-            inkLayer = std::make_unique<InkLayer>(window, CommitMessage, ReadyMessage, ink.get(), SizeF{ 1, 1 }, options.mouseInks);
+            inkLayer = std::make_unique<InkLayer>(window, InkMessages{ CommitMessage, ReadyMessage, HistoryMessage, CircleMessage },
+                ink.get(), options.mouseInks);
             inkLayer->load = [this](int page) { return load ? load(page) : std::vector<InkStroke>{}; };
             inkLayer->store = [this](int page, std::vector<InkStroke> strokes) { if (store) store(page, std::move(strokes)); };
             inkLayer->collected = [this](int page, InkStroke const& stroke) {
@@ -140,7 +153,10 @@ namespace inkpages
                     view = inkView;
                 }
                 auto points = stroke.GetInkPoints();
-                std::string text = std::format("ink: stroke on page {} ({} points)", page, points.Size());
+                auto attributes = stroke.DrawingAttributes();
+                auto c = attributes.Color();
+                std::string text = std::format("ink: stroke on page {} ({} points, #{:02X}{:02X}{:02X}{}, size {:.2f})", page,
+                    points.Size(), c.R, c.G, c.B, attributes.DrawAsHighlighter() ? " highlighter" : "", attributes.Size().Width);
                 for (uint32_t i : { 0u, points.Size() - 1 })
                 {
                     auto p = points.GetAt(i).Position();
@@ -228,16 +244,19 @@ namespace inkpages
             case ReadyMessage:
                 presenterReady = true;
                 winrt::check_hresult(graphics.dcomp->Commit());
-                SetTimer(window, CursorTimer, CursorDelayMs, nullptr);
                 Changed(true);
                 return 0;
+            case HistoryMessage:
+                Changed(!viewport->Moving()); // pages with history keep their ink
+                if (historyChanged) historyChanged();
+                return 0;
+            case CircleMessage:
+                if (lp) circle->Show(InkLayer::UnpackPoint(wp), tool.eraserRadius, RenderScale(scale, CurrentView().zoom));
+                else circle->Hide();
+                winrt::check_hresult(graphics.dcomp->Commit());
+                return 0;
             case WM_TIMER:
-                if (wp == CursorTimer)
-                {
-                    KillTimer(window, CursorTimer);
-                    inkLayer->ActivateCursor();
-                }
-                else if (wp == MotionTimer)
+                if (wp == MotionTimer)
                 {
                     Changed(false);
                 }
@@ -336,7 +355,9 @@ namespace inkpages
             // Ink: pages near the view.
             if (presenterReady)
             {
-                std::set<int> next = LivePages(layout, visible, live, held);
+                std::set<int> keep = held;
+                for (int page : inkLayer->History().pages) keep.insert(page);
+                std::set<int> next = LivePages(layout, visible, live, keep);
                 if (next != live)
                 {
                     live = next;
@@ -381,10 +402,15 @@ namespace inkpages
             });
         }
 
-        void Surface::SetPen(Color color, float size, UINT cursorResourceId)
+        void Surface::SetTool(ToolState state)
         {
-            inkLayer->SetPen({ color.a, color.r, color.g, color.b }, size);
-            inkLayer->SetCursor(cursorResourceId);
+            tool = state;
+            inkLayer->SetTool(state);
+            if (state.tool != Tool::Eraser || state.wholeStrokeErasing)
+            {
+                circle->Hide();
+                winrt::check_hresult(graphics.dcomp->Commit());
+            }
         }
 
         void Surface::Hold(int page, bool hold)

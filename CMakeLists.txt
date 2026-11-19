@@ -27,12 +27,18 @@ add_library(InkPages STATIC
     src/Viewport.cpp
     src/PaperLayer.cpp
     src/InkLayer.cpp
+    src/InkState.cpp
+    src/StrokeEdit.cpp
+    src/PartialEraser.cpp
+    src/CircleLayer.cpp
+    src/Icons.cpp
+    src/Toolbar.cpp
     src/WritingSurface.cpp
 )
 target_include_directories(InkPages PUBLIC include)
 target_compile_options(InkPages PRIVATE ${INKPAGES_COMPILE_OPTIONS})
 target_compile_definitions(InkPages PUBLIC ${INKPAGES_DEFINITIONS})
-target_link_libraries(InkPages PUBLIC windowsapp d3d11 dxgi d2d1 dcomp)
+target_link_libraries(InkPages PUBLIC windowsapp d3d11 dxgi d2d1 dcomp comctl32)
 
 # The demo and development app (UI tests in Windows Sandbox run against it).
 add_executable(InkPagesDemo WIN32 demo/main.cpp demo/app.rc)

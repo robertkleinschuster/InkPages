@@ -4,7 +4,9 @@
 // they are printed with, with Windows ink on them.
 //   - Finger: pan with inertia, pinch zoom. Precision touchpad: the same. Mouse wheel scrolls, Ctrl+wheel zooms.
 //     (DirectManipulation.) Pen and mouse buttons never pan.
-//   - Pen: writes (Windows ink presenter), with the pen cursor the app chooses (a cursor resource of its exe).
+//   - Pen: writes (Windows ink presenter) with the active tool - pen, highlighter or eraser (whole strokes: Windows
+//     ink's; exact: the circle at the pen) - and the pen cursor the app chooses (a cursor resource of its exe). The
+//     pen's eraser end erases with any tool. Undo/redo: one history across pages.
 //   - Lazy pages: only pages near the view hold their strokes in the presenter; the app gives and takes them (page
 //     coordinates) through `load`/`store`, and can keep a page's ink (Hold).
 // All methods: UI thread. Callbacks marked "ink thread" run on Windows' ink host thread.
@@ -20,6 +22,7 @@
 
 #include "inkpages/PageLayout.h"
 #include "inkpages/Paper.h"
+#include "inkpages/Pens.h"
 #include "inkpages/ViewMath.h"
 
 namespace inkpages
@@ -36,6 +39,17 @@ namespace inkpages
         float gap = 24, margin = 24;          // between pages, around the document (DIPs)
         Color background{ 0xFF, 0xE6, 0xE6, 0xE6 };
         bool mouseInks = false;               // the mouse is a pointer; true lets it write (desktop testing)
+    };
+
+    /// What the pen does: the active tool with its look (the toolbar makes it from ToolChoices).
+    struct ToolState
+    {
+        Tool tool = Tool::Pen;
+        Color color{ 0xFF, 0, 0, 0 };
+        float width = ToolChoices::DefaultPenWidth; // pens: width at full pressure; highlighters: drawn width
+        UINT cursor = 0;                            // cursor resource in the app's exe (0: Windows' default)
+        bool wholeStrokeErasing = false;            // the eraser (and the pen's eraser end) erases whole strokes
+        float eraserRadius = ToolChoices::DefaultEraserRadius; // the exact eraser's circle (page units)
     };
 
     class WritingSurface
@@ -59,11 +73,22 @@ namespace inkpages
         /// The view moved or zoomed (UI thread; while moving too).
         std::function<void()> viewChanged;
 
-        /// The pen: color and size (DIPs at half pressure, Windows ink's meaning) and its cursor (resource id in the
-        /// app's exe, 0: Windows' default).
-        virtual void SetPen(Color color, float size, UINT cursorResourceId) = 0;
+        /// The active tool (the toolbar sets it).
+        virtual void SetTool(ToolState tool) = 0;
 
-        /// Keeps a page's ink in the presenter even when it is far from the view (e.g. while it has an edit).
+        /// One history in time order across pages: strokes written, erased (whole or exactly).
+        virtual void Undo() = 0;
+        virtual void Redo() = 0;
+        virtual bool CanUndo() const = 0;
+        virtual bool CanRedo() const = 0;
+        /// The content as it is now was saved; whether it still (or again, after undoing back) is.
+        virtual void MarkSaved() = 0;
+        virtual bool AtSavePoint() const = 0;
+        /// The history changed: enable undo/redo, mark the document as changed (UI thread).
+        std::function<void()> historyChanged;
+
+        /// Keeps a page's ink in the presenter even when it is far from the view. (Pages with undo history are kept by
+        /// the surface itself.)
         virtual void Hold(int page, bool hold) = 0;
 
         using InkStroke = winrt::Windows::UI::Input::Inking::InkStroke;
