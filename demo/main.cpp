@@ -29,7 +29,7 @@
 
 namespace
 {
-    using Stroke = inkpages::InkStroke;
+    using Stroke = inkpages::KeyedStroke;
 
     std::unique_ptr<inkpages::WritingSurface> surface;
     std::unique_ptr<inkpages::Toolbar> toolbar;

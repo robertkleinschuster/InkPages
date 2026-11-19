@@ -63,6 +63,17 @@ namespace inkpages
         bool recognizeShapes = false;
     };
 
+    /// A stroke as the app keeps it: page coordinates, the app's key (0: new ink - written, an erased piece, cut at a
+    /// page's edge, duplicated or pasted), and the transform a move or scale applied since it was loaded with that key
+    /// (page coordinates: from the points as loaded on their page to the points now on this page; identity when
+    /// unchanged; the pen width is never scaled). Undo/redo that brings a stroke back brings its key back.
+    struct KeyedStroke
+    {
+        InkStroke stroke{ nullptr };
+        uint64_t key = 0;
+        Affine transform;
+    };
+
     /// A selection as the app's clipboard keeps it: strokes relative to the selection's top left, the app's pictures.
     struct Clip
     {
@@ -142,15 +153,16 @@ namespace inkpages
         /// The pages an edit (or its undo/redo) changed: the app's data of them is out of date (StrokesOf).
         std::function<void(std::set<int> const& pages)> contentChanged;
 
-        // ---- strokes (the app persists them; InkStroke keeps points with pressure, tilt and time, and its attributes)
+        // ---- strokes (the app persists them; InkStroke keeps points with pressure, tilt and time, and its attributes;
+        //      the key says which of the app's strokes it is, see KeyedStroke)
         /// The strokes of a page now, in page coordinates (copies; e.g. to save). Waits for the ink thread. A page whose
         /// ink is not in the presenter (lazy) gives nothing: the app holds its strokes since `store`.
-        virtual std::vector<InkStroke> StrokesOf(int page) = 0;
+        virtual std::vector<KeyedStroke> StrokesOf(int page) = 0;
         /// Keeps a page's ink in the presenter even when it is far from the view (pages with history are kept anyway).
         virtual void Hold(int page, bool hold) = 0;
         /// Lazy pages (ink thread): a page coming near asks for its strokes, a page going far hands them over (page
         /// coordinates).
-        std::function<std::vector<InkStroke>(int page)> load;
-        std::function<void(int page, std::vector<InkStroke> strokes)> store;
+        std::function<std::vector<KeyedStroke>(int page)> load;
+        std::function<void(int page, std::vector<KeyedStroke> strokes)> store;
     };
 }

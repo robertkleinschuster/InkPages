@@ -64,7 +64,7 @@ namespace inkpages::detail
         void MarkSaved() override;
         bool AtSavePoint() const override { return ink->Edits().State().atSavePoint; }
 
-        std::vector<InkStroke> StrokesOf(int page) override;
+        std::vector<KeyedStroke> StrokesOf(int page) override;
         void Hold(int page, bool hold) override;
 
         static LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wp, LPARAM lp);

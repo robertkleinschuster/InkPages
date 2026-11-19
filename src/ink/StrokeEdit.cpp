@@ -28,6 +28,7 @@ namespace inkpages::detail
         for (auto& e : back)
         {
             InkStroke copy = e.stroke.Clone();
+            ink.keys.Copied(e.stroke.Id(), copy.Id()); // a stroke brought back keeps the app's key
             ink.Add(copy, e.page);
             e.stroke = copy;
         }

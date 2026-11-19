@@ -11,6 +11,7 @@
 
 #include "ink/Strokes.h"
 #include "inkpages/model/PageLayout.h"
+#include "inkpages/model/StrokeKeys.h"
 
 namespace inkpages::detail
 {
@@ -26,7 +27,10 @@ namespace inkpages::detail
     {
         InkStrokeContainer container{ nullptr };
         std::map<uint32_t, int> owner; // stroke id -> page
+        StrokeKeys keys;               // the app's keys of loaded strokes, followed from object to object
         PageLayout layout;
+
+        PointF Origin(int page) const { return { layout.Page(page).left, layout.Page(page).top }; }
 
         int PageOf(InkStroke const& stroke) const;
         void Add(InkStroke const& stroke, int page);

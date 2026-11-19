@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "ink/InkLayer.h"
+#include "inkpages/WritingSurface.h"
 
 namespace inkpages::detail
 {
@@ -17,15 +18,15 @@ namespace inkpages::detail
     public:
         explicit PageStore(InkLayer& ink) : ink(ink) {}
 
-        std::function<std::vector<InkStroke>(int page)> load;
-        std::function<void(int page, std::vector<InkStroke> strokes)> store;
+        std::function<std::vector<KeyedStroke>(int page)> load;
+        std::function<void(int page, std::vector<KeyedStroke> strokes)> store;
 
         void SetLive(std::set<int> const& pages);
         /// Every live page goes to `store` (another document comes).
         void ReleaseAll();
         /// Copies of a live page's strokes in page coordinates (a page that is not live has none here: the app holds
         /// them since its `store`).
-        std::vector<InkStroke> Snapshot(int page) const;
+        std::vector<KeyedStroke> Snapshot(int page) const;
         bool IsLive(int page) const { return live.contains(page); }
 
     private:

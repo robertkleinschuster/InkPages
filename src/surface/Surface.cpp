@@ -108,8 +108,8 @@ namespace inkpages::detail
     void Surface::OnPresenterReady()
     {
         pageStore = std::make_unique<PageStore>(*ink);
-        pageStore->load = [this](int page) { return load ? load(page) : std::vector<InkStroke>{}; };
-        pageStore->store = [this](int page, std::vector<InkStroke> strokes) { if (store) store(page, std::move(strokes)); };
+        pageStore->load = [this](int page) { return load ? load(page) : std::vector<KeyedStroke>{}; };
+        pageStore->store = [this](int page, std::vector<KeyedStroke> strokes) { if (store) store(page, std::move(strokes)); };
         tools = std::make_unique<ToolInput>(*ink, overlay);
         tools->selected = [this](StrokeSelection const& made, std::vector<PointF> const& polygon) {
             ui->Post([this, made, polygon] { selection->Selected(made, polygon); });
@@ -333,9 +333,9 @@ namespace inkpages::detail
         host.Post("saved", [this] { ink->Edits().MarkSaved(); });
     }
 
-    std::vector<InkStroke> Surface::StrokesOf(int page)
+    std::vector<KeyedStroke> Surface::StrokesOf(int page)
     {
-        auto strokes = std::make_shared<std::vector<InkStroke>>(); // outlives a timed-out wait
+        auto strokes = std::make_shared<std::vector<KeyedStroke>>(); // outlives a timed-out wait
         host.Run("snapshot", [this, page, strokes] { if (pageStore) *strokes = pageStore->Snapshot(page); });
         return *strokes;
     }

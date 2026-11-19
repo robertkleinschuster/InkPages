@@ -93,6 +93,7 @@ namespace inkpages::detail
         {
             edit->Removed(s, ink.PageOf(s));
             moved.push_back(Transformed(s, m));
+            ink.keys.Moved(s.Id(), moved.back().Id(), m); // the app's stroke, moved (cut at a page edge: new ink)
         }
         ink.Remove(strokes);
         Place(moved, *edit);

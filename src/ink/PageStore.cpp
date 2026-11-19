@@ -23,13 +23,22 @@ namespace inkpages::detail
         for (int page : std::set<int>(live)) Release(page);
     }
 
-    std::vector<InkStroke> PageStore::Snapshot(int page) const
+    std::vector<KeyedStroke> PageStore::Snapshot(int page) const
     {
         auto& state = ink.State();
         if (page < 0 || page >= state.layout.Count()) return {};
-        RectF r = state.layout.Page(page);
-        std::vector<InkStroke> strokes;
-        for (InkStroke const& s : state.StrokesOn(page)) strokes.push_back(Transformed(s, Affine::Translation(-r.left, -r.top)));
+        PointF origin = state.Origin(page);
+        std::vector<KeyedStroke> strokes;
+        for (InkStroke const& s : state.StrokesOn(page))
+        {
+            KeyedStroke keyed{ Transformed(s, Affine::Translation(-origin.x, -origin.y)) };
+            if (auto key = state.keys.Find(s.Id(), origin))
+            {
+                keyed.key = key->key;
+                keyed.transform = key->transform;
+            }
+            strokes.push_back(std::move(keyed));
+        }
         return strokes;
     }
 
@@ -37,7 +46,9 @@ namespace inkpages::detail
     {
         auto& state = ink.State();
         auto strokes = Snapshot(page);
-        state.Remove(state.StrokesOn(page));
+        auto leaving = state.StrokesOn(page);
+        state.Remove(leaving);
+        for (InkStroke const& s : leaving) state.keys.Forget(s.Id());
         live.erase(page);
         Log(std::format("ink: page {} released ({} strokes)", page, strokes.size()));
         if (store) store(page, std::move(strokes));
@@ -48,9 +59,14 @@ namespace inkpages::detail
         live.insert(page);
         if (!load) return;
         auto& state = ink.State();
-        RectF r = state.layout.Page(page);
-        std::vector<InkStroke> strokes = load(page);
-        for (InkStroke const& s : strokes) state.Add(Transformed(s, Affine::Translation(r.left, r.top)), page);
+        PointF origin = state.Origin(page);
+        std::vector<KeyedStroke> strokes = load(page);
+        for (KeyedStroke const& s : strokes)
+        {
+            InkStroke placed = Transformed(s.stroke, Affine::Translation(origin.x, origin.y));
+            state.keys.Loaded(placed.Id(), s.key, s.transform, origin);
+            state.Add(placed, page);
+        }
         if (!strokes.empty()) Log(std::format("ink: page {} restored ({} strokes)", page, strokes.size()));
     }
 }
