@@ -4,6 +4,9 @@
 // with Windows ink on them and the tools that work on it.
 //   - Finger and precision touchpad: pan with inertia, pinch zoom; mouse wheel scrolls, Ctrl+wheel zooms
 //     (DirectManipulation). Touch never draws; pen and mouse buttons never pan.
+//   - Mouse (and touchpad clicks): never writes. A drag selects (lasso or rectangle by the select mode, with any tool),
+//     moves the selection or scales it at a corner; a click beside the selection clears it, on a picture selects it.
+//   - Taps: a mouse click or finger tap that no selection gesture took is the app's (`tapped`: links).
 //   - Pen: the active tool (ToolState): pen, highlighter, eraser (whole strokes or exactly the circle), selection
 //     (lasso or rectangle; the barrel button lassos with any tool; the pen over the selection moves and scales it),
 //     shapes (and recognition of drawn shapes). The pen's eraser end erases with any tool. Windows' ruler/protractor.
@@ -46,7 +49,6 @@ namespace inkpages
         float minZoom = 0.2f, maxZoom = 6;
         float gap = 24, margin = 24;          // between pages, around the document (page units)
         Color background{ 0xFF, 0xE6, 0xE6, 0xE6 };
-        bool mouseInks = false;               // the mouse is a pointer; true lets it write (desktop testing)
     };
 
     /// What the pen does (the toolbar makes it from ToolChoices).
@@ -73,6 +75,8 @@ namespace inkpages
         uint64_t key = 0;
         Affine transform;
     };
+
+    enum class PointerKind { Mouse, Touch };
 
     /// A selection as the app's clipboard keeps it: strokes relative to the selection's top left, the app's pictures.
     struct Clip
@@ -107,6 +111,10 @@ namespace inkpages
         virtual float Scale() const = 0;        // pixels per DIP (the window's DPI / 96)
         virtual std::optional<int> PageInView() const = 0;
         std::function<void()> viewChanged;      // moved or zoomed (also while moving)
+        /// A mouse click or finger tap on a page (under 300 ms, moved under 3 page units, one finger, not a pan) that no
+        /// selection gesture took (a click beside the selection clears it, a click on a picture selects it). `point`:
+        /// page coordinates of the press. For the app's links; the pen never taps here.
+        std::function<void(int page, PointF point, PointerKind kind)> tapped;
 
         // ---- the app's content below the ink
         /// The underlay of a page: what lies under the ink (background and ruling, a rendered PDF page, the app's

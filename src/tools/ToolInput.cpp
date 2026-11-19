@@ -90,6 +90,7 @@ namespace inkpages::detail
                     shapes.Cancel(); // a lost pointer leaves no shape; a lost erase keeps what it erased
                     lasso.clear();
                     overlay.SetLasso({});
+                    mouseGesture = false;
                     if (eraser.Running()) ink.Edits().Push(eraser.End());
                     gesture = Gesture::None;
                 });
@@ -182,6 +183,13 @@ namespace inkpages::detail
 
     void ToolInput::Press(PointF at, bool barrel)
     {
+        if (mouseGesture) // the pen takes over from the mouse
+        {
+            mouseGesture = false;
+            gesture = Gesture::None;
+            lasso.clear();
+            overlay.SetLasso({});
+        }
         if (barrel || settings.tool == Tool::Select)
         {
             gesture = Gesture::Select;
@@ -204,6 +212,37 @@ namespace inkpages::detail
             gesture = Gesture::Shape;
             shapes.Begin(at, settings.shape);
         }
+    }
+
+    void ToolInput::MouseSelectBegin(std::vector<PointF> const& path)
+    {
+        if (path.empty() || gesture != Gesture::None) return; // the pen's gesture runs
+        gesture = Gesture::Select;
+        rectangle = settings.selectMode == SelectMode::Rectangle;
+        mouseGesture = true;
+        lasso = { path.front() };
+        Move(path);
+    }
+
+    void ToolInput::MouseSelectMove(std::vector<PointF> const& path)
+    {
+        if (mouseGesture) Move(path);
+    }
+
+    void ToolInput::MouseSelectEnd(PointF at)
+    {
+        if (!mouseGesture) return;
+        mouseGesture = false;
+        Release(at);
+    }
+
+    void ToolInput::MouseSelectCancel()
+    {
+        if (!mouseGesture) return;
+        mouseGesture = false;
+        gesture = Gesture::None;
+        lasso.clear();
+        overlay.SetLasso({});
     }
 
     void ToolInput::Move(std::vector<PointF> const& path)

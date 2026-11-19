@@ -59,7 +59,11 @@ namespace inkpages::detail
             if (viewChanged) viewChanged();
         };
         viewport->onStatus = [this](bool settled) {
-            if (viewport->Moving()) SetTimer(window, MotionTimer, MotionIntervalMs, nullptr);
+            if (viewport->Moving())
+            {
+                if (touchTaps) touchTaps->Cancel("the view moves"); // a pan is no tap
+                SetTimer(window, MotionTimer, MotionIntervalMs, nullptr);
+            }
             if (!settled) return;
             KillTimer(window, MotionTimer);
             Changed(true);
@@ -77,7 +81,12 @@ namespace inkpages::detail
             [this] { return scale; }, [this]() -> PageLayout const& { return layout; },
             [this] { if (selectionChanged) selectionChanged(); }, this });
 
-        ink = std::make_unique<InkLayer>(host, composition->Ink(), options.mouseInks,
+        auto toDocument = [this](POINT client) { return ToDocument(client); };
+        mouse = std::make_unique<MouseSelect>(window, host, [this] { return tools.get(); }, *selection, toDocument,
+            [this](PointF at) { Tapped(at, PointerKind::Mouse); });
+        touchTaps = std::make_unique<TouchTaps>(toDocument, [this](PointF at) { Tapped(at, PointerKind::Touch); });
+
+        ink = std::make_unique<InkLayer>(host, composition->Ink(),
             [this] { OnPresenterReady(); }, [this] { ui->Post([this] { composition->Commit(); }); });
         Resized();
         composition->Commit();
@@ -93,6 +102,8 @@ namespace inkpages::detail
                 pageStore.reset();
             });
             ink.reset();
+            mouse.reset();
+            touchTaps.reset();
             selection.reset();
             viewport.reset();
             composition.reset();
@@ -103,6 +114,19 @@ namespace inkpages::detail
         }
         SetWindowLongPtrW(window, GWLP_USERDATA, 0);
         DestroyWindow(window);
+    }
+
+    PointF Surface::ToDocument(POINT client) const
+    {
+        return ViewportToDocument({ static_cast<float>(client.x), static_cast<float>(client.y) }, viewport->Current(), scale);
+    }
+
+    void Surface::Tapped(PointF document, PointerKind kind)
+    {
+        auto page = layout.PageAt(document);
+        if (!page || !tapped) return; // beside the pages
+        RectF r = layout.Page(*page);
+        tapped(*page, { document.x - r.left, document.y - r.top }, kind);
     }
 
     // Ink thread, once: the tools and the lazy pages need the presenter.

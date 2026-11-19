@@ -47,6 +47,12 @@ namespace inkpages::detail
         void SetFrame(std::optional<SelectionFrame> frame);
         /// The window's pen left the selection: the presenter gets it back.
         void GiveBackPen();
+        /// The mouse (window input, it never reaches the presenter) selects as the selection tool does, whatever tool
+        /// is active: a lasso or a rectangle by the tool's select mode. `path` = the points since the press.
+        void MouseSelectBegin(std::vector<PointF> const& path);
+        void MouseSelectMove(std::vector<PointF> const& path);
+        void MouseSelectEnd(PointF at);
+        void MouseSelectCancel();
 
         InkSelection& Selection() { return selection; }
         Stencils& Stencil() { return stencils; }
@@ -81,6 +87,7 @@ namespace inkpages::detail
         bool penTakenNow = false;
         Gesture gesture = Gesture::None;
         bool rectangle = false;
+        bool mouseGesture = false; // the running selection gesture is the mouse's
         std::vector<PointF> lasso;
     };
 }

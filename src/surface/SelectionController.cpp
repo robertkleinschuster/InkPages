@@ -73,6 +73,15 @@ namespace inkpages::detail
         Set(made, std::move(picked));
     }
 
+    bool SelectionController::SelectPictureAt(PointF at)
+    {
+        PictureHost* host = c.pictures();
+        auto picture = host ? host->PictureAt(at) : std::nullopt;
+        if (!picture) return false;
+        Set({}, { *picture });
+        return true;
+    }
+
     void SelectionController::Set(StrokeSelection const& made, std::vector<PictureId> picked)
     {
         strokes = made;

@@ -16,9 +16,9 @@ namespace inkpages::detail
     using winrt::Windows::UI::Core::CoreInputDeviceTypes;
     using winrt::Windows::UI::Core::PointerEventArgs;
 
-    InkLayer::InkLayer(InkHost& host, IDCompositionVisual* root, bool mouseInks, std::function<void()> ready,
+    InkLayer::InkLayer(InkHost& host, IDCompositionVisual* root, std::function<void()> ready,
         std::function<void()> commit)
-        : host(host), mouseInks(mouseInks), ready(std::move(ready)), commit(std::move(commit))
+        : host(host), ready(std::move(ready)), commit(std::move(commit))
     {
         winrt::com_ptr<IDCompositionVisual> visual;
         visual.copy_from(root);
@@ -174,9 +174,8 @@ namespace inkpages::detail
 
     void InkLayer::ApplyDevices()
     {
-        auto devices = penTaken ? CoreInputDeviceTypes::None : CoreInputDeviceTypes::Pen;
-        if (mouseInks) devices = devices | CoreInputDeviceTypes::Mouse;
-        presenter.InputDeviceTypes(devices);
+        // Only the pen writes: the finger pans (DirectManipulation) and the mouse selects and taps (window input).
+        presenter.InputDeviceTypes(penTaken ? CoreInputDeviceTypes::None : CoreInputDeviceTypes::Pen);
     }
 
     void InkLayer::SetCursor(UINT resourceId)

@@ -2,7 +2,7 @@
 
 // The writing surface's implementation: the child window and the modules it wires together - Composition (visual
 // tree, sheets, page layers, overlay), Viewport (DirectManipulation), InkLayer + PageStore + ToolInput (ink thread),
-// SelectionController (UI thread). It owns them and hands work between the threads; the logic lives in the modules.
+// SelectionController, MouseSelect, TouchTaps (UI thread). It owns them and hands work between the threads; the logic lives in the modules.
 
 #include <atomic>
 #include <memory>
@@ -15,7 +15,9 @@
 #include "inkpages/WritingSurface.h"
 #include "render/Overlay.h"
 #include "surface/Composition.h"
+#include "surface/MouseSelect.h"
 #include "surface/SelectionController.h"
+#include "surface/TouchTaps.h"
 #include "surface/Viewport.h"
 #include "tools/ToolInput.h"
 
@@ -85,6 +87,8 @@ namespace inkpages::detail
         void ZoomToRect(RectF content);
         void Rearrange(std::vector<PageSpec> specs, PageMap const& map);
         void BuildLayout(std::vector<PageSpec> specs, std::vector<Paper>& papers);
+        PointF ToDocument(POINT client) const;
+        void Tapped(PointF document, PointerKind kind);
 
         SurfaceOptions options;
         HWND window = nullptr;
@@ -99,6 +103,8 @@ namespace inkpages::detail
         std::unique_ptr<PageStore> pageStore; // ink thread
         std::unique_ptr<ToolInput> tools;    // ink thread
         std::unique_ptr<SelectionController> selection;
+        std::unique_ptr<MouseSelect> mouse;
+        std::unique_ptr<TouchTaps> touchTaps;
         PictureHost* pictureHost = nullptr;
         std::vector<PageSpec> pages;
         PageLayout layout;

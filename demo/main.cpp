@@ -7,7 +7,8 @@
 //       R recognize drawn shapes;
 //       Q/W/E/T zoom 0.5/1/2/4, F fit width, Page Down/Up next/previous page, Home first page.
 // Environment: INKPAGES_DEMO_LOG (log file), INKPAGES_DEMO_PAGES (page count, default 4),
-//              INKPAGES_DEMO_MOUSE=1 (the mouse writes too), INKPAGES_DEMO_CHOICES (file keeping the tool choices).
+//              INKPAGES_DEMO_CHOICES (file keeping the tool choices).
+// Taps (mouse click, finger tap) are logged ("demo: tap"), as an app would follow a link there.
 
 #include <windows.h>
 #include <commctrl.h>
@@ -311,10 +312,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
         winrt::check_pointer(window);
         status = CreateWindowExW(0, STATUSCLASSNAMEW, L"", WS_CHILD | WS_VISIBLE, 0, 0, 0, 0, window, nullptr, instance, nullptr);
 
-        inkpages::SurfaceOptions options;
-        options.mouseInks = Environment(L"INKPAGES_DEMO_MOUSE") == L"1";
-        surface = inkpages::WritingSurface::Create(window, options);
+        surface = inkpages::WritingSurface::Create(window);
         surface->viewChanged = UpdateStatus;
+        surface->tapped = [](int page, inkpages::PointF at, inkpages::PointerKind kind) {
+            inkpages::Log(std::format("demo: tap ({}) on page {} at {:.0f},{:.0f}",
+                kind == inkpages::PointerKind::Mouse ? "mouse" : "touch", page, at.x, at.y));
+        };
         surface->historyChanged = UpdateStatus; // before the toolbar: it chains this handler
         surface->load = [](int page) {
             std::scoped_lock guard(parkedLock);

@@ -49,6 +49,8 @@ namespace inkpages::detail
         // From the ink thread's tools (handed to the UI thread):
         void Selected(StrokeSelection const& made, std::vector<PointF> const& polygon);
         void Cleared();
+        /// A click (mouse) selects the app's picture under it, as a selection tap does; false when there is none.
+        bool SelectPictureAt(PointF at);
 
         /// Window pointer input (pen given to the window, mouse); true when it was the selection's.
         bool OnPointer(UINT message, WPARAM wp, LPARAM lp);

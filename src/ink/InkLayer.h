@@ -36,7 +36,7 @@ namespace inkpages::detail
     {
     public:
         /// `ready` and `commit` run on the ink thread (the owner hands them to the UI thread).
-        InkLayer(InkHost& host, IDCompositionVisual* root, bool mouseInks, std::function<void()> ready,
+        InkLayer(InkHost& host, IDCompositionVisual* root, std::function<void()> ready,
             std::function<void()> commit);
         ~InkLayer();
         InkLayer(InkLayer const&) = delete;
@@ -68,7 +68,6 @@ namespace inkpages::detail
         void ApplyCursor();
 
         InkHost& host;
-        bool mouseInks;
         std::function<void()> ready, commit;
         winrt::com_ptr<IInkPresenterDesktop> desktop;
         InkPresenter presenter{ nullptr };
