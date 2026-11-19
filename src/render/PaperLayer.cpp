@@ -17,7 +17,8 @@ namespace inkpages::detail
         D2D1_COLOR_F ToD2D(Color c) { return { c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f }; }
     }
 
-    PaperLayer::PaperLayer(Graphics& graphics, RectF page, Paper paper) : graphics(graphics), page(page), paper(paper)
+    PaperLayer::PaperLayer(Graphics& graphics, RectF page, Paper paper, Underlay underlay)
+        : graphics(graphics), page(page), paper(paper), underlay(std::move(underlay))
     {
         winrt::check_hresult(graphics.dcomp->CreateVisual(visual.put()));
         winrt::check_hresult(graphics.dcomp->CreateVirtualSurface(1, 1, DXGI_FORMAT_B8G8R8A8_UNORM,
@@ -87,6 +88,17 @@ namespace inkpages::detail
                     continue;
                 }
                 dc->DrawLine({ line.from.x, line.from.y }, { line.to.x, line.to.y }, brush.get(), paper.thickness);
+            }
+            if (underlay)
+            {
+                try
+                {
+                    underlay(dc.get(), { clip.left, clip.top, clip.right, clip.bottom });
+                }
+                catch (...)
+                {
+                    LogException("the app's underlay");
+                }
             }
             dc->PopAxisAlignedClip();
         }

@@ -14,6 +14,7 @@
 // All methods and callbacks on the UI thread unless marked "ink thread".
 
 #include <windows.h>
+#include <d2d1_1.h>
 #include <dcomp.h>
 
 #include <functional>
@@ -91,6 +92,14 @@ namespace inkpages
         std::function<void()> viewChanged;      // moved or zoomed (also while moving)
 
         // ---- the app's content below the ink
+        /// The underlay of a page: what lies under the ink (background and ruling, a rendered PDF page, the app's
+        /// pictures and texts, strokes Windows ink cannot draw). The surface calls it to draw into `dc` in page
+        /// coordinates (the transform maps them to pixels at the settled zoom), over the page's Paper (an app that draws
+        /// its own background gives the pages PaperKind::Plain), for the part `area` (page coordinates) of a page near
+        /// the view; again when the zoom settles or after InvalidatePage. Keep it fast: it runs on the UI thread.
+        std::function<void(int page, ID2D1DeviceContext* dc, RectF area)> drawUnderlay;
+        /// The page's underlay changed (a PDF render arrived, a picture moved): drawn anew.
+        virtual void InvalidatePage(int page) = 0;
         /// A visual for the app's content of a page (PDF page, pictures): page units, origin at the page's top left,
         /// above the paper, below the ink. Draw with the surface's device; sharpness: `RenderScale`.
         virtual IDCompositionVisual* PageLayer(int page) = 0;

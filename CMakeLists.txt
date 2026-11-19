@@ -26,7 +26,7 @@ target_compile_definitions(InkPages PUBLIC ${INKPAGES_DEFINITIONS})
 target_link_libraries(InkPages PUBLIC windowsapp d3d11 dxgi d2d1 dcomp comctl32)
 
 # The demo and development app (UI tests in Windows Sandbox run against it).
-add_executable(InkPagesDemo WIN32 demo/main.cpp demo/app.rc)
+add_executable(InkPagesDemo WIN32 demo/main.cpp demo/DemoPictures.cpp demo/app.rc)
 target_compile_options(InkPagesDemo PRIVATE ${INKPAGES_COMPILE_OPTIONS})
 target_link_options(InkPagesDemo PRIVATE /MANIFEST:NO) # the manifest is a resource (app.manifest)
 target_link_libraries(InkPagesDemo PRIVATE InkPages comctl32)

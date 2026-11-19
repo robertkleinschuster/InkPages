@@ -36,7 +36,13 @@ namespace inkpages::detail
         winrt::check_hresult(root->SetClip(clip.get()));
     }
 
-    void Composition::SetPages(PageLayout const& newLayout, std::vector<Paper> const& paper)
+    void Composition::Invalidate(int page)
+    {
+        if (page >= 0 && page < static_cast<int>(papers.size())) papers[page]->Invalidate();
+    }
+
+    void Composition::SetPages(PageLayout const& newLayout, std::vector<Paper> const& paper,
+        std::function<void(int, ID2D1DeviceContext*, RectF)> underlay)
     {
         layout = newLayout;
         papers.clear();
@@ -45,7 +51,9 @@ namespace inkpages::detail
         winrt::check_hresult(layers->RemoveAllVisuals());
         for (int i = 0; i < layout.Count(); ++i)
         {
-            papers.push_back(std::make_unique<PaperLayer>(graphics, layout.Page(i), paper[i]));
+            Underlay pageUnderlay;
+            if (underlay) pageUnderlay = [underlay, i](ID2D1DeviceContext* dc, RectF area) { underlay(i, dc, area); };
+            papers.push_back(std::make_unique<PaperLayer>(graphics, layout.Page(i), paper[i], std::move(pageUnderlay)));
             winrt::check_hresult(sheets->AddVisual(papers.back()->Visual(), FALSE, nullptr));
             winrt::com_ptr<IDCompositionVisual> layer;
             winrt::check_hresult(graphics.dcomp->CreateVisual(layer.put()));

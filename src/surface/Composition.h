@@ -31,7 +31,11 @@ namespace inkpages::detail
 
         void SetScale(float pixelsPerDip);
         void SetClip(SIZE pixels);
-        void SetPages(PageLayout const& layout, std::vector<Paper> const& papers);
+        /// `underlay(page, dc, area)`: the app's drawing under the ink of a page (page coordinates).
+        void SetPages(PageLayout const& layout, std::vector<Paper> const& papers,
+            std::function<void(int, ID2D1DeviceContext*, RectF)> underlay);
+        /// A page's underlay changed: drawn anew at the next UpdateSheets.
+        void Invalidate(int page);
         /// Draws the sheets near `visible` at `renderScale` (pixels per page unit); far sheets free their drawing.
         void UpdateSheets(RectF visible, float renderScale);
         void Commit();

@@ -96,6 +96,9 @@ namespace inkpages::detail
         }
         ink.Remove(strokes);
         Place(moved, *edit);
+        std::string pages;
+        for (int page : edit->Pages()) pages += std::format(" {}", page);
+        Log(std::format("selection: {} strokes moved (pages{})", moved.size(), pages));
         return edit;
     }
 

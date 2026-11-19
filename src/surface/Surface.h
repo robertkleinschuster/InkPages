@@ -42,6 +42,7 @@ namespace inkpages::detail
         float RenderScale() const override { return sheetScale; }
         void Commit() override { composition->Commit(); }
         void SetPictureHost(PictureHost* picturesOfApp) override { pictureHost = picturesOfApp; }
+        void InvalidatePage(int page) override;
 
         void SetTool(ToolState tool) override;
         void SetRuler(bool shown) override;

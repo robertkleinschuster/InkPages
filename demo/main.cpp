@@ -1,7 +1,10 @@
 // InkPages Demo: the library's development and test app (UI tests in Windows Sandbox run against it). It uses only the
 // library's public API: the toolbar (German texts, as an app passes its language), a writing surface with A4 pages on
 // graph paper, a status bar.
-// Keys: Ctrl+Z / Ctrl+Y undo/redo; tools (test hooks): 1/2/3 pens, 4/5 highlighters, 0 eraser, X erase whole strokes;
+// The demo also places a few colored cards (its "pictures", DemoPictures) that the selection takes along.
+// Keys: Ctrl+Z / Ctrl+Y undo/redo, Ctrl+X/C/V/D, Del, Ctrl+A (selection); tools (test hooks): 1/2/3 pens,
+//       4/5 highlighters, 0 eraser, X erase whole strokes, 6 select, 7 shapes, 8 ruler, 9 rectangle selection,
+//       R recognize drawn shapes;
 //       Q/W/E/T zoom 0.5/1/2/4, F fit width, Page Down/Up next/previous page, Home first page.
 // Environment: INKPAGES_DEMO_LOG (log file), INKPAGES_DEMO_PAGES (page count, default 4),
 //              INKPAGES_DEMO_MOUSE=1 (the mouse writes too), INKPAGES_DEMO_CHOICES (file keeping the tool choices).
@@ -22,6 +25,7 @@
 #include "inkpages/Log.h"
 #include "inkpages/Toolbar.h"
 #include "inkpages/WritingSurface.h"
+#include "DemoPictures.h"
 
 namespace
 {
@@ -29,6 +33,8 @@ namespace
 
     std::unique_ptr<inkpages::WritingSurface> surface;
     std::unique_ptr<inkpages::Toolbar> toolbar;
+    std::unique_ptr<DemoPictures> pictures;
+    bool ruler = false;
     HWND status = nullptr;
     std::wstring choicesFile;
 
@@ -55,6 +61,24 @@ namespace
         t.wholeStrokeEraseTip = L"Ganze Striche radieren: Radierer und Radierer-Taste des Stifts löschen jeden Strich, "
             L"den sie berühren. Aus: nur, was im Kreis liegt. Der Pfeil: Größe des Kreises";
         t.eraserRadius = L"Größe";
+        t.select = L"Auswählen";
+        t.selectTip = L"Auswählen: Lasso oder Rechteck (der Pfeil); ziehen verschiebt, Ecken skalieren. Mit dem Stift geht "
+            L"das Lasso mit jedem Werkzeug: mit gehaltener Stifttaste ziehen";
+        t.lasso = L"Lasso";
+        t.rectangle = L"Rechteck";
+        t.shapes = L"Formen";
+        t.shapesTip = L"Formen: Linie, Pfeil, Rechteck, Ellipse (der Pfeil); gezeichnete Formen können erkannt werden";
+        t.shapeKinds = { L"Linie", L"Pfeil", L"Rechteck", L"Ellipse" };
+        t.recognizeShapes = L"Gezeichnete Formen erkennen";
+        t.ruler = L"Lineal";
+        t.protractor = L"Geodreieck";
+        t.rulerTip = L"Lineal / Geodreieck (der Pfeil): Striche daran entlang werden gerade";
+        t.cut = L"Auswahl ausschneiden (Strg+X)";
+        t.copy = L"Auswahl kopieren (Strg+C)";
+        t.paste = L"Einfügen (Strg+V)";
+        t.duplicate = L"Auswahl duplizieren (Strg+D)";
+        t.deleteSelection = L"Auswahl löschen (Entf)";
+        t.selectAll = L"Alles auf der Seite auswählen (Strg+A)";
         t.undo = L"Rückgängig (Strg+Z)";
         t.redo = L"Wiederholen (Strg+Y)";
         t.color = L"Farbe";
@@ -128,7 +152,29 @@ namespace
         int page = surface->PageInView().value_or(0);
         if (ctrl && key == 'Z') surface->Undo();
         else if (ctrl && key == 'Y') surface->Redo();
+        else if (ctrl && key == 'X') surface->Cut();
+        else if (ctrl && key == 'C') surface->Copy();
+        else if (ctrl && key == 'V') surface->Paste();
+        else if (ctrl && key == 'D') surface->Duplicate();
+        else if (ctrl && key == 'A') surface->SelectAll();
         else if (ctrl) return;
+        else if (key == VK_DELETE) surface->DeleteSelection();
+        else if (key == '6') ChooseTool(inkpages::Tool::Select, 0);
+        else if (key == '9')
+        {
+            auto choices = toolbar->Choices();
+            choices.tool = inkpages::Tool::Select;
+            choices.selectMode = inkpages::SelectMode::Rectangle;
+            toolbar->Choose(choices);
+        }
+        else if (key == '7') ChooseTool(inkpages::Tool::Shape, 0);
+        else if (key == '8') surface->SetRuler(ruler = !ruler);
+        else if (key == 'R')
+        {
+            auto choices = toolbar->Choices();
+            choices.recognizeShapes = !choices.recognizeShapes;
+            toolbar->Choose(choices);
+        }
         else if (key >= '1' && key <= '3') ChooseTool(inkpages::Tool::Pen, static_cast<int>(key - '1'));
         else if (key == '4' || key == '5') ChooseTool(inkpages::Tool::Highlighter, static_cast<int>(key - '4'));
         else if (key == '0') ChooseTool(inkpages::Tool::Eraser, 0);
@@ -164,6 +210,8 @@ namespace
                 return 0;
             case WM_DESTROY:
                 toolbar.reset();
+                if (surface) surface->SetPictureHost(nullptr);
+                pictures.reset();
                 surface.reset();
                 PostQuitMessage(0);
                 return 0;
@@ -229,6 +277,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
         a4.paper.kind = inkpages::PaperKind::Graph;
         a4.paper.spacing = 5 * 72 / 25.4f; // 5 mm squares (page units are points)
         surface->SetPages(std::vector<inkpages::PageSpec>(count, a4));
+        pictures = std::make_unique<DemoPictures>(*surface);
+        pictures->Add({ 84, 444, 244, 524 }, { 0xFF, 0x7F, 0xC8, 0xF0 });
+        pictures->Add({ 300, 444, 400, 524 }, { 0xFF, 0xF0, 0xC0, 0x7F });
+        surface->SetPictureHost(pictures.get());
 
         ShowWindow(window, show == SW_SHOWDEFAULT ? SW_SHOWMAXIMIZED : show);
         Layout(window);

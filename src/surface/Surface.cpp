@@ -203,7 +203,9 @@ namespace inkpages::detail
             ink->Edits().Clear();
             ink->SetLayout(layout);
         });
-        composition->SetPages(layout, papers);
+        composition->SetPages(layout, papers, [this](int page, ID2D1DeviceContext* dc, RectF area) {
+            if (drawUnderlay) drawUnderlay(page, dc, area);
+        });
         sheetScale = 0;
         SetScale();
         Log(std::format("surface: {} pages, document {:.0f}x{:.0f}", layout.Count(), layout.DocumentSize().width,
@@ -336,6 +338,13 @@ namespace inkpages::detail
         auto strokes = std::make_shared<std::vector<InkStroke>>(); // outlives a timed-out wait
         host.Run("snapshot", [this, page, strokes] { if (pageStore) *strokes = pageStore->Snapshot(page); });
         return *strokes;
+    }
+
+    void Surface::InvalidatePage(int page)
+    {
+        composition->Invalidate(page);
+        composition->UpdateSheets(Visible(), sheetScale);
+        composition->Commit();
     }
 
     void Surface::Hold(int page, bool hold)
