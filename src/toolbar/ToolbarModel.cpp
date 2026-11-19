@@ -7,7 +7,7 @@ namespace inkpages::detail
 {
     namespace Glyph // Segoe Fluent Icons
     {
-        constexpr wchar_t Undo = 0xE7A7, Redo = 0xE7A6, Pen = 0xE76D, Highlighter = 0xE7E6, Eraser = 0xE75C,
+        constexpr wchar_t Undo = 0xE97A, Redo = 0xEE35, Pen = 0xE76D, Highlighter = 0xE7E6, Eraser = 0xE75C,
             WholeStrokes = 0xED62, Lasso = 0xF1BE, Shapes = 0, Ruler = 0xED5E, Cut = 0xE8C6, Copy = 0xE8C8,
             Paste = 0xE77F, Duplicate = 0xF413, Delete = 0xE74D, SelectAll = 0xE8B3;
     }
