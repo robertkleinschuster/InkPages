@@ -15,27 +15,12 @@ set(INKPAGES_COMPILE_OPTIONS /W4 /WX /permissive- /EHsc /utf-8)
 set(INKPAGES_DEFINITIONS UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 
 # The library (linked statically into the apps).
-add_library(InkPages STATIC
-    src/Log.cpp
-    src/Paper.cpp
-    src/PageLayout.cpp
-    src/ViewMath.cpp
-    src/Pens.cpp
-    src/StrokeEraser.cpp
-    src/UndoHistory.cpp
-    src/Graphics.cpp
-    src/Viewport.cpp
-    src/PaperLayer.cpp
-    src/InkLayer.cpp
-    src/InkState.cpp
-    src/StrokeEdit.cpp
-    src/PartialEraser.cpp
-    src/CircleLayer.cpp
-    src/Icons.cpp
-    src/Toolbar.cpp
-    src/WritingSurface.cpp
-)
-target_include_directories(InkPages PUBLIC include)
+# Modules (src/<module>, public headers include/inkpages[/model]); dependencies point downwards only:
+#   toolbar -> surface -> tools -> ink -> render -> model -> (none);  base (Log) is used by all.
+file(GLOB INKPAGES_SOURCES CONFIGURE_DEPENDS
+    src/base/*.cpp src/model/*.cpp src/render/*.cpp src/ink/*.cpp src/tools/*.cpp src/surface/*.cpp src/toolbar/*.cpp)
+add_library(InkPages STATIC ${INKPAGES_SOURCES})
+target_include_directories(InkPages PUBLIC include PRIVATE src)
 target_compile_options(InkPages PRIVATE ${INKPAGES_COMPILE_OPTIONS})
 target_compile_definitions(InkPages PUBLIC ${INKPAGES_DEFINITIONS})
 target_link_libraries(InkPages PUBLIC windowsapp d3d11 dxgi d2d1 dcomp comctl32)

@@ -20,10 +20,10 @@
 
 #include <winrt/Windows.UI.Input.Inking.h>
 
-#include "inkpages/PageLayout.h"
-#include "inkpages/Paper.h"
-#include "inkpages/Pens.h"
-#include "inkpages/ViewMath.h"
+#include "inkpages/model/PageLayout.h"
+#include "inkpages/model/Paper.h"
+#include "inkpages/model/Pens.h"
+#include "inkpages/model/ViewMath.h"
 
 namespace inkpages
 {

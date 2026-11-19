@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "inkpages/Pens.h"
+#include "inkpages/model/Pens.h"
 #include "inkpages/WritingSurface.h"
 
 namespace inkpages

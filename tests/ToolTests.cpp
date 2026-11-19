@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
-#include "inkpages/Pens.h"
-#include "inkpages/StrokeEraser.h"
-#include "inkpages/UndoHistory.h"
+#include "inkpages/model/Pens.h"
+#include "inkpages/model/StrokeEraser.h"
+#include "inkpages/model/UndoHistory.h"
 
 namespace inkpages::tests
 {

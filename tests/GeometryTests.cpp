@@ -2,9 +2,9 @@
 
 #include <algorithm>
 
-#include "inkpages/PageLayout.h"
-#include "inkpages/Paper.h"
-#include "inkpages/ViewMath.h"
+#include "inkpages/model/PageLayout.h"
+#include "inkpages/model/Paper.h"
+#include "inkpages/model/ViewMath.h"
 
 namespace inkpages::tests
 {
