@@ -15,9 +15,10 @@ them, plus their toolbar – native, lean, modern Win32.
 
 There is no file format inside: the app supplies its document's pages and adds its own commands.
 
-**Status (2026-11-19): the move from WinUI 3 to C++/Win32 is under way – the writing surface (pages, paper, ink,
-pan/zoom, pen cursor, lazy pages) and the first tools (toolbar, pen and highlighter presets, eraser whole/exact, the
-pen's eraser end, undo/redo) are in; selection, shapes and the ruler follow.** The WinUI 3 version
+**Status (2026-11-19): the C++/Win32 library has the writing surface (pages, paper, the app's underlay, ink,
+pan/zoom, pen cursor, lazy pages with stroke keys) and the tools (toolbar, pen and highlighter presets, eraser
+whole/exact, the pen's eraser end, selection with the app's pictures, shapes and recognition, Windows' ruler and
+protractor, undo/redo).** The WinUI 3 version
 (C#, `InkCanvas`/`InkToolbar`, with its WinUI fork runtime) is tagged
 [`winui-final`](https://github.com/robertkleinschuster/InkPages/tree/winui-final).
 
@@ -33,34 +34,40 @@ Requirements: Windows 11 (x64), Visual Studio 2026 with the C++ desktop workload
 .\build.ps1 -NoTests
 ```
 
-## Embedding (phase 1 API)
+## Embedding
 
 ```cpp
 #include "inkpages/WritingSurface.h"
+#include "inkpages/Toolbar.h"
 
-auto surface = inkpages::WritingSurface::Create(parentWindow);       // a child window; place it with MoveWindow
-inkpages::PageSpec a4;                                                // 595 x 842 DIP
-a4.paper = { inkpages::PaperKind::Graph, 5 * 96 / 25.4f };            // 5 mm squares, clipped to the sheet
-surface->SetPages(std::vector<inkpages::PageSpec>(3, a4));            // stacked vertically
-surface->SetPen({ 0xFF, 0, 0, 0 }, 2, IDC_MY_PEN_CURSOR);             // color, size (DIPs), cursor resource of the exe
-surface->FitWidth();
-surface->load = [](int page) { /* the page's strokes, page coordinates (ink thread) */ return strokes; };
-surface->store = [](int page, std::vector<InkStroke> strokes) { /* keep them (ink thread) */ };
-surface->viewChanged = [] { /* zoom / page in view changed */ };
+auto surface = inkpages::WritingSurface::Create(parentWindow);  // a child window; place it with MoveWindow
+inkpages::PageSpec page;                                         // size in page units (default A4 in points)
+page.paper = { inkpages::PaperKind::Graph, 5 * 72 / 25.4f };     // or Plain, and draw your own background:
+surface->drawUnderlay = [](int page, ID2D1DeviceContext* dc, inkpages::RectF area) { /* background, PDF, pictures */ };
+surface->SetPages({ page, page, page });
+surface->load = [](int page) { return std::vector<inkpages::KeyedStroke>{ /* stroke, your key, transform */ }; };
+surface->store = [](int page, std::vector<inkpages::KeyedStroke> strokes) { /* keep them (ink thread) */ };
+surface->SetPictureHost(&myPictures);                            // your pictures in the selection
+auto toolbar = inkpages::Toolbar::Create(parentWindow, *surface, choices, texts, cursorFor);
+toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize()); };
 ```
 
-- Finger and precision touchpad pan (inertia) and pinch-zoom; the mouse wheel scrolls, Ctrl+wheel zooms
-  (DirectManipulation). Pen and mouse buttons never pan; the pen writes (the mouse too with `mouseInks`).
-- `ZoomTo`, `FitWidth`, `ScrollToPage`, `PageInView`, `CurrentView`, `Layout` (page rectangles, page at a point).
-- Lazy pages: only pages near the view hold their strokes in the ink presenter; the others are handed to `store` and
-  come back through `load`. `Hold(page, true)` keeps a page's ink (e.g. while it has an edit).
-- Toolbar: `inkpages::Toolbar::Create(parent, *surface, choices, texts, cursorFor)` – undo/redo, pen presets (color
-  and width menus), highlighter presets, eraser and the "erase whole strokes" toggle (its arrow: the circle's size),
-  the app's own buttons. `ToolbarTexts` (English defaults; the app passes its language), `ToolChoices` (the app keeps
-  them: `choicesChanged`, `Serialize`/`Parse`), `Choose` for keyboard shortcuts.
-- Undo/redo: `surface->Undo()`, `Redo()`, `historyChanged`, `MarkSaved()`/`AtSavePoint()` – one history across pages.
-- The pen cursor is a cursor resource in the app's exe (the demo ships dot cursors per color × width,
-  `demo/tools/make_cursors.py`).
+- **Pages and view:** `SetPages`, `ZoomTo`, `FitWidth`, `ScrollToPage`, `PageInView`, `Layout`, `viewChanged`.
+  Finger/touchpad pan and pinch, wheel scrolls, Ctrl+wheel zooms; pen and mouse buttons never pan.
+- **Strokes:** `KeyedStroke` = `InkStroke` (points with pressure, tilt, time; drawing attributes) in page
+  coordinates + the app's key + the transform since loading. Lazy pages: `load`/`store` (ink thread); `StrokesOf(page)`
+  to save live pages; `contentChanged(pages)` after every edit; `Hold(page)`.
+- **The app's content:** `drawUnderlay` + `InvalidatePage` (D2D, page coordinates, under the ink), `PageLayer(page)`
+  (DComp visual for live content), `PictureHost` (`Pictures.h`: your pictures selected, moved, scaled, deleted,
+  duplicated with the strokes; undo calls back).
+- **Tools:** `SetTool(ToolState)` (the toolbar does it): pen, highlighter, eraser (whole strokes or exact circle),
+  select (lasso/rectangle; the barrel lassos with any tool), shapes (+ recognition), `SetRuler`/`SetProtractor`. The
+  pen's eraser end erases with any tool. Pen cursor: a cursor resource of the app's exe (`cursorFor`).
+- **Selection:** `Cut`, `Copy`, `Paste`, `Duplicate`, `DeleteSelection`, `SelectAll`, `ClearSelection`,
+  `selectionChanged`; Windows ink's clipboard, or your own format with `copyToClipboard`/`pasteFromClipboard` (`Clip`).
+- **History:** `Undo`, `Redo`, `historyChanged`, `MarkSaved`/`AtSavePoint` – one history across pages.
+- **Toolbar:** comctl32, Segoe Fluent icons, menus at the presets (color, width), at the eraser toggle (size), at
+  select (lasso/rectangle), shapes (kind, recognition) and the ruler; `ToolbarTexts` in your language; app buttons.
 
 ## Layout
 

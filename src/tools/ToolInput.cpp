@@ -229,9 +229,20 @@ namespace inkpages::detail
         switch (gesture)
         {
         case Gesture::Erase:
-            if (eraser.Running()) ink.Edits().Push(eraser.End());
+            if (eraser.Running())
+            {
+                auto edit = eraser.End();
+                Log(std::format("tools: exact erase ({} pages)", edit->Pages().size()));
+                ink.Edits().Push(edit);
+            }
             break;
-        case Gesture::Shape: ink.Edits().Push(shapes.End(at)); break;
+        case Gesture::Shape:
+        {
+            auto edit = shapes.End(at);
+            Log(std::format("tools: shape ({} strokes)", edit->Empty() ? 0 : 1));
+            ink.Edits().Push(edit);
+            break;
+        }
         case Gesture::Select:
         {
             std::vector<PointF> polygon = rectangle ? RectanglePolygon(lasso.front(), at) : lasso;

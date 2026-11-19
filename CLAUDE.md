@@ -18,7 +18,9 @@ Phase 0 (2026-11-19): project skeleton – library (`Log`), demo window, unit te
 Phase 1 (2026-11-19): the writing surface – `WritingSurface` (pages, paper, ink, DirectManipulation pan/zoom, pen
 cursor, lazy pages), demo, unit tests and sandbox tests (see "Writing surface" below).
 Phase 2a (2026-11-19): toolbar, pens, highlighters, eraser (whole strokes and exact), the pen's eraser end, undo/redo
-(see "Tools" below). Next: 2b selection, 2c shapes, recognition, ruler.
+(see "Tools" below). Phase 2b/2c (2026-11-19): selection with the app's pictures, shapes, recognition, ruler/protractor,
+strokes cut at page edges, stroke keys, page underlay (see "Selection, shapes, ruler"); the library is split into
+modules (see "Structure").
 
 ## Rules (agreed with the user)
 
@@ -56,33 +58,43 @@ Phase 2a (2026-11-19): toolbar, pens, highlighters, eraser (whole strokes and ex
   a sample every ~4 DIPs). The demo logs to `INKPAGES_DEMO_LOG` (TestKit sets `out\demo.log`).
 - Synthetic input fails with ERROR_ACCESS_DENIED while the host session is locked (Win32 demo, 2026-11-19).
 
-## Structure
+## Structure (modules)
 
-- `include/inkpages/` – the public headers; `src/` – the library (static); `demo/` – the demo app (manifest: comctl32
-  v6, PerMonitorV2); `tests/` – unit tests; `UiTests/` – sandbox runner and TestKit.
-- `Log.h`: `SetLogFile`, `SetErrorSink` (errors also to the app, e.g. its errors.log), `Log`, `LogError`,
-  `DescribeHr`, `LogHr`, `LogException`.
-- Pure logic (unit-tested, `tests/GeometryTests.cpp`): `Paper.h` (paper kinds and their lines, ported from
-  `Model/PaperLines.cs`), `PageLayout.h` (vertical page stack, page at/nearest to a point, page in view),
-  `ViewMath.h` (DirectManipulation's transform <-> document DIPs, zoom clamp, fit width, zoom/scroll rectangles kept on
-  the content, `LivePages` = which pages hold their ink).
-- `WritingSurface.h` (public) / `src/WritingSurface.cpp`: the child window; wires `Graphics` (D3D11 + D2D + DComp
-  device), `Viewport` (DirectManipulation), `PaperLayer` (one sheet: D2D into a DComp virtual surface) and `InkLayer`
-  (the ink presenter on Windows' ink host thread, page ownership of strokes, lazy load/store).
-- Tools (2a): `Pens.h` (PenWidths, HighlighterWidths, InkWidth, Palette, PenPreset, ToolChoices with a text round
-  trip), `StrokeEraser.h` (the exact eraser's geometry), `UndoHistory.h` (one history over an `Edit` interface, save
-  point) - pure, unit-tested (`tests/ToolTests.cpp`). `Toolbar.h` / `src/Toolbar.cpp` (comctl32 toolbar in its own
-  container window; `ToolbarTexts`, app buttons, `Choose`, `choicesChanged`), `src/Icons.cpp` (Segoe Fluent Icons
-  glyphs and swatches drawn at the DPI). Ink side: `src/InkState` (container + stroke -> page + helpers),
-  `src/StrokeEdit` (removed/added strokes; undo re-adds `Clone()`s), `src/PartialEraser` (exact eraser on unprocessed
-  input), `src/CircleLayer` (its circle, a D2D ring below the ink).
-- `demo/`: `main.cpp` (only the public API; German toolbar texts), `cursors/` + `tools/make_cursors.py` (a dot cursor
-  per palette color × width step, 80 cursors, ids 1000/2000 + color × 10 + step),
-  `UiTests/SurfaceTest.ps1` (pan/pinch/wheel, ink under the pen, page 2, lazy pages, pen + finger, cursor),
-  `UiTests/BoundaryTest.ps1` (a stroke across the gap), `UiTests/ToolsTest.ps1` (presets, highlighter, eraser exact
-  and whole, the eraser end both ways, a preset's menu, undo/redo across two pages, the cursor on the first hover). `tools/cursorprobe.cpp`: DXGI Desktop Duplication probe – the
-  pointer as the screen draws it (GetCursorInfo and screenshots cannot show it); `build.ps1` puts it in
-  `.local-build	ools` (pass it with `-Data`).
+Folders are modules; each has a narrow interface and **dependencies point downwards only**:
+
+```
+toolbar  ->  surface  ->  tools  ->  ink  ->  render  ->  model        (base: Log, used by all)
+```
+
+- `include/inkpages/` – the public API: `WritingSurface.h` (the surface, its tools and callbacks), `Toolbar.h`,
+  `Pictures.h` (the app's pictures in the selection), `Log.h`; `include/inkpages/model/` – pure data and logic the
+  API uses (`Paper`, `PageLayout`, `ViewMath`, `Pens`, `Geometry`, `StrokeEraser`, `UndoHistory`, `StrokeKeys`).
+- `src/base` – `Log`.
+- `src/model` – pure logic, no Win32/WinRT (unit-tested: `tests/GeometryTests`, `ToolTests`, `ToolGeometryTests`,
+  `StrokeKeysTests`): page layout, view math (zoom, fit width, zoom rectangles kept on the content, lazy pages), paper
+  lines, pens and tool choices (text round trip), the exact eraser's geometry, affine transforms, the selection frame
+  and its handles, taps, clipping at a page's edge, shape outlines, the undo history (+ CompositeEdit, save point),
+  stroke keys.
+- `src/render` – drawing with D3D11/D2D/DComp: `Graphics` (devices), `PaperLayer` (a sheet: color, paper, the app's
+  underlay into a DComp virtual surface), `Overlay` (tools' feedback below the ink: circle, lasso, frame, shape).
+- `src/ink` – the ink presenter and its state (ink thread): `InkHost` (IInkDesktopHost, work items), `UiThread` (work
+  handed to the UI thread), `InkLayer` (presenter, pens, mode, cursor, collected/erased strokes into the history,
+  strokes cut at the pages' edges), `InkState` (container, stroke -> page, stroke keys), `Strokes` (make/transform
+  strokes), `StrokeEdit` (an undo step of strokes), `History`, `PageStore` (lazy pages, snapshots with keys).
+- `src/tools` – each tool in its own unit (ink thread): `ToolInput` (routes unprocessed input and hover, presenter
+  mode, eraser-end and selection takeovers, taps beside the selection, recognition), `ExactEraser`, `InkSelection`
+  (select/preview/commit/delete/duplicate/clipboard of strokes), `ShapeTool`, `ShapeRecognizer` (InkAnalyzer),
+  `Stencils` (ruler, protractor), `PictureEdit` (the app's pictures in an undo step).
+- `src/surface` – the window (UI thread): `Surface` (implements WritingSurface, wires the modules, hands work between
+  threads), `SurfaceWindow` (window procedure: input to the module it belongs to), `Composition` (visual tree, sheets,
+  page layers, overlay), `Viewport` (DirectManipulation), `SelectionController` (selection with the app's pictures,
+  window pointer drags, auto-scroll, commands).
+- `src/toolbar` – `Toolbar` (comctl32 toolbar in its own container window), `ToolbarModel` (buttons, states, tips –
+  no Win32, unit-tested), `ToolbarMenus` (popup menus), `Icons` (Segoe Fluent Icons glyphs, swatches).
+- `demo/` – `main.cpp` (only the public API; German toolbar texts), `DemoPictures` (cards in page layers: the picture
+  extension point), `cursors/` + `tools/make_cursors.py` (a dot cursor per palette color × width step, ids 1000/2000 +
+  color × 10 + step), `UiTests/` (`SurfaceTest`, `BoundaryTest`, `ToolsTest`, `SelectionTest`). `tools/cursorprobe.cpp`:
+  DXGI Desktop Duplication probe – the pointer as the screen draws it; `build.ps1` puts it in `.local-build\tools`.
 
 ## Writing surface (phase 1, measured 2026-11-19; sandbox = Windows Sandbox 1514x900 at 150 %)
 
@@ -158,6 +170,38 @@ Phase 2a (2026-11-19): toolbar, pens, highlighters, eraser (whole strokes and ex
   a stroke on page 1 and one on page 2 undone in time order and redone.
 - Presenter state lives on the host thread: input events (Windows' input thread) and UI calls queue work items
   (`OnInkThread`, run inline when already on the host thread).
+
+## Selection, shapes, ruler (phase 2b/2c, 2026-11-19; sandbox `SelectionTest.ps1`)
+
+- **Strokes never cross a page:** one presenter over the document, so a stroke is cut at the page's edge when it is
+  collected, moved, pasted or recognized (`InkState::Split`, `ClipToRect`); pieces in the gap are dropped – the
+  simplest way that matches Xournal++ keeping strokes per page. Sandbox: a stroke drawn across the gap came out as a
+  piece on page 1 and one on page 2, nothing over the gap.
+- **Selection:** the lasso/rectangle runs on unprocessed input (`RightDragAction = LeaveUnprocessed`: the barrel
+  always lassos, with any tool); strokes are selected with the container's `SelectWithPolyLine` (its `Selected` flags
+  are reset at once – the library keeps the selection itself and uses `Selected` only as the removal mark), the app's
+  pictures by `PictureHost::PicturesIn`. Moving/scaling runs on window pointer input: the pen hovering over the frame
+  takes the pen from the presenter (`InputDeviceTypes = None`), the window gets WM_POINTER*; hovering away gives it
+  back. Preview: `InkStroke.PointTransform` (the ink redraws live) and `PictureHost::Preview`; commit: transformed
+  strokes replace the originals (width unchanged), cut at page edges, one undo step with the pictures
+  (`CompositeEdit`). A short still press on the selection (`Tap`) clears it; a tap beside it clears it and its dot is
+  dropped; writing beside it clears it. Near the view's edge the drag scrolls the pages (16 ms timer = one frame;
+  `ZoomToRect` kept on the content). Undo/redo clear the selection (its frame would not fit).
+  Sandbox: barrel lasso selected 2 strokes + 1 card, the pen moved them (card moved too), undo/redo, tap beside,
+  duplicate, copy, delete, undo, paste (Windows ink's clipboard), rectangle select + tap clears.
+- **Shapes** on unprocessed input (preview in the overlay), one stroke of even width (pen width at full pressure,
+  no pressure). **Recognition:** `InkAnalyzer.AnalyzeAsync` (Completed handler, result posted to the ink thread); the
+  freehand stroke is replaced by the clean outline as its own undo step.
+- **Ruler/protractor:** `InkPresenterRuler(presenter)` / `InkPresenterProtractor(presenter)` work on the Win32
+  presenter (documented constructors). Without a transform the ruler appeared at the document-sized presenter's top
+  right, out of view: the library places it in the view (`Transform`). Touch on the stencil vs. DirectManipulation's
+  touch panning: not tested yet (device).
+- **Stroke keys** (`StrokeKeys`, `KeyedStroke`): load/store/StrokesOf carry the app's key and the transform since
+  loading; followed through `Clone()` in undo, moves (`Moved`), lazy copies; new ink, erased pieces, cuts, duplicates,
+  pastes have key 0.
+- **Underlay:** the app draws under the ink with D2D (`drawUnderlay(page, dc, area)`, page coordinates) into the
+  sheet's virtual surface, over the Paper; `InvalidatePage` redraws it; page layers (`PageLayer`) are DComp visuals for
+  live content (pictures dragged by the selection).
 
 ## Facts learned in the WinUI version (tag `winui-final`; measured on the user's device and in Windows Sandbox, 2026-11-15..19)
 
