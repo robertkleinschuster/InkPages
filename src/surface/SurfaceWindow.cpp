@@ -71,7 +71,8 @@ namespace inkpages::detail
     LRESULT Surface::Handle(UINT message, WPARAM wp, LPARAM lp)
     {
         // A text being edited takes the keyboard and the mouse (and the pen's mouse messages) in its box first.
-        if (textEditor && textEditor->Editing())
+        bool wasEditing = textEditor && textEditor->Editing();
+        if (wasEditing)
         {
             LRESULT result = 0;
             if (textEditor->OnMessage(message, wp, lp, result)) return result;
@@ -109,7 +110,8 @@ namespace inkpages::detail
         case WM_LBUTTONDBLCLK: // (the class has CS_DBLCLKS for the text box: outside it a press is a press)
         {
             if (!IsRealMouse()) break;
-            bool had = selection->HasSelection();
+            // A press that cleared the selection or ended a text's edit is no click of its own.
+            bool had = selection->HasSelection() || (wasEditing && !textEditor->Editing());
             if (selection->OnPointer(message, wp, lp)) return 0; // on the selection: move or scale
             mouse->Press({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) }, had);
             return 0;

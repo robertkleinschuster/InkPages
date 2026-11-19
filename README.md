@@ -55,12 +55,14 @@ toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize(
 - **Pages and view:** `MarkCurrentPage(bool)` (the page in view outlined in the accent color; turn it on for more than
   one page), `SetPages`, `InsertPages(index, specs)`, `RemovePage(index)`, `MovePage(from, to)` (the history,
   strokes, stroke keys and page layers follow; edits of a removed page are dropped; remap your own per-page data with
-  `model/PageMap.h`; the strokes you keep for `store`d pages in `pagesRemapped`, ink thread, in order with load/store), `ZoomTo`, `FitWidth`, `ScrollToPage`, `PageInView`, `Layout`, `viewChanged`.
+  `model/PageMap.h`; the strokes you keep for `store`d pages in `pagesRemapped`, ink thread, in order with load/store), `ZoomTo`, `FitWidth`, `ScrollToPage`, `ScrollTo(page, point)` (the point to the view's top left, 16 DIPs in: outline
+  entries, links), `RevealRect(page, area)` (scrolls only as far as needed: search hits), `PageInView`, `Layout`, `viewChanged`.
   Finger/touchpad pan and pinch, wheel scrolls, Ctrl+wheel zooms; pen and mouse buttons never pan.
 - **Input:** only the pen writes. The mouse (and touchpad clicks) selects with any tool: a drag lassos (or draws the
   rectangle, by the select mode), on the selection moves it, on a corner scales it; a click beside it clears it, on a
-  picture selects it. `tapped(page, point, PointerKind)`: a mouse click or finger tap no selection gesture took (for
-  links); a finger pan is no tap.
+  picture selects it; with the Text tool a click writes or edits a text there (a click beside the box ends it).
+  `tapped(page, point, PointerKind)`: a mouse click or finger tap no selection gesture took (for links); a finger pan
+  is no tap.
 - **Strokes:** `KeyedStroke` = `InkStroke` (points with pressure, tilt, time; drawing attributes) in page
   coordinates + the app's key + the transform since loading. Lazy pages: `load`/`store` (ink thread); `StrokesOf(page)`
   to save live pages; `contentChanged(pages)` after every edit; `Hold(page)`.

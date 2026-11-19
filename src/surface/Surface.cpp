@@ -88,7 +88,12 @@ namespace inkpages::detail
         auto toDocument = [this](POINT client) { return ToDocument(client); };
         auto zoom = [this] { return viewport->Current().zoom; };
         mouse = std::make_unique<MouseSelect>(window, host, [this] { return tools.get(); }, *selection, toDocument, zoom,
-            [this](PointF at) { Tapped(at, PointerKind::Mouse); });
+            [this](PointF at) { Tapped(at, PointerKind::Mouse); },
+            [this](PointF at) {
+                if (currentTool != Tool::Text) return false;
+                textEditor->Tap(at, textStyle);
+                return true;
+            });
         touchTaps = std::make_unique<TouchTaps>(toDocument, zoom, [this](PointF at) { Tapped(at, PointerKind::Touch); });
 
         automation = std::make_unique<SurfaceAutomation>(window);
@@ -463,6 +468,31 @@ namespace inkpages::detail
         });
     }
 
+    namespace
+    {
+        constexpr float RevealMarginDip = 16; // around a point or area brought into view
+    }
+
+    void Surface::ScrollTo(int page, PointF point)
+    {
+        if (page < 0 || page >= layout.Count()) return;
+        WhenReady([this, page, point] {
+            RectF r = layout.Page(page);
+            ZoomToRect(ScrollToPointRect(ClientSize(), CurrentView(), scale, { r.left + point.x, r.top + point.y },
+                RevealMarginDip * scale));
+        });
+    }
+
+    void Surface::RevealRect(int page, RectF area)
+    {
+        if (page < 0 || page >= layout.Count()) return;
+        WhenReady([this, page, area] {
+            RectF r = layout.Page(page);
+            RectF doc{ r.left + area.left, r.top + area.top, r.left + area.right, r.top + area.bottom };
+            if (auto to = inkpages::RevealRect(ClientSize(), CurrentView(), scale, doc, RevealMarginDip * scale)) ZoomToRect(*to);
+        });
+    }
+
     void Surface::SetTool(ToolState state)
     {
         ToolSettings settings{ state.tool, state.wholeStrokeErasing, state.eraserRadius, state.selectMode,
@@ -471,6 +501,7 @@ namespace inkpages::detail
         bool pens = state.tool == Tool::Pen || state.tool == Tool::Highlighter;
         if (state.tool != Tool::Select) selection->Clear();
         textStyle = state.text;
+        currentTool = state.tool;
         if (state.tool == Tool::Text) textEditor->SetStyle(state.text); // the edited text takes the menu's choice
         else textEditor->End();
         host.Post("tool", [this, settings, look, pens, cursor = state.cursor] {

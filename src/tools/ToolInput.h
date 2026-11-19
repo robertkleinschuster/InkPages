@@ -41,7 +41,7 @@ namespace inkpages::detail
         std::function<void(StrokeSelection const&, std::vector<PointF> const& polygon)> selected;
         std::function<void()> cleared;
         std::function<void(bool taken)> penTaken;
-        /// Ink thread: a pen tap with the Text tool (document point).
+        /// Ink thread: a pen tap with the Text tool (document point: edit the text there or start one).
         std::function<void(PointF at)> textTapped;
         /// Any thread: the view's zoom now (taps are measured on the screen).
         std::function<float()> zoom;
@@ -52,6 +52,9 @@ namespace inkpages::detail
         void Cancel();
         /// The selection's frame as the UI shows it (strokes and pictures), or none.
         void SetFrame(std::optional<SelectionFrame> frame);
+        /// While the selection is dragged: the ink previews `m` (PointTransform) and the frame shows it too, in the same
+        /// work item (identity: as they are). The frame the tools hit-test stays until the drag is committed.
+        void PreviewSelection(Affine const& m);
         /// The text box being edited (document), or none: the pen hovering over it goes to the window (it edits there).
         void SetTextBox(std::optional<RectF> box);
         /// The window's pen left the selection: the presenter gets it back.
@@ -96,6 +99,7 @@ namespace inkpages::detail
         std::optional<RectF> textBox;
         PointF textPress;
         uint64_t textPressMs = 0;
+        float textFarthest = 0; // how far the gesture went from the press (page units)
         bool eraserEndTaken = false;
         bool penTakenNow = false;
         Gesture gesture = Gesture::None;

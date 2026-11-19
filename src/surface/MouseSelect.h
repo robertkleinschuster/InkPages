@@ -4,7 +4,8 @@
 // not take it, its buttons come to the window. A drag beside the selection selects as the selection tool does (lasso
 // or rectangle by its mode, with any tool active) - drawn and decided by ToolInput on the ink thread; moving and
 // scaling the selection is SelectionController's (it gets the press first). A click selects the app's picture under
-// it; a click that neither cleared a selection nor picked a picture is the app's tap (PDF links).
+// it; a click that neither cleared a selection nor picked a picture is the app's tap (PDF links). With the Text tool
+// a click writes or edits a text there (a drag still selects); a click that ended an edit is just that.
 
 #include <windows.h>
 
@@ -24,9 +25,9 @@ namespace inkpages::detail
     public:
         MouseSelect(HWND window, InkHost& host, std::function<ToolInput*()> tools, SelectionController& selection,
             std::function<PointF(POINT client)> toDocument, std::function<float()> zoom,
-            std::function<void(PointF document)> tapped)
+            std::function<void(PointF document)> tapped, std::function<bool(PointF document)> textClick)
             : window(window), host(host), tools(std::move(tools)), selection(selection), toDocument(std::move(toDocument)),
-              zoom(std::move(zoom)), tapped(std::move(tapped)) {}
+              zoom(std::move(zoom)), tapped(std::move(tapped)), textClick(std::move(textClick)) {}
 
         /// The left button went down beside the selection; `clearedSelection`: the press cleared one (then it is no tap).
         void Press(POINT client, bool clearedSelection);
@@ -45,6 +46,7 @@ namespace inkpages::detail
         std::function<PointF(POINT)> toDocument;
         std::function<float()> zoom;
         std::function<void(PointF)> tapped;
+        std::function<bool(PointF)> textClick; // the Text tool takes a click (a text there); false: not the Text tool
         TapGesture gesture;
         std::vector<PointF> path; // until it is a drag
         bool lassoing = false;

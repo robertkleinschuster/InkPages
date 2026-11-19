@@ -32,7 +32,9 @@ Invoke-Test {
     "touch keyboard setting before: " + (Get-ItemProperty 'HKCU:\Software\Microsoft\TabletTip\1.7' -ErrorAction SilentlyContinue).TouchKeyboardTapInvoke
     Start-TestApp 'InkPagesDemo.exe'
     [Inj]::MoveMouse(700, 340)
+    Start-Sleep 2  # the window settles first: a key sent earlier came after the first pen tap (that tap inked)
     Key 0x53  # S: the Text tool
+    Start-Sleep 1
 
     # 1. the sandbox's default setting
     PenTap 'new text' 200 140

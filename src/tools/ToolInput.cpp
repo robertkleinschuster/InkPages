@@ -116,6 +116,7 @@ namespace inkpages::detail
 
     void ToolInput::Cancel()
     {
+        if (gesture != Gesture::None) Log(std::format("tools: gesture {} ends without its release", static_cast<int>(gesture)));
         shapes.Cancel(); // a lost pointer leaves no shape; a lost erase keeps what it erased
         lasso.clear();
         overlay.SetLasso({});
@@ -152,6 +153,15 @@ namespace inkpages::detail
         frame = f;
         overlay.SetFrame(f);
         if (!f && !textBox) GiveBackPen();
+    }
+
+    void ToolInput::PreviewSelection(Affine const& m)
+    {
+        selection.Preview(m);
+        if (!frame) return;
+        SelectionFrame shown = *frame;
+        shown.bounds = m.Bounds(frame->bounds); // the handles keep their size, as the frame on the screen
+        overlay.SetFrame(shown);
     }
 
     void ToolInput::SetTextBox(std::optional<RectF> box)
@@ -227,18 +237,20 @@ namespace inkpages::detail
         }
         else if (settings.tool == Tool::Text)
         {
-            gesture = Gesture::Text; // a tap places or edits a text
+            gesture = Gesture::Text; // a press without a drag places or edits a text
             textPress = at;
             textPressMs = GetTickCount64();
+            textFarthest = 0;
+            Log(std::format("tools: text press at {:.1f},{:.1f}", at.x, at.y));
         }
     }
 
     void ToolInput::MouseSelectBegin(std::vector<PointF> const& path)
     {
         if (path.empty() || gesture != Gesture::None) return; // the pen's gesture runs
+        mouseGesture = true;
         gesture = Gesture::Select;
         rectangle = settings.selectMode == SelectMode::Rectangle;
-        mouseGesture = true;
         lasso = { path.front() };
         Move(path);
     }
@@ -270,6 +282,9 @@ namespace inkpages::detail
         {
         case Gesture::Erase: eraser.MoveAlong(path); break;
         case Gesture::Shape: shapes.Move(path.back()); break;
+        case Gesture::Text: // how far the pen went: a drag is no text
+            for (PointF p : path) textFarthest = std::max(textFarthest, std::abs(p.x - textPress.x) + std::abs(p.y - textPress.y));
+            break;
         case Gesture::Select:
             if (rectangle) overlay.SetLasso(RectanglePolygon(lasso.front(), path.back()));
             else
@@ -303,9 +318,14 @@ namespace inkpages::detail
         }
         case Gesture::Text:
         {
-            float moved = std::abs(at.x - textPress.x) + std::abs(at.y - textPress.y);
+            // Where to write is the press point; only a drag is not a text. How long the pen rests does not matter: a
+            // real pen's tap is often held longer than Tap's 300 ms.
+            textFarthest = std::max(textFarthest, std::abs(at.x - textPress.x) + std::abs(at.y - textPress.y));
             unsigned ms = static_cast<unsigned>(GetTickCount64() - textPressMs);
-            if (Tap::IsTap(moved, ms, Zoom()) && textTapped) textTapped(textPress);
+            bool tap = textFarthest < Tap::MaxDistance(Zoom());
+            Log(std::format("tools: text release, moved {:.2f} units in {} ms (tap distance {:.2f}): {}", textFarthest, ms,
+                Tap::MaxDistance(Zoom()), tap ? "a text there" : "a drag, no text"));
+            if (tap && textTapped) textTapped(textPress);
             break;
         }
         case Gesture::Select:

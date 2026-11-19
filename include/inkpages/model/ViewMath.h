@@ -4,6 +4,7 @@
 // between document DIPs and the viewport's pixels. Pure math (unit-tested).
 //   viewport pixel = document DIP * scale * zoom + offset
 
+#include <optional>
 #include <set>
 
 #include "inkpages/model/PageLayout.h"
@@ -40,6 +41,14 @@ namespace inkpages
 
     /// The content rectangle that shows `documentTop` at the viewport's top at the current zoom, left as it is.
     RectF ScrollRect(SizeF viewportPx, View view, float scale, float documentTop);
+
+    /// The content rectangle that brings document point `at` to the viewport's top left, `marginPx` (viewport pixels)
+    /// away from the edges, at the current zoom.
+    RectF ScrollToPointRect(SizeF viewportPx, View view, float scale, PointF at, float marginPx);
+
+    /// The content rectangle that brings `area` (document) into view with `marginPx` around it, moving as little as
+    /// needed at the current zoom; none when it is in view already. An area larger than the view shows its top left.
+    std::optional<RectF> RevealRect(SizeF viewportPx, View view, float scale, RectF area, float marginPx);
 
     /// Lazy pages: which pages keep (or get) their ink. Pages within one viewport height of the visible area come in;
     /// pages already live stay until they are more than two viewport heights away; held pages always stay.

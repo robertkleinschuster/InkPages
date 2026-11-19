@@ -43,6 +43,8 @@ namespace inkpages::detail
         void ZoomTo(float zoom) override;
         void FitWidth() override;
         void ScrollToPage(int page) override;
+        void ScrollTo(int page, PointF point) override;
+        void RevealRect(int page, RectF area) override;
         View CurrentView() const override { return viewport ? viewport->Current() : View{}; }
         float Scale() const override { return scale; }
         std::optional<int> PageInView() const override { return layout.PageInView(Visible()); }
@@ -125,6 +127,7 @@ namespace inkpages::detail
         std::unique_ptr<TextEditor> textEditor;
         TextHost* textHost = nullptr;
         TextStyle textStyle; // the Text tool's
+        Tool currentTool = Tool::Pen;
         // Page operations issued (UI thread) and applied on the ink thread: a tool's result made before the ink thread
         // applied every issued one refers to the old pages and is dropped.
         std::atomic<unsigned> pagesGeneration = 0, inkPagesGeneration = 0;

@@ -50,6 +50,7 @@ namespace inkpages::detail
         End(true, at);
         ReleaseCapture();
         if (wasLasso || !tap) return;
+        if (!consumed && textClick && textClick(*tap)) return; // the Text tool: a text there
         if (selection.SelectPictureAt(*tap)) // also when the press cleared a selection: one click, as the pen's tap
         {
             Log("mouse: the click selected a picture");

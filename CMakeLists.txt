@@ -46,7 +46,7 @@ FetchContent_Declare(googletest
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 enable_testing()
-add_executable(InkPagesTests tests/LogTests.cpp tests/GeometryTests.cpp tests/ToolTests.cpp tests/ToolGeometryTests.cpp tests/ToolbarModelTests.cpp tests/StrokeKeysTests.cpp tests/PathDataTests.cpp tests/PageMapTests.cpp tests/TapGestureTests.cpp tests/TextTests.cpp tests/RichEditBoxTests.cpp tests/StrokeEditTests.cpp tests/InkHostTests.cpp)
+add_executable(InkPagesTests tests/LogTests.cpp tests/GeometryTests.cpp tests/ToolTests.cpp tests/ToolGeometryTests.cpp tests/ToolbarModelTests.cpp tests/StrokeKeysTests.cpp tests/PathDataTests.cpp tests/PageMapTests.cpp tests/TapGestureTests.cpp tests/TextTests.cpp tests/RichEditBoxTests.cpp tests/StrokeEditTests.cpp tests/InkHostTests.cpp tests/ScrollTests.cpp)
 target_compile_options(InkPagesTests PRIVATE ${INKPAGES_COMPILE_OPTIONS})
 target_link_libraries(InkPagesTests PRIVATE InkPages GTest::gtest_main)
 target_include_directories(InkPagesTests PRIVATE src) # pure units of the modules (e.g. toolbar/ToolbarModel)

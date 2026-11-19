@@ -74,6 +74,7 @@ namespace inkpages::detail
 
     void TextEditor::Tap(PointF at, TextStyle const& style)
     {
+        Log(std::format("text: tap at {:.1f},{:.1f} (editing {}, text host {})", at.x, at.y, Editing(), c.texts() != nullptr));
         if (Editing())
         {
             Log("text: a tap beside the box ends editing");
@@ -81,14 +82,22 @@ namespace inkpages::detail
             return;
         }
         TextHost* texts = c.texts();
-        if (!texts) return;
+        if (!texts)
+        {
+            Log("text: no text host - the app has not set one (SetTextHost)");
+            return;
+        }
         if (auto existing = texts->TextAt(at))
         {
             Begin(existing, texts->Get(*existing), at);
             return;
         }
         auto page = c.layout().PageAt(at);
-        if (!page) return; // beside the pages
+        if (!page)
+        {
+            Log("text: the tap is beside the pages");
+            return;
+        }
         RectF r = c.layout().Page(*page);
         Text text{ *page, { at.x - r.left, at.y - r.top - style.size * 0.6f }, L"", style }; // the line centered on the tap
         Begin(std::nullopt, text, at);

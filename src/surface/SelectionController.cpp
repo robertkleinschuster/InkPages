@@ -204,7 +204,7 @@ namespace inkpages::detail
         drag->m = frame->Drag(drag->handle, drag->start, at);
         Affine m = drag->m;
         c.host->Post("selection preview", [tools = c.tools, m] {
-            if (ToolInput* t = tools()) t->Selection().Preview(m);
+            if (ToolInput* t = tools()) t->PreviewSelection(m); // the ink and its frame move together
         });
         if (PictureHost* host = c.pictures(); host && !pictures.empty()) host->Preview(pictures, m);
         // Near the view's edge the pages scroll (per frame) while the pen holds still too.
@@ -250,7 +250,7 @@ namespace inkpages::detail
         if (Tap::IsTap(d.farthest, ms, c.viewport->Current().zoom))
         {
             c.host->Post("selection preview end", [tools = c.tools] {
-                if (ToolInput* t = tools()) t->Selection().Preview({});
+                if (ToolInput* t = tools()) t->PreviewSelection({});
             });
             if (PictureHost* host = c.pictures(); host && !pictures.empty()) host->Preview(pictures, {});
             Log("selection: a tap on the selection clears it");

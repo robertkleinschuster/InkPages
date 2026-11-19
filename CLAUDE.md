@@ -40,7 +40,9 @@ modules (see "Structure").
 - **No app dependencies.** No file format, no app texts (apps pass their language). Small classes with one job; logic
   without UI is unit-tested.
 - Windows 11 (26200) only, x64. Right-handed: nothing interactive at the right edge. Touch and touchpad never draw: they
-  pan and zoom the sheet; the pen writes; the mouse never writes (user, 2026-11-19): it selects and taps links.
+  pan and zoom the sheet; the pen writes; the mouse never writes (user, 2026-11-19): a drag selects (with every
+  tool), a click on a picture selects it, a click with the Text tool writes or edits a text, otherwise a click taps
+  links. No drawn-out text boxes (user, 2026-11-19): upstream `<text>` has no width, a drawn frame could not be kept.
 - Code, comments and commits in English. Breaking API changes: update Xournal Studio in the same session.
 - Coordinate with the MatheTrainer session: announce before editing this repository; one Windows Sandbox at a time
   (`wsb list` empty, lock file xournal-studio-windows `.local-build\sandbox.lock`).
@@ -275,6 +277,15 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   line (`KEYEVENTF_UNICODE` injection: WM_CHAR whatever the layout), ended by a tap beside, edited again (End, " neu"),
   change undone/redone, an empty text left nothing, a mouse lasso selected the text (through `PictureHost`), moved it,
   undo; at zoom 2 the box lay exactly on the text. UI Automation and the touch keyboard: see the next point.
+- **Real pen taps with the Text tool** (device bug 2026-11-19: no box opened): the tap was judged by `Tap` (under 300 ms,
+  under 3 DIPs), and a real pen's deliberate tap is often held longer (synthetic taps in the sandbox lasted a few ms).
+  The Text tool now takes any press without a drag as "here": the farthest movement during the press under the tap
+  distance, however long. Sandbox `TextTest`: a tap held 450 ms with jitter opens the box (log "tools: text release,
+  moved ... in ... ms"); the log lines on that path (`tools: text press/release`, `text: tap at ...`, why nothing
+  opens: no text host, beside the pages) show it on a device too.
+- **The selection frame follows the drag:** the move/scale preview and the frame drawn in the overlay change in one
+  work item on the ink thread (`ToolInput::PreviewSelection`): before, only the ink moved and the frame jumped on
+  release. The frame the tools hit-test stays the committed one until the drag ends.
 - **Text box in UI Automation** (2026-11-19, sandbox `KeyboardTest.ps1`): Microsoft's route for a windowless RichEdit
   ([doc] https://learn.microsoft.com/windows/win32/api/textserv/nn-textserv-iricheditwindowlessaccessibility):
   `SurfaceAutomation` answers WM_GETOBJECT (UiaRootObjectId) with a fragment root hosted on the window

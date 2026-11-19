@@ -245,6 +245,12 @@ public static class Inj
         Mouse(0, P(x, y));
     }
 
+    /// <summary>The left mouse button down or up at client DIPs (a drag held in the middle, e.g. for a screenshot).</summary>
+    public static void MouseButton(double x, double y, bool down)
+    {
+        Mouse(down ? 0x2u : 0x4u, P(x, y));
+    }
+
     /// <summary>Left-button mouse drag through client DIP points (x0, y0, x1, y1, ...), a sample every ~4 DIPs.</summary>
     public static void MouseDrag(double[] pts)
     {

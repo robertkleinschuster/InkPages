@@ -1,8 +1,8 @@
 #pragma once
 
 // The app's texts (Xournal++'s <text>: plain text with newlines, one font, size and color, placed by its top left). The
-// Text tool edits one at a time: a pen tap on a page starts a new text there, a tap on a text edits it, a tap beside the
-// box ends editing (so does Escape, another tool, undo/redo, a page operation). While a text is edited the library
+// Text tool edits one at a time: a pen tap or mouse click on a page starts a new text there (however long the pen
+// rests; a drag is no text), one on a text edits it, one beside the box ends editing (so does Escape, another tool, undo/redo, a page operation). While a text is edited the library
 // shows it (a windowless RichEdit in the page's composition); the app leaves it out of its own drawing. At the end the
 // library hands the result back (Add, Change, or Remove when it was emptied) and records it as one undo step; an empty
 // new text is nothing.

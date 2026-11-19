@@ -171,9 +171,10 @@ namespace inkpages::detail
         TextBoxEnds();
         state->root = nullptr;
         state->window = nullptr;
-        // [doc] UiaReturnRawElementProvider with nulls: UI Automation lets go of the window's providers.
+        // [doc] For a window that goes away: UiaReturnRawElementProvider with nulls lets UI Automation drop what it holds
+        // of the window's providers. (UiaDisconnectProvider is for an element that is destroyed while its window lives -
+        // the text box; on the root it returned E_INVALIDARG at every exit.)
         UiaReturnRawElementProvider(window, 0, 0, nullptr);
-        LogHr("UIA: disconnect the surface", UiaDisconnectProvider(root.get()));
     }
 
     bool SurfaceAutomation::OnGetObject(WPARAM wp, LPARAM lp, LRESULT& result)

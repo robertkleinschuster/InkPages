@@ -6,7 +6,8 @@
 //     (DirectManipulation). Touch never draws; pen and mouse buttons never pan.
 //   - Mouse (and touchpad clicks): never writes. A drag selects (lasso or rectangle by the select mode, with any tool),
 //     moves the selection or scales it at a corner; a click beside the selection clears it, on a picture selects it.
-//   - Text tool: a pen tap writes a text there (or edits the text there), the keyboard types (TextHost, Texts.h).
+//   - Text tool: a pen tap or mouse click writes a text there (or edits the text there), the keyboard types (TextHost,
+//     Texts.h); a pen drag writes nothing, a mouse drag still selects.
 //   - Taps: a mouse click or finger tap that no selection gesture took is the app's (`tapped`: links).
 //   - Pen: the active tool (ToolState): pen, highlighter, eraser (whole strokes or exactly the circle), selection
 //     (lasso or rectangle; the barrel button lassos with any tool; the pen over the selection moves and scales it),
@@ -112,6 +113,12 @@ namespace inkpages
         virtual void ZoomTo(float zoom) = 0;    // around the view's center
         virtual void FitWidth() = 0;
         virtual void ScrollToPage(int page) = 0;
+        /// Scrolls so that `point` (page units on `page`) is at the view's top left, 16 DIPs in; the zoom stays, the
+        /// view stays on the content (outline entries, links).
+        virtual void ScrollTo(int page, PointF point) = 0;
+        /// Scrolls only when `area` (page units on `page`) is not entirely in view, as little as needed, keeping 16 DIPs
+        /// around it (stepping through search hits). The zoom stays.
+        virtual void RevealRect(int page, RectF area) = 0;
         virtual View CurrentView() const = 0;   // DirectManipulation's transform (pixels)
         virtual float Scale() const = 0;        // pixels per DIP (the window's DPI / 96)
         virtual std::optional<int> PageInView() const = 0;

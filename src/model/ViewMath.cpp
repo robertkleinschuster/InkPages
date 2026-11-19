@@ -54,6 +54,31 @@ namespace inkpages
         return { left, top, left + viewportPx.width / view.zoom, top + viewportPx.height / view.zoom };
     }
 
+    RectF ScrollToPointRect(SizeF viewportPx, View view, float scale, PointF at, float marginPx)
+    {
+        float m = marginPx / view.zoom; // content pixels
+        float left = at.x * scale - m, top = at.y * scale - m;
+        return { left, top, left + viewportPx.width / view.zoom, top + viewportPx.height / view.zoom };
+    }
+
+    std::optional<RectF> RevealRect(SizeF viewportPx, View view, float scale, RectF area, float marginPx)
+    {
+        float m = marginPx / view.zoom;
+        RectF shown{ -view.dx / view.zoom, -view.dy / view.zoom, (viewportPx.width - view.dx) / view.zoom,
+            (viewportPx.height - view.dy) / view.zoom };
+        RectF want{ area.left * scale - m, area.top * scale - m, area.right * scale + m, area.bottom * scale + m };
+        // Per axis: the least shift that shows the area; an area larger than the view shows its start.
+        auto shift = [](float lo, float hi, float viewLo, float viewHi) {
+            if (lo < viewLo || hi - lo > viewHi - viewLo) return lo - viewLo;
+            if (hi > viewHi) return hi - viewHi;
+            return 0.f;
+        };
+        float dx = shift(want.left, want.right, shown.left, shown.right);
+        float dy = shift(want.top, want.bottom, shown.top, shown.bottom);
+        if (dx == 0 && dy == 0) return std::nullopt;
+        return RectF{ shown.left + dx, shown.top + dy, shown.right + dx, shown.bottom + dy };
+    }
+
     std::set<int> LivePages(PageLayout const& layout, RectF visible, std::set<int> const& live, std::set<int> const& held)
     {
         float h = visible.Height();
