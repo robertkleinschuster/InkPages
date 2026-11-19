@@ -20,6 +20,9 @@ add_library(InkPages STATIC
     src/Paper.cpp
     src/PageLayout.cpp
     src/ViewMath.cpp
+    src/Pens.cpp
+    src/StrokeEraser.cpp
+    src/UndoHistory.cpp
     src/Graphics.cpp
     src/Viewport.cpp
     src/PaperLayer.cpp
@@ -52,7 +55,7 @@ FetchContent_Declare(googletest
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 enable_testing()
-add_executable(InkPagesTests tests/LogTests.cpp tests/GeometryTests.cpp)
+add_executable(InkPagesTests tests/LogTests.cpp tests/GeometryTests.cpp tests/ToolTests.cpp)
 target_compile_options(InkPagesTests PRIVATE ${INKPAGES_COMPILE_OPTIONS})
 target_link_libraries(InkPagesTests PRIVATE InkPages GTest::gtest_main)
 include(GoogleTest)

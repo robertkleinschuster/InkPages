@@ -26,7 +26,7 @@ namespace inkpages
 {
     struct PageSpec
     {
-        SizeF size{ 595.28f, 841.89f }; // DIPs (A4: 210 x 297 mm)
+        SizeF size{ 595.28f, 841.89f }; // page units (the default: A4 in points, as Xournal++ stores it)
         Paper paper;
     };
 
