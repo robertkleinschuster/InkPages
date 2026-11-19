@@ -197,7 +197,12 @@ xournal-studio-windows' CLAUDE.md on 2026-11-18 so that every embedding app (Mat
   the tip over the selection).
 - `Selection`, `SelectionDrag` and `DragAutoScroll` handle the selection (its commands' state: `PenToolbar.ShowSelection`). A move or scale runs
   on XAML pointer input on the page's `Surface`, because the presenter that got the press keeps the pen and its
-  coordinates drift once its page scrolls. Auto-scroll runs on `CompositionTarget.Rendering`.
+  coordinates drift once its page scrolls. Auto-scroll runs on `CompositionTarget.Rendering`. **Moves are exact
+  (user, 2026-11-19):** a move or scale is applied however small it is; only a short (< 300 ms), nearly still (< 3
+  units) press on the selection is a tap that clears it (`Model/Tap`; before, every move under 3 units counted as a tap
+  and was lost). A tip tap beside the selection clears it and leaves no dot (`InkWorkspace.OnStrokesCollected` takes the
+  tap's stroke out again: beside a selection the pen inks); writing beside it clears it and keeps the stroke. Sandbox:
+  `InkPages.Demo/UiTests/SmallMoveTest.ps1`.
 - `PartialEraser`, `ShapeTool`, `ShapeRecognition`, `UndoStack` (`IPageEdit`: `PageEdit`, `TransformEdit`,
   `CombinedEdit`), `InkLog`.
 - `Model/` has no UI: `ToolChoices`/`PenPreset`, `StrokeEraser`, `ShapeGeometry`/`ShapeKind`, `InkStrokes` (drawn width;

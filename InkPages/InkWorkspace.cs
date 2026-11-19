@@ -443,9 +443,40 @@ public sealed class InkWorkspace
         Undo.Push(edit);
     }
 
-    /// <summary>Records new ink for undo; with shape recognition on, hand-drawn shapes become clean ones.</summary>
+    // A stroke that is only a tap: short and (nearly) where it began (Tap).
+    private static bool IsTap(InkStroke stroke)
+    {
+        var points = stroke.GetInkPoints();
+        if (points.Count == 0)
+        {
+            return true;
+        }
+        var first = points[0].Position;
+        double farthest = points.Max(p => Math.Abs(p.Position.X - first.X) + Math.Abs(p.Position.Y - first.Y));
+        return Tap.IsTap(farthest, stroke.StrokeDuration ?? TimeSpan.Zero);
+    }
+
+    /// <summary>
+    /// Records new ink for undo; with shape recognition on, hand-drawn shapes become clean ones. Writing beside a selection
+    /// ends it; a tap there only ends it and leaves no dot (user, 2026-11-19: the pen inks beside a selection – only over it
+    /// the selection takes the pen – so the tap's dot is taken out again).
+    /// </summary>
     private async void OnStrokesCollected(InkPage page, IReadOnlyList<InkStroke> strokes)
     {
+        if (Selection.Current != null && !Selection.IsDragging)
+        {
+            var taps = strokes.Where(IsTap).ToList();
+            Selection.Clear();
+            if (taps.Count > 0)
+            {
+                PageEdit.RemoveStrokes(page, taps);
+                strokes = strokes.Except(taps).ToList();
+                if (strokes.Count == 0)
+                {
+                    return;
+                }
+            }
+        }
         int shown = generation, pageShown = pageResets.GetValueOrDefault(page);
         var edit = new PageEdit(page);
         recognizing[page] = recognizing.GetValueOrDefault(page) + 1; // the page's view stays until it is recorded

@@ -22,6 +22,8 @@ public sealed class SelectionTool(UndoStack undo)
     private Point start;
     private Point anchor, handle; // scaling: the fixed corner and where the pen pressed
     private bool moved;           // the pen left the start point (a closed lasso ends where it began: no tap)
+    private double farthest;      // the farthest the pen was from the start (|dx| + |dy|): a move or scale is a tap only near it (Tap)
+    private long pressedAt;       // Environment.TickCount64 at the press
     private Polyline? lasso;
     private Rectangle? rectangle;
 
@@ -105,6 +107,8 @@ public sealed class SelectionTool(UndoStack undo)
         view = page;
         start = p;
         moved = false;
+        farthest = 0;
+        pressedAt = Environment.TickCount64;
         gesture = Gesture.None;
         dragEdits.Clear();
         handOverFailed = false;
@@ -148,7 +152,8 @@ public sealed class SelectionTool(UndoStack undo)
 
     public void Move(Point p)
     {
-        moved |= Math.Abs(p.X - start.X) + Math.Abs(p.Y - start.Y) >= 3;
+        farthest = Math.Max(farthest, Math.Abs(p.X - start.X) + Math.Abs(p.Y - start.Y));
+        moved |= farthest >= Tap.MaxDistance;
         switch (gesture)
         {
             case Gesture.Lasso:
@@ -180,7 +185,10 @@ public sealed class SelectionTool(UndoStack undo)
         Canvas.SetZIndex(page, 0);
         RemoveFeedback();
         gesture = Gesture.None;
-        bool tap = !moved && Math.Abs(p.X - start.X) + Math.Abs(p.Y - start.Y) < 3;
+        double distance = Math.Abs(p.X - start.X) + Math.Abs(p.Y - start.Y);
+        bool tap = !moved && distance < Tap.MaxDistance;
+        // A move or scale is applied exactly however small it is; only a short, (nearly) still press is a tap.
+        bool dragTap = Tap.IsTap(Math.Max(farthest, distance), TimeSpan.FromMilliseconds(Environment.TickCount64 - pressedAt));
         switch (finished)
         {
             case Gesture.Lasso when !tap:
@@ -195,7 +203,7 @@ public sealed class SelectionTool(UndoStack undo)
             case Gesture.Lasso or Gesture.Rectangle:
                 SelectPictureAt(page, p);
                 break;
-            case Gesture.Move or Gesture.Scale when tap:
+            case Gesture.Move or Gesture.Scale when dragTap:
                 // A tap on the selection clears it (or selects the picture under the pen).
                 Current?.Revert();
                 Clear();
@@ -237,6 +245,8 @@ public sealed class SelectionTool(UndoStack undo)
         Canvas.SetZIndex(view, 1);
         var q = new Point(p.X + target.Offset.X, p.Y + target.Offset.Y);
         start = q; // the content is where it was shown: the move goes on from here
+        this.moved = true; // (the local "moved" above is the handed-over content)
+        farthest = Tap.MaxDistance; // a drag, not a tap
         lastOnPage = q;
         Current = new Selection(view, moved.Strokes, moved.Pictures, null);
         SelectionChanged?.Invoke(this, EventArgs.Empty);
