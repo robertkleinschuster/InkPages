@@ -57,7 +57,7 @@ namespace inkpages::detail
         void SetPictureHost(PictureHost* picturesOfApp) override { pictureHost = picturesOfApp; }
         void SetTextHost(TextHost* textsOfApp) override;
         bool EditingText() const override { return textEditor && textEditor->Editing(); }
-        void EndTextEditing() override { if (textEditor) textEditor->End(); }
+        void EndTextEditing() override;
         void InvalidatePage(int page) override;
 
         void SetTool(ToolState tool) override;

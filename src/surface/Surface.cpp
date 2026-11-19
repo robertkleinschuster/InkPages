@@ -530,6 +530,15 @@ namespace inkpages::detail
         if (auto page = PageInView()) selection->SelectAll(*page);
     }
 
+    void Surface::EndTextEditing()
+    {
+        if (!textEditor || !textEditor->Editing()) return;
+        textEditor->End();
+        // The text's edit goes to the history on the ink thread (posted): wait for it, so AtSavePoint/CanUndo answer
+        // with the text in (an app asks "save changes?" right after this).
+        host.Run("text ended", [] {});
+    }
+
     void Surface::SetTextHost(TextHost* textsOfApp)
     {
         textEditor->End();

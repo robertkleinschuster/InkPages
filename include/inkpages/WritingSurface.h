@@ -155,7 +155,8 @@ namespace inkpages
         /// A text is being edited: the surface's window has the keyboard focus (an app's own key shortcuts should leave
         /// typing alone meanwhile).
         virtual bool EditingText() const = 0;
-        /// Ends editing (the result goes to the app and the history); e.g. before saving.
+        /// Ends editing (the result goes to the app and the history); e.g. before saving. Returns once the history has
+        /// the edit: AtSavePoint/CanUndo count the text right after the call.
         virtual void EndTextEditing() = 0;
         std::function<void(bool editing)> textEditingChanged;
 
