@@ -52,7 +52,8 @@ auto toolbar = inkpages::Toolbar::Create(parentWindow, *surface, choices, texts,
 toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize()); };
 ```
 
-- **Pages and view:** `SetPages`, `InsertPages(index, specs)`, `RemovePage(index)`, `MovePage(from, to)` (the history,
+- **Pages and view:** `MarkCurrentPage(bool)` (the page in view outlined in the accent color; turn it on for more than
+  one page), `SetPages`, `InsertPages(index, specs)`, `RemovePage(index)`, `MovePage(from, to)` (the history,
   strokes, stroke keys and page layers follow; edits of a removed page are dropped; remap your own per-page data with
   `model/PageMap.h`; the strokes you keep for `store`d pages in `pagesRemapped`, ink thread, in order with load/store), `ZoomTo`, `FitWidth`, `ScrollToPage`, `PageInView`, `Layout`, `viewChanged`.
   Finger/touchpad pan and pinch, wheel scrolls, Ctrl+wheel zooms; pen and mouse buttons never pan.

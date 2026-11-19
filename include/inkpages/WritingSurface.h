@@ -115,6 +115,9 @@ namespace inkpages
         virtual View CurrentView() const = 0;   // DirectManipulation's transform (pixels)
         virtual float Scale() const = 0;        // pixels per DIP (the window's DPI / 96)
         virtual std::optional<int> PageInView() const = 0;
+        /// Outlines the page in view in the system's accent color (2 page units wide, 3 away from the page, rounded) - an
+        /// app turns it on for documents with more than one page. Off by default.
+        virtual void MarkCurrentPage(bool mark) = 0;
         std::function<void()> viewChanged;      // moved or zoomed (also while moving)
         /// A mouse click or finger tap on a page (under 300 ms, moved under 3 page units, one finger, not a pan) that no
         /// selection gesture took (a click beside the selection clears it, a click on a picture selects it). `point`:

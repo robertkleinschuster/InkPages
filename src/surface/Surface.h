@@ -9,11 +9,14 @@
 #include <mutex>
 #include <set>
 
+#include <winrt/Windows.UI.ViewManagement.h>
+
 #include "ink/InkLayer.h"
 #include "ink/PageStore.h"
 #include "ink/UiThread.h"
 #include "inkpages/WritingSurface.h"
 #include "render/Overlay.h"
+#include "render/PageMark.h"
 #include "surface/Composition.h"
 #include "surface/MouseSelect.h"
 #include "surface/SelectionController.h"
@@ -43,6 +46,7 @@ namespace inkpages::detail
         View CurrentView() const override { return viewport ? viewport->Current() : View{}; }
         float Scale() const override { return scale; }
         std::optional<int> PageInView() const override { return layout.PageInView(Visible()); }
+        void MarkCurrentPage(bool mark) override;
 
         IDCompositionVisual* PageLayer(int page) override { return composition->PageLayer(page); }
         IDCompositionDevice* CompositionDevice() override { return composition->Devices().dcomp.get(); }
@@ -88,6 +92,8 @@ namespace inkpages::detail
         void SetScale();
         void Changed(bool settled);
         void DrawOverlay();
+        void ShowPageMark();
+        void ReadAccent();
         void WhenReady(std::function<void()> action);
         void ZoomToRect(RectF content);
         void Rearrange(std::vector<PageSpec> specs, PageMap const& map);
@@ -111,6 +117,11 @@ namespace inkpages::detail
         std::unique_ptr<MouseSelect> mouse;
         std::unique_ptr<TouchTaps> touchTaps;
         std::unique_ptr<SurfaceAutomation> automation;
+        std::unique_ptr<PageMark> pageMark;
+        bool markCurrentPage = false;
+        Color accent{ 0xFF, 0x00, 0x5F, 0xB8 };
+        winrt::Windows::UI::ViewManagement::UISettings uiSettings{ nullptr };
+        winrt::event_token accentChanged{};
         std::unique_ptr<TextEditor> textEditor;
         TextHost* textHost = nullptr;
         TextStyle textStyle; // the Text tool's

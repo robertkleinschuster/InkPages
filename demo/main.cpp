@@ -78,6 +78,7 @@ namespace
         inkpages::PageLayout before = surface->Layout();
         surface->InsertPages(at, { A4() });
         pictures->Remap(inkpages::PageMap::Insert(before.Count(), at, 1), before); // the cards and texts follow their pages
+        surface->MarkCurrentPage(surface->Layout().Count() > 1);
         inkpages::Log(std::format("demo: page inserted at {}", at));
     }
 
@@ -94,6 +95,7 @@ namespace
         inkpages::PageLayout before = surface->Layout();
         surface->RemovePage(page);
         pictures->Remap(inkpages::PageMap::Remove(before.Count(), page), before);
+        surface->MarkCurrentPage(surface->Layout().Count() > 1);
         inkpages::Log(std::format("demo: page {} removed", page));
     }
 
@@ -356,6 +358,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
         int count = 4;
         if (auto value = Environment(L"INKPAGES_DEMO_PAGES"); !value.empty()) count = std::max(1, _wtoi(value.c_str()));
         surface->SetPages(std::vector<inkpages::PageSpec>(count, A4()));
+        surface->MarkCurrentPage(count > 1); // as an app does: the page in view outlined when there are several
         pictures = std::make_unique<DemoPictures>(*surface);
         pictures->Add({ 84, 444, 244, 524 }, { 0xFF, 0x7F, 0xC8, 0xF0 });
         pictures->Add({ 300, 444, 400, 524 }, { 0xFF, 0xF0, 0xC0, 0x7F });

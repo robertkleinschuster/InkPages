@@ -88,7 +88,7 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   and its handles, taps, clipping at a page's edge, shape outlines, the undo history (+ CompositeEdit, save point),
   stroke keys.
 - `src/render` – drawing with D3D11/D2D/DComp: `Graphics` (devices), `PaperLayer` (a sheet: color, paper, the app's
-  underlay into a DComp virtual surface), `Overlay` (tools' feedback below the ink: circle, lasso, frame, shape).
+  underlay into a DComp virtual surface), `Overlay` (tools' feedback below the ink: circle, lasso, frame, shape), `PageMark` (the outline of the page in view).
 - `src/ink` – the ink presenter and its state (ink thread): `InkHost` (IInkDesktopHost, work items), `UiThread` (work
   handed to the UI thread), `InkLayer` (presenter, pens, mode, cursor, collected/erased strokes into the history,
   strokes cut at the pages' edges), `InkState` (container, stroke -> page, stroke keys), `Strokes` (make/transform
@@ -305,6 +305,14 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   result made before the ink thread applied every issued page operation is dropped (generation counted on both
   threads). Sheets of pages that stay keep their drawing (`PaperLayer::MoveTo`). Taps are measured on the screen
   (`Tap::MaxDistanceDip` / zoom); a finger that stops the pages' inertia is no tap (device check).
+- **Page in view outlined** (`MarkCurrentPage(bool)`, 2026-11-19, sandbox `MarkTest.ps1`): as the WinUI version (tag
+  `winui-final`, InkPage: MarkGap 3, MarkThickness 2, CornerRadius 4, AccentFillColorDefaultBrush) - a 2-unit outline
+  3 units around the page, rounded, in the accent's first darker shade (`UISettings.GetColorValue(AccentDark1)`: what
+  AccentFillColorDefaultBrush is in the light theme), read again on `ColorValuesChanged` (a worker thread: posted to
+  the UI thread). `render/PageMark` draws four strips (top/bottom with the corners, left/right) into the composition's
+  mark layer below the sheets - never over a page or the ink, not in any page's content - at the settled zoom's
+  resolution; it follows `PageInView` as the view moves (the 120 ms motion tick). Sandbox: outline at fit width (115 %)
+  and 50 %, crisp at 150 % (corner enlarged), and on page 2 after a finger scroll.
 - **Underlay:** the app draws under the ink with D2D (`drawUnderlay(page, dc, area)`, page coordinates) into the
   sheet's virtual surface, over the Paper; `InvalidatePage` redraws it; page layers (`PageLayer`) are DComp visuals for
   live content (pictures dragged by the selection).

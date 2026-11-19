@@ -6,9 +6,10 @@ namespace inkpages::detail
     {
         auto& dc = graphics.dcomp;
         winrt::check_hresult(dc->CreateTargetForHwnd(window, TRUE, target.put()));
-        for (auto* visual : { &root, &content, &sheets, &layers, &texts, &ink }) winrt::check_hresult(dc->CreateVisual(visual->put()));
+        for (auto* visual : { &root, &content, &marks, &sheets, &layers, &texts, &ink }) winrt::check_hresult(dc->CreateVisual(visual->put()));
         overlay = std::make_unique<OverlayLayer>(graphics);
         winrt::check_hresult(root->AddVisual(content.get(), FALSE, nullptr));
+        winrt::check_hresult(content->AddVisual(marks.get(), FALSE, nullptr)); // below the sheets: never over a page
         winrt::check_hresult(content->AddVisual(sheets.get(), FALSE, nullptr));
         winrt::check_hresult(content->AddVisual(layers.get(), FALSE, nullptr));
         winrt::check_hresult(content->AddVisual(texts.get(), FALSE, nullptr));

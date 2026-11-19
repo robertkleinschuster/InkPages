@@ -4,6 +4,7 @@
 #include <format>
 
 #include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.UI.ViewManagement.h>
 
 #include "inkpages/Log.h"
 
@@ -91,6 +92,7 @@ namespace inkpages::detail
         touchTaps = std::make_unique<TouchTaps>(toDocument, zoom, [this](PointF at) { Tapped(at, PointerKind::Touch); });
 
         automation = std::make_unique<SurfaceAutomation>(window);
+        pageMark = std::make_unique<PageMark>(composition->Devices(), composition->MarkLayer());
         textEditor = std::make_unique<TextEditor>(TextEditorContext{ window, &composition->Devices(),
             composition->TextLayer(), &host, ui.get(), [this] { return ink.get(); }, [this] { return tools.get(); },
             [this] { return textHost; }, [this] { return CurrentView(); }, [this] { return scale; },
@@ -110,6 +112,7 @@ namespace inkpages::detail
         try
         {
             textEditor.reset(); // ends editing first: the result still reaches the app and the history
+            if (uiSettings) uiSettings.ColorValuesChanged(accentChanged);
             host.Run("tools shutdown", [this] {
                 tools.reset();
                 pageStore.reset();
@@ -119,6 +122,7 @@ namespace inkpages::detail
             touchTaps.reset();
             selection.reset();
             viewport.reset();
+            pageMark.reset();
             composition.reset();
             automation.reset();
         }
@@ -352,6 +356,7 @@ namespace inkpages::detail
         float before = sheetScale;
         if (settled || sheetScale <= 0) sheetScale = Quantized(scale, CurrentView().zoom);
         composition->UpdateSheets(visible, sheetScale);
+        ShowPageMark();
         if (sheetScale != before)
         {
             DrawOverlay();
@@ -370,6 +375,44 @@ namespace inkpages::detail
             }
         }
         composition->Commit();
+    }
+
+    void Surface::MarkCurrentPage(bool mark)
+    {
+        if (mark && !uiSettings)
+        {
+            // The accent as Windows' settings have it, and again when the user changes it (the event comes on a worker
+            // thread: the UI thread reads and draws).
+            uiSettings = winrt::Windows::UI::ViewManagement::UISettings();
+            accentChanged = uiSettings.ColorValuesChanged([this](auto&&, auto&&) {
+                ui->Post([this] {
+                    ReadAccent();
+                    ShowPageMark();
+                    composition->Commit();
+                });
+            });
+            ReadAccent();
+        }
+        markCurrentPage = mark;
+        ShowPageMark();
+        composition->Commit();
+    }
+
+    // WinUI drew the mark with AccentFillColorDefaultBrush: on the light paper that is the accent's first darker shade.
+    void Surface::ReadAccent()
+    {
+        auto c = uiSettings.GetColorValue(winrt::Windows::UI::ViewManagement::UIColorType::AccentDark1);
+        accent = { c.A, c.R, c.G, c.B };
+    }
+
+    void Surface::ShowPageMark()
+    {
+        std::optional<RectF> page;
+        if (markCurrentPage && sheetScale > 0)
+        {
+            if (auto current = PageInView()) page = layout.Page(*current);
+        }
+        pageMark->Show(page, accent, sheetScale);
     }
 
     void Surface::DrawOverlay()
