@@ -37,6 +37,10 @@ namespace inkpages::detail
         /// The content changed (or a new scale): the next Update draws everything it needs anew.
         void Invalidate() { drawn = {}; }
 
+        /// The page moved (pages were inserted, removed or moved before it): its drawing goes along, the underlay now
+        /// draws for its new index. A new size draws anew.
+        void MoveTo(RectF page, Underlay underlay);
+
         /// Far from the view: free the drawing (the sheet shows nothing until the next Update).
         void Discard();
 

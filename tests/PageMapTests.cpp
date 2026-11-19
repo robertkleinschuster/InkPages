@@ -26,6 +26,16 @@ namespace inkpages::tests
         EXPECT_EQ((std::set<int>{ 0, 2 }), map.Apply({ 0, 1, 3 }));
     }
 
+    TEST(PageMap, RemovingAPageThatIsNotThereChangesNothing)
+    {
+        for (int page : { -1, 4, 99 })
+        {
+            PageMap map = PageMap::Remove(4, page);
+            EXPECT_EQ((std::vector<int>{ 0, 1, 2, 3 }), map.newIndex) << page;
+            EXPECT_EQ(4, map.newCount) << page;
+        }
+    }
+
     TEST(PageMap, MoveDownAndUp)
     {
         EXPECT_EQ((std::vector<int>{ 2, 0, 1, 3 }), PageMap::Move(4, 0, 2).newIndex);

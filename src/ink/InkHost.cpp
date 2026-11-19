@@ -71,21 +71,41 @@ namespace inkpages::detail
         if (FAILED(hr)) LogHr(std::format("QueueWorkItem({})", name), hr);
     }
 
-    bool InkHost::Run(char const* name, std::function<void()> work, DWORD timeoutMs)
+    void InkHost::Run(char const* name, std::function<void()> work, DWORD timeoutMs)
     {
         if (OnThread())
         {
-            WorkItem(name, std::move(work)).Invoke();
-            return true;
-        }
-        auto done = std::make_shared<Event>();
-        Post(name, [work = std::move(work), done] {
             work();
-            SetEvent(done->handle);
-        });
-        if (WaitForSingleObject(done->handle, timeoutMs) == WAIT_OBJECT_0) return true;
-        LogError(std::format("ink: {} did not finish within {} ms", name, timeoutMs));
-        return false;
+            return;
+        }
+        struct Done : Event
+        {
+            std::exception_ptr error;
+        };
+        auto done = std::make_shared<Done>();
+        HRESULT hr = host->QueueWorkItem(winrt::make<WorkItem>(name, [work = std::move(work), done] {
+            // The event is set however the work ends; its exception goes to the waiting caller.
+            struct Signal
+            {
+                HANDLE handle;
+                ~Signal() { SetEvent(handle); }
+            } signal{ done->handle };
+            try
+            {
+                work();
+            }
+            catch (...)
+            {
+                done->error = std::current_exception();
+            }
+        }).get());
+        if (FAILED(hr)) winrt::throw_hresult(LogHr(std::format("QueueWorkItem({})", name), hr));
+        if (WaitForSingleObject(done->handle, timeoutMs) != WAIT_OBJECT_0)
+        {
+            LogError(std::format("ink: {} did not finish within {} ms", name, timeoutMs));
+            throw winrt::hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT), winrt::to_hstring(std::format("ink thread: {} timed out", name)));
+        }
+        if (done->error) std::rethrow_exception(done->error);
     }
 
     winrt::com_ptr<IInkCommitRequestHandler> MakeCommitHandler(std::function<void()> commit)

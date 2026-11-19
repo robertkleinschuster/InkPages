@@ -4,6 +4,13 @@
 
 namespace inkpages::detail
 {
+    InkStroke InkState::Current(InkStroke const& stroke) const
+    {
+        InkStroke now = stroke;
+        for (auto it = replacedBy.find(now.Id()); it != replacedBy.end(); it = replacedBy.find(now.Id())) now = it->second;
+        return now;
+    }
+
     int InkState::PageOf(InkStroke const& stroke) const
     {
         if (auto it = owner.find(stroke.Id()); it != owner.end()) return it->second;
@@ -90,12 +97,15 @@ namespace inkpages::detail
     {
         if (!relocation || oldPage < 0 || oldPage >= static_cast<int>(relocation->shift.size())) return stroke;
         if (auto it = relocation->copies.find(stroke.Id()); it != relocation->copies.end()) return it->second;
+        if (relocation->made.contains(stroke.Id())) return stroke;
         PointF d = relocation->shift[oldPage];
         if (d.x == 0 && d.y == 0) return stroke;
         Affine m = Affine::Translation(d.x, d.y);
         InkStroke copy = Transformed(stroke, m);
         keys.Moved(stroke.Id(), copy.Id(), m); // the app's key follows (its page coordinates stay the same)
         relocation->copies.emplace(stroke.Id(), copy);
+        relocation->made.insert(copy.Id());
+        Replaced(stroke, copy);
         return copy;
     }
 

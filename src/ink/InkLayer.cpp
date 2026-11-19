@@ -27,14 +27,22 @@ namespace inkpages::detail
 
     InkLayer::~InkLayer()
     {
-        // The presenter's objects are released on their own thread.
-        host.Run("release presenter", [this] {
-            history.Clear();
-            ink.container = nullptr;
-            input = nullptr;
-            presenter = nullptr;
-            desktop = nullptr;
-        });
+        // The presenter's objects are released on their own thread - waited for without a timeout: the work refers to
+        // this layer, which must not go before it ran.
+        try
+        {
+            host.Run("release presenter", [this] {
+                history.Clear();
+                ink.container = nullptr;
+                input = nullptr;
+                presenter = nullptr;
+                desktop = nullptr;
+            }, INFINITE);
+        }
+        catch (...)
+        {
+            LogException("ink: release presenter");
+        }
     }
 
     void InkLayer::Create(IDCompositionVisual* root)

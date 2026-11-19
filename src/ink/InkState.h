@@ -41,6 +41,12 @@ namespace inkpages::detail
         InkStroke Relocated(InkStroke const& stroke, int oldPage);
         void EndRelocation() { relocation.reset(); }
 
+        /// The stroke as it is now: undo, redo and relocation put copies in place of strokes (a stroke cannot be added
+        /// again), and edits recorded earlier still name the original - they find the copy here.
+        InkStroke Current(InkStroke const& stroke) const;
+        /// `now` takes `before`'s place (its copy).
+        void Replaced(InkStroke const& before, InkStroke const& now) { replacedBy.insert_or_assign(before.Id(), now); }
+
         int PageOf(InkStroke const& stroke) const;
         void Add(InkStroke const& stroke, int page);
         /// Removes exactly these strokes from the container (by id).
@@ -57,7 +63,9 @@ namespace inkpages::detail
         {
             std::vector<PointF> shift;            // by old page
             std::map<uint32_t, InkStroke> copies; // stroke id -> its copy at the new place
+            std::set<uint32_t> made;              // the copies' ids: already at their new place
         };
         std::optional<Relocation> relocation;
+        std::map<uint32_t, InkStroke> replacedBy; // stroke id -> the copy that took its place (followed in a chain)
     };
 }

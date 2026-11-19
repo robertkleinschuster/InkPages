@@ -14,7 +14,10 @@ namespace inkpages
 
     PageMap PageMap::Remove(int count, int page)
     {
-        PageMap map{ std::vector<int>(count), count - (page >= 0 && page < count ? 1 : 0) };
+        PageMap map{ std::vector<int>(count), count };
+        for (int i = 0; i < count; ++i) map.newIndex[i] = i;
+        if (page < 0 || page >= count) return map; // no such page: nothing changes
+        map.newCount = count - 1;
         for (int i = 0; i < count; ++i) map.newIndex[i] = i < page ? i : i == page ? -1 : i - 1;
         return map;
     }

@@ -27,6 +27,22 @@ namespace inkpages::detail
         winrt::check_hresult(visual->SetBitmapInterpolationMode(DCOMPOSITION_BITMAP_INTERPOLATION_MODE_LINEAR));
     }
 
+    void PaperLayer::MoveTo(RectF to, Underlay next)
+    {
+        bool resized = to.Width() != page.Width() || to.Height() != page.Height();
+        page = to;
+        underlay = std::move(next);
+        if (resized)
+        {
+            scale = 0; // the next Update sizes and draws it
+            drawn = {};
+            return;
+        }
+        if (scale <= 0) return;
+        D2D1_MATRIX_3X2_F m{ 1 / scale, 0, 0, 1 / scale, page.left, page.top };
+        winrt::check_hresult(visual->SetTransform(m));
+    }
+
     bool PaperLayer::Update(RectF needed, float renderScale)
     {
         // The part of the sheet to have drawn, page-relative.

@@ -21,8 +21,10 @@ namespace inkpages::detail
 
         IInkDesktopHost* Get() const { return host.get(); }
         void Post(char const* name, std::function<void()> work);
-        /// Runs `work` on the ink thread and waits for it (shutdown, snapshots). False on timeout.
-        bool Run(char const* name, std::function<void()> work, DWORD timeoutMs = 3000);
+        /// Runs `work` on the ink thread and waits for it (snapshots; INFINITE at shutdown: the work refers to objects
+        /// that are about to go). The work's exception comes to the caller; a timeout throws hresult_error
+        /// (HRESULT_FROM_WIN32(ERROR_TIMEOUT)) - the work may still run later, so it must hold what it touches.
+        void Run(char const* name, std::function<void()> work, DWORD timeoutMs = 3000);
         bool OnThread() const { return GetCurrentThreadId() == thread.load(); }
 
     private:

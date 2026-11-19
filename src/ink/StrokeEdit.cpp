@@ -22,13 +22,21 @@ namespace inkpages::detail
 
     void StrokeEdit::Swap(InkState& ink, std::vector<Entry>& gone, std::vector<Entry>& back)
     {
+        // Edits recorded earlier may name strokes that undo/redo/relocation have replaced by copies since: the current
+        // copy is what goes and what is brought back.
         std::vector<InkStroke> remove;
-        for (auto const& e : gone) remove.push_back(e.stroke);
+        for (auto& e : gone)
+        {
+            e.stroke = ink.Current(e.stroke);
+            remove.push_back(e.stroke);
+        }
         ink.Remove(remove);
         for (auto& e : back)
         {
-            InkStroke copy = e.stroke.Clone();
-            ink.keys.Copied(e.stroke.Id(), copy.Id()); // a stroke brought back keeps the app's key
+            InkStroke was = ink.Current(e.stroke);
+            InkStroke copy = was.Clone();
+            ink.keys.Copied(was.Id(), copy.Id()); // a stroke brought back keeps the app's key
+            ink.Replaced(was, copy);
             ink.Add(copy, e.page);
             e.stroke = copy;
         }
@@ -40,7 +48,7 @@ namespace inkpages::detail
         {
             for (auto& e : *list)
             {
-                e.stroke = ink.Relocated(e.stroke, e.page);
+                e.stroke = ink.Relocated(ink.Current(e.stroke), e.page);
                 e.page = map(e.page);
             }
         }
