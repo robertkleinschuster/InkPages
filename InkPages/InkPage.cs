@@ -107,6 +107,8 @@ public abstract partial class InkPage : UserControl
             paperLines.Data = lines;
             paperLines.Stroke = value == null ? null : new SolidColorBrush(value.Color);
             paperLines.StrokeThickness = value?.Thickness ?? 0;
+            // Lines on the sheet's edges are centered on them: cut at the sheet, nothing sticks out (user, 2026-11-19).
+            paperLines.Clip = new RectangleGeometry { Rect = new Windows.Foundation.Rect(0, 0, Width, Height) };
         }
     }
 
