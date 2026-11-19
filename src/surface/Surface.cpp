@@ -303,12 +303,16 @@ namespace inkpages::detail
 
     void Surface::SetRuler(bool shown)
     {
-        host.Post("ruler", [this, shown] { if (tools) tools->Stencil().ShowRuler(shown); });
+        RectF v = Visible();
+        PointF at{ v.left + v.Width() / 8, (v.top + v.bottom) / 2 }; // in view, from the left
+        host.Post("ruler", [this, shown, at] { if (tools) tools->Stencil().ShowRuler(shown, at); });
     }
 
     void Surface::SetProtractor(bool shown)
     {
-        host.Post("protractor", [this, shown] { if (tools) tools->Stencil().ShowProtractor(shown); });
+        RectF v = Visible();
+        PointF at{ (v.left + v.right) / 2, (v.top + v.bottom) / 2 };
+        host.Post("protractor", [this, shown, at] { if (tools) tools->Stencil().ShowProtractor(shown, at); });
     }
 
     void Surface::SelectAll()

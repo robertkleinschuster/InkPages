@@ -89,10 +89,10 @@ Invoke-Test {
     Key 0x37
     Drag 'line shape' @(380, 100, 480, 130)
     Key 0x52; Key 0x31
-    $circle = @(); for ($a = 0; $a -le 360; $a += 15) { $r = [Math]::PI * $a / 180; $circle += 300 + 25 * [Math]::Cos($r); $circle += 60 + 25 * [Math]::Sin($r) }
+    $circle = @(); for ($a = 0; $a -le 360; $a += 15) { $r = [Math]::PI * $a / 180; $circle += 300 + 25 * [Math]::Cos($r); $circle += 170 + 25 * [Math]::Sin($r) }
     Drag 'circle to recognize' $circle
     Start-Sleep 2
-    ZShot '09-shapes' 340 90
+    ZShot '09-shapes' 340 160
     Key 0x52
 
     # 7. a stroke across the gap between pages 1 and 2 is cut into two strokes, one per page
@@ -101,13 +101,15 @@ Invoke-Test {
     Shot '10-gap'
 
     # 8. drag a selection to the view's bottom edge: the pages scroll, the strokes land further down
-    Drag 'stroke 4' @(380, 120, 460, 125)
-    Drag 'barrel lasso 4' @(370, 105, 470, 105, 470, 140, 370, 140, 370, 105) $BARREL
-    Hover 420 122 0; Hover 421 123 0
-    Drag 'to the edge' @(421, 123, 421, 360) 0 60
+    Start-Sleep 2   # the pan's inertia ends
+    Drag 'stroke 4' @(380, 200, 460, 205)
+    Drag 'barrel lasso 4' @(370, 185, 470, 185, 470, 220, 370, 220, 370, 185) $BARREL
+    Hover 420 202 0; Hover 421 203 0
+    Drag 'to the edge' @(421, 203, 421, 360) 0 60
     ZShot '11-auto-scrolled' 421 300
 
     # 9. Windows' ruler
     Key 0x38
     Shot '12-ruler'
+    Key 0x38
 }
