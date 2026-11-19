@@ -93,7 +93,7 @@ toolbar  ->  surface  ->  tools  ->  ink  ->  render  ->  model        (base: Lo
   no Win32, unit-tested), `ToolbarMenus` (popup menus), `Icons` (Segoe Fluent Icons glyphs, swatches).
 - `demo/` – `main.cpp` (only the public API; German toolbar texts), `DemoPictures` (cards in page layers: the picture
   extension point), `cursors/` + `tools/make_cursors.py` (a dot cursor per palette color × width step, ids 1000/2000 +
-  color × 10 + step), `UiTests/` (`SurfaceTest`, `BoundaryTest`, `ToolsTest`, `SelectionTest`). `tools/cursorprobe.cpp`:
+  color × 10 + step), `UiTests/` (`SurfaceTest`, `BoundaryTest`, `ToolsTest`, `SelectionTest`, `RulerTouchTest`). `tools/cursorprobe.cpp`:
   DXGI Desktop Duplication probe – the pointer as the screen draws it; `build.ps1` puts it in `.local-build\tools`.
 
 ## Writing surface (phase 1, measured 2026-11-19; sandbox = Windows Sandbox 1514x900 at 150 %)
@@ -194,8 +194,17 @@ toolbar  ->  surface  ->  tools  ->  ink  ->  render  ->  model        (base: Lo
   freehand stroke is replaced by the clean outline as its own undo step.
 - **Ruler/protractor:** `InkPresenterRuler(presenter)` / `InkPresenterProtractor(presenter)` work on the Win32
   presenter (documented constructors). Without a transform the ruler appeared at the document-sized presenter's top
-  right, out of view: the library places it in the view (`Transform`). Touch on the stencil vs. DirectManipulation's
-  touch panning: not tested yet (device).
+  right, out of view: the library places it in the view when it is shown (`Transform`). [doc] The stencil has no
+  property to stay in view (`InkPresenterRuler`: Length, Width, AreTickMarksVisible, IsCompassVisible, colors, Kind,
+  IsVisible, Transform): it lies on the document and scrolls with the pages, like a ruler on paper; shown again, it
+  comes back into view. [measured, sandbox `RulerTouchTest.ps1`] A finger drag on the ruler moves the ruler and does
+  not pan the pages (no DirectManipulation contact): the stencil takes the touch itself although the presenter's
+  `InputDeviceTypes` has no touch; a finger beside it pans as before.
+- A selection tap (selection tool or barrel) on no stroke selects the app's picture under the pen
+  (`PictureHost::PictureAt`, optional); the frame and its handles keep their screen size when the zoom changes
+  (`SelectionController::Zoomed`). Sandbox: the card was selected by a tap; at 100 % the handles kept their size.
+- Toolbar numbers use `ToolbarTexts::decimalSeparator` ("0,85 pt"); the shapes tool's icon is drawn (Segoe Fluent
+  Icons has no shapes glyph: square and circle in the font's stroke weight, `ShapesIcon`).
 - **Stroke keys** (`StrokeKeys`, `KeyedStroke`): load/store/StrokesOf carry the app's key and the transform since
   loading; followed through `Clone()` in undo, moves (`Moved`), lazy copies; new ink, erased pieces, cuts, duplicates,
   pastes have key 0.
