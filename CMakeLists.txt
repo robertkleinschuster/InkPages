@@ -17,6 +17,9 @@ set(INKPAGES_DEFINITIONS UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 # The library (linked statically into the apps).
 add_library(InkPages STATIC
     src/Log.cpp
+    src/Paper.cpp
+    src/PageLayout.cpp
+    src/ViewMath.cpp
 )
 target_include_directories(InkPages PUBLIC include)
 target_compile_options(InkPages PRIVATE ${INKPAGES_COMPILE_OPTIONS})
@@ -38,7 +41,7 @@ FetchContent_Declare(googletest
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 enable_testing()
-add_executable(InkPagesTests tests/LogTests.cpp)
+add_executable(InkPagesTests tests/LogTests.cpp tests/GeometryTests.cpp)
 target_compile_options(InkPagesTests PRIVATE ${INKPAGES_COMPILE_OPTIONS})
 target_link_libraries(InkPagesTests PRIVATE InkPages GTest::gtest_main)
 include(GoogleTest)
