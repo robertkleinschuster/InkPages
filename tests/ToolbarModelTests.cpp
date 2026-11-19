@@ -67,4 +67,16 @@ namespace inkpages::tests
         EXPECT_EQ(L"app", TipOf(ButtonId::Extension, ToolChoices{}, texts, { { 7, 0xE710, L"app" } }));
         EXPECT_EQ(L"", TipOf(ButtonId::Pen + 9, ToolChoices{}, texts, {}));
     }
+
+    TEST(ToolbarModel, AppButtonsStartGroupsWhereTheyAsk)
+    {
+        std::vector<ToolbarButton> app(4);
+        app[2].groupStart = true; // Speichern, Exportieren | Seite einfuegen, Seite loeschen
+        std::vector<bool> starts;
+        for (auto const& b : ToolbarButtons(ToolChoices{}, app))
+        {
+            if (b.id >= ButtonId::Extension) starts.push_back(b.groupStart);
+        }
+        EXPECT_EQ((std::vector<bool>{ true, false, true, false }), starts);
+    }
 }

@@ -73,6 +73,7 @@ namespace inkpages
         std::wstring name;     // its accessible name (UI Automation, Narrator); empty: the tip
         std::wstring path;     // used when glyph is 0
         float pathSize = 20;
+        bool groupStart = false; // a separator before it (the first app button always has one)
     };
 
     class Toolbar

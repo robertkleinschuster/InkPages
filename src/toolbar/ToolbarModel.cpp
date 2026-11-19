@@ -39,7 +39,7 @@ namespace inkpages::detail
         b.push_back({ ButtonId::SelectAll, Glyph::SelectAll });
         for (size_t i = 0; i < extensions.size(); ++i)
         {
-            b.push_back({ ButtonId::Extension + static_cast<int>(i), extensions[i].glyph, std::nullopt, Command, i == 0 }); // glyph 0: its path
+            b.push_back({ ButtonId::Extension + static_cast<int>(i), extensions[i].glyph, std::nullopt, Command, i == 0 || extensions[i].groupStart }); // glyph 0: its path
         }
         return b;
     }
