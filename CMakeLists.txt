@@ -52,3 +52,9 @@ target_link_libraries(InkPagesTests PRIVATE InkPages GTest::gtest_main)
 target_include_directories(InkPagesTests PRIVATE src) # pure units of the modules (e.g. toolbar/ToolbarModel)
 include(GoogleTest)
 gtest_discover_tests(InkPagesTests)
+
+# Test tool: what native UI Automation (as Narrator) sees in a window.
+add_executable(uiaprobe tools/uiaprobe.cpp)
+target_compile_options(uiaprobe PRIVATE ${INKPAGES_COMPILE_OPTIONS})
+target_compile_definitions(uiaprobe PRIVATE ${INKPAGES_DEFINITIONS})
+target_link_libraries(uiaprobe PRIVATE windowsapp oleaut32 uiautomationcore)

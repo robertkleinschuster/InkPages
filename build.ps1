@@ -19,7 +19,7 @@ New-Item -ItemType Directory -Force $demo | Out-Null
 Copy-Item (Join-Path $build "$Config\InkPagesDemo.exe") $demo -Force
 $tools = Join-Path $PSScriptRoot '.local-build\tools'
 New-Item -ItemType Directory -Force $tools | Out-Null
-Copy-Item (Join-Path $build "$Config\cursorprobe.exe") $tools -Force   # test tool (sandbox -Data)
+Copy-Item (Join-Path $build "$Config\cursorprobe.exe"), (Join-Path $build "$Config\uiaprobe.exe") $tools -Force   # test tools (sandbox -Data)
 "demo: $demo\InkPagesDemo.exe; tools: $tools"
 
 if (-not $NoTests) {
