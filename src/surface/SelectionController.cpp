@@ -56,7 +56,7 @@ namespace inkpages::detail
         {
             RectF b{ polygon[0].x, polygon[0].y, polygon[0].x, polygon[0].y };
             for (PointF p : polygon) b = { std::min(b.left, p.x), std::min(b.top, p.y), std::max(b.right, p.x), std::max(b.bottom, p.y) };
-            if (made.Empty() && b.Width() + b.Height() < Tap::MaxDistance)
+            if (made.Empty() && b.Width() + b.Height() < Tap::MaxDistance(c.viewport->Current().zoom))
             {
                 // A tap (with the selection tool or the barrel) on no stroke selects the picture under the pen.
                 if (auto picture = host->PictureAt({ (b.left + b.right) / 2, (b.top + b.bottom) / 2 })) picked.push_back(*picture);
@@ -152,7 +152,7 @@ namespace inkpages::detail
         POINT client{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
         bool pointer = message == WM_POINTERDOWN || message == WM_POINTERUPDATE || message == WM_POINTERUP;
         if (pointer) ScreenToClient(c.window, &client); // pointer messages carry screen coordinates
-        bool down = message == WM_POINTERDOWN || message == WM_LBUTTONDOWN;
+        bool down = message == WM_POINTERDOWN || message == WM_LBUTTONDOWN || message == WM_LBUTTONDBLCLK;
         bool up = message == WM_POINTERUP || message == WM_LBUTTONUP;
         bool contact = pointer ? IS_POINTER_INCONTACT_WPARAM(wp) : (wp & MK_LBUTTON) != 0;
         if (down)
@@ -176,8 +176,10 @@ namespace inkpages::detail
             else if (contact) MoveTo(client);
             return true;
         }
-        // The window's pen hovering away from the selection goes back to the ink.
-        if (pointer && !contact && (!frame || frame->At(ToDocument(client)) == Handle::None))
+        // The window's pen hovering away from the selection (and the edited text box) goes back to the ink.
+        PointF at = ToDocument(client);
+        bool kept = (frame && frame->At(at) != Handle::None) || (c.keepsPen && c.keepsPen(at));
+        if (pointer && !contact && !kept)
         {
             c.host->Post("give back pen", [tools = c.tools] {
                 if (ToolInput* t = tools()) t->GiveBackPen();
@@ -245,7 +247,7 @@ namespace inkpages::detail
         Drag d = *drag;
         drag.reset();
         unsigned ms = static_cast<unsigned>(GetTickCount64() - d.began);
-        if (Tap::IsTap(d.farthest, ms))
+        if (Tap::IsTap(d.farthest, ms, c.viewport->Current().zoom))
         {
             c.host->Post("selection preview end", [tools = c.tools] {
                 if (ToolInput* t = tools()) t->Selection().Preview({});

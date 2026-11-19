@@ -32,6 +32,7 @@ namespace inkpages::detail
     {
         static bool registered = [] {
             WNDCLASSEXW wc{ sizeof(wc) };
+            wc.style = CS_DBLCLKS; // a double tap selects a word in the edited text
             wc.lpfnWndProc = WindowProc;
             wc.hInstance = GetModuleHandleW(nullptr);
             wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
@@ -56,6 +57,7 @@ namespace inkpages::detail
             }
             if (!viewport->Moving()) Changed(true);
             selection->Zoomed();
+            if (textEditor) textEditor->ViewChanged();
             if (viewChanged) viewChanged();
         };
         viewport->onStatus = [this](bool settled) {
@@ -79,12 +81,21 @@ namespace inkpages::detail
         selection = std::make_unique<SelectionController>(SelectionContext{ window, viewport.get(), &host, ui.get(),
             [this] { return ink.get(); }, [this] { return tools.get(); }, [this] { return pictureHost; },
             [this] { return scale; }, [this]() -> PageLayout const& { return layout; },
-            [this] { if (selectionChanged) selectionChanged(); }, this });
+            [this] { if (selectionChanged) selectionChanged(); },
+            [this](PointF at) { return textEditor && textEditor->Contains(at); }, this });
 
         auto toDocument = [this](POINT client) { return ToDocument(client); };
-        mouse = std::make_unique<MouseSelect>(window, host, [this] { return tools.get(); }, *selection, toDocument,
+        auto zoom = [this] { return viewport->Current().zoom; };
+        mouse = std::make_unique<MouseSelect>(window, host, [this] { return tools.get(); }, *selection, toDocument, zoom,
             [this](PointF at) { Tapped(at, PointerKind::Mouse); });
-        touchTaps = std::make_unique<TouchTaps>(toDocument, [this](PointF at) { Tapped(at, PointerKind::Touch); });
+        touchTaps = std::make_unique<TouchTaps>(toDocument, zoom, [this](PointF at) { Tapped(at, PointerKind::Touch); });
+
+        textEditor = std::make_unique<TextEditor>(TextEditorContext{ window, &composition->Devices(),
+            composition->TextLayer(), &host, ui.get(), [this] { return ink.get(); }, [this] { return tools.get(); },
+            [this] { return textHost; }, [this] { return CurrentView(); }, [this] { return scale; },
+            [this] { return sheetScale; }, [this]() -> PageLayout const& { return layout; },
+            [this] { composition->Commit(); } });
+        textEditor->editingChanged = [this](bool editing) { if (textEditingChanged) textEditingChanged(editing); };
 
         ink = std::make_unique<InkLayer>(host, composition->Ink(),
             [this] { OnPresenterReady(); }, [this] { ui->Post([this] { composition->Commit(); }); });
@@ -97,10 +108,11 @@ namespace inkpages::detail
     {
         try
         {
+            textEditor.reset(); // ends editing first: the result still reaches the app and the history
             host.Run("tools shutdown", [this] {
                 tools.reset();
                 pageStore.reset();
-            });
+            }, INFINITE); // the work refers to this surface: it must have run before the members go
             ink.reset();
             mouse.reset();
             touchTaps.reset();
@@ -137,10 +149,23 @@ namespace inkpages::detail
         pageStore->store = [this](int page, std::vector<KeyedStroke> strokes) { if (store) store(page, std::move(strokes)); };
         tools = std::make_unique<ToolInput>(*ink, overlay);
         tools->selected = [this](StrokeSelection const& made, std::vector<PointF> const& polygon) {
-            ui->Post([this, made, polygon] { selection->Selected(made, polygon); });
+            ui->Post([this, made, polygon, generation = inkPagesGeneration.load()] {
+                if (generation != pagesGeneration) return; // made on pages that changed since
+                textEditor->End(); // one thing at a time: a selection ends editing
+                selection->Selected(made, polygon);
+            });
         };
         tools->cleared = [this] { ui->Post([this] { selection->Cleared(); }); };
         tools->penTaken = [](bool) {};
+        tools->zoom = [this] {
+            std::scoped_lock guard(viewLock);
+            return inkView.zoom;
+        };
+        tools->textTapped = [this](PointF at) {
+            ui->Post([this, at, generation = inkPagesGeneration.load()] {
+                if (generation == pagesGeneration) textEditor->Tap(at, textStyle);
+            });
+        };
         ink->Edits().changed = [this](HistoryState state) {
             ui->Post([this, state] {
                 Changed(!viewport->Moving()); // pages with history keep their ink
@@ -250,12 +275,20 @@ namespace inkpages::detail
 
     void Surface::Rearrange(std::vector<PageSpec> specs, PageMap const& map)
     {
+        textEditor->End();
         selection->Clear();
         std::vector<Paper> papers;
         BuildLayout(std::move(specs), papers);
         held = map.Apply(held);
         live = map.Apply(live);
+        ++pagesGeneration; // selections made on the old pages are dropped
         host.Post("rearrange pages", [this, map, layout = layout] {
+            ++inkPagesGeneration;
+            if (tools) // a gesture running on the old pages ends, before the history follows the pages
+            {
+                tools->Cancel();
+                tools->Selection().Clear();
+            }
             auto& state = ink->State();
             state.BeginRelocation(map, layout);
             ink->Edits().RemapPages(map);
@@ -277,12 +310,20 @@ namespace inkpages::detail
 
     void Surface::SetPages(std::vector<PageSpec> specs)
     {
+        textEditor->End();
         std::vector<Paper> papers;
         BuildLayout(std::move(specs), papers);
         selection->Clear();
         live.clear();
         held.clear();
+        ++pagesGeneration;
         host.Post("pages", [this, layout = layout] {
+            ++inkPagesGeneration;
+            if (tools)
+            {
+                tools->Cancel();
+                tools->Selection().Clear();
+            }
             if (pageStore) pageStore->ReleaseAll(); // the old document's ink goes to `store`
             ink->Edits().Clear();
             ink->SetLayout(layout);
@@ -308,6 +349,7 @@ namespace inkpages::detail
         {
             DrawOverlay();
             if (renderScaleChanged) renderScaleChanged();
+            if (textEditor) textEditor->ViewChanged();
         }
         if (presenterReady)
         {
@@ -378,6 +420,9 @@ namespace inkpages::detail
         PenLook look{ state.tool == Tool::Highlighter ? Tool::Highlighter : Tool::Pen, state.color, state.width };
         bool pens = state.tool == Tool::Pen || state.tool == Tool::Highlighter;
         if (state.tool != Tool::Select) selection->Clear();
+        textStyle = state.text;
+        if (state.tool == Tool::Text) textEditor->SetStyle(state.text); // the edited text takes the menu's choice
+        else textEditor->End();
         host.Post("tool", [this, settings, look, pens, cursor = state.cursor] {
             if (pens) ink->SetPen(look);
             ink->SetCursor(cursor);
@@ -404,14 +449,22 @@ namespace inkpages::detail
         if (auto page = PageInView()) selection->SelectAll(*page);
     }
 
+    void Surface::SetTextHost(TextHost* textsOfApp)
+    {
+        textEditor->End();
+        textHost = textsOfApp;
+    }
+
     void Surface::Undo()
     {
+        textEditor->End(); // the edit first becomes a step of its own
         selection->Clear(); // the frame would no longer fit what undo changes
         host.Post("undo", [this] { ink->Edits().Undo(); });
     }
 
     void Surface::Redo()
     {
+        textEditor->End();
         selection->Clear();
         host.Post("redo", [this] { ink->Edits().Redo(); });
     }
@@ -421,10 +474,13 @@ namespace inkpages::detail
         host.Post("saved", [this] { ink->Edits().MarkSaved(); });
     }
 
-    std::vector<KeyedStroke> Surface::StrokesOf(int page)
+    std::optional<std::vector<KeyedStroke>> Surface::StrokesOf(int page)
     {
-        auto strokes = std::make_shared<std::vector<KeyedStroke>>(); // outlives a timed-out wait
-        host.Run("snapshot", [this, page, strokes] { if (pageStore) *strokes = pageStore->Snapshot(page); });
+        // Shared with the work: a timed-out wait leaves it running later. Throws on a timeout or the ink thread's error.
+        auto strokes = std::make_shared<std::optional<std::vector<KeyedStroke>>>();
+        host.Run("snapshot", [this, page, strokes] {
+            if (pageStore && pageStore->IsLive(page)) *strokes = pageStore->Snapshot(page);
+        });
         return *strokes;
     }
 

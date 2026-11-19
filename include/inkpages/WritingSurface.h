@@ -6,6 +6,7 @@
 //     (DirectManipulation). Touch never draws; pen and mouse buttons never pan.
 //   - Mouse (and touchpad clicks): never writes. A drag selects (lasso or rectangle by the select mode, with any tool),
 //     moves the selection or scales it at a corner; a click beside the selection clears it, on a picture selects it.
+//   - Text tool: a pen tap writes a text there (or edits the text there), the keyboard types (TextHost, Texts.h).
 //   - Taps: a mouse click or finger tap that no selection gesture took is the app's (`tapped`: links).
 //   - Pen: the active tool (ToolState): pen, highlighter, eraser (whole strokes or exactly the circle), selection
 //     (lasso or rectangle; the barrel button lassos with any tool; the pen over the selection moves and scales it),
@@ -29,6 +30,7 @@
 #include <winrt/Windows.UI.Input.Inking.h>
 
 #include "inkpages/Pictures.h"
+#include "inkpages/Texts.h"
 #include "inkpages/model/PageLayout.h"
 #include "inkpages/model/PageMap.h"
 #include "inkpages/model/Paper.h"
@@ -64,6 +66,7 @@ namespace inkpages
         SelectMode selectMode = SelectMode::Lasso;
         ShapeKind shape = ShapeKind::Line;
         bool recognizeShapes = false;
+        TextStyle text;                             // the Text tool's font, size and color
     };
 
     /// A stroke as the app keeps it: page coordinates, the app's key (0: new ink - written, an erased piece, cut at a
@@ -137,6 +140,14 @@ namespace inkpages
         /// Commit after drawing into page layers.
         virtual void Commit() = 0;
         virtual void SetPictureHost(PictureHost* host) = 0;
+        /// The app's texts (Texts.h); without a host the Text tool does nothing.
+        virtual void SetTextHost(TextHost* host) = 0;
+        /// A text is being edited: the surface's window has the keyboard focus (an app's own key shortcuts should leave
+        /// typing alone meanwhile).
+        virtual bool EditingText() const = 0;
+        /// Ends editing (the result goes to the app and the history); e.g. before saving.
+        virtual void EndTextEditing() = 0;
+        std::function<void(bool editing)> textEditingChanged;
 
         // ---- tools
         virtual void SetTool(ToolState tool) = 0;
@@ -171,9 +182,11 @@ namespace inkpages
 
         // ---- strokes (the app persists them; InkStroke keeps points with pressure, tilt and time, and its attributes;
         //      the key says which of the app's strokes it is, see KeyedStroke)
-        /// The strokes of a page now, in page coordinates (copies; e.g. to save). Waits for the ink thread. A page whose
-        /// ink is not in the presenter (lazy) gives nothing: the app holds its strokes since `store`.
-        virtual std::vector<KeyedStroke> StrokesOf(int page) = 0;
+        /// The strokes of a page now, in page coordinates (copies; e.g. to save). Waits for the ink thread (up to 3 s).
+        /// None: the page's ink is not in the presenter (lazy, or not loaded yet) - the app's own strokes of it are
+        /// current (those it gave to `load` or got from `store`). Throws winrt::hresult_error when the ink thread does
+        /// not answer in time or fails (never save a page from a failed call).
+        virtual std::optional<std::vector<KeyedStroke>> StrokesOf(int page) = 0;
         /// Keeps a page's ink in the presenter even when it is far from the view (pages with history are kept anyway).
         virtual void Hold(int page, bool hold) = 0;
         /// Lazy pages (ink thread): a page coming near asks for its strokes, a page going far hands them over (page

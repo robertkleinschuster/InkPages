@@ -129,6 +129,28 @@ namespace inkpages::detail
         return c;
     }
 
+    std::optional<ToolChoices> TextMenu(HWND owner, RECT anchor, ToolChoices c, ToolbarTexts const& t)
+    {
+        std::vector<Item> items;
+        int fonts = static_cast<int>(TextFonts::Faces.size()), sizes = static_cast<int>(TextSizes::Steps.size());
+        for (int i = 0; i < fonts; ++i) items.push_back({ TextFonts::Faces[i], i == c.textFont });
+        items.push_back({ {}, false, std::nullopt, true });
+        int size = TextSizes::StepOf(c.textSize);
+        for (int i = 0; i < sizes; ++i) items.push_back({ Size(t, TextSizes::Steps[i]), i == size });
+        items.push_back({ {}, false, std::nullopt, true });
+        for (size_t i = 0; i < Palette::Pens.size(); ++i)
+        {
+            items.push_back({ t.penColors[i], static_cast<int>(i) == c.textColor, Palette::Pens[i] });
+        }
+        int chosen = Show(owner, anchor, items);
+        if (chosen < 0) return std::nullopt;
+        if (chosen < fonts) c.textFont = chosen;
+        else if (chosen < fonts + 1 + sizes) c.textSize = TextSizes::Steps[chosen - fonts - 1];
+        else c.textColor = chosen - fonts - sizes - 2;
+        c.tool = Tool::Text;
+        return c;
+    }
+
     std::optional<StencilChoice> StencilMenu(HWND owner, RECT anchor, StencilChoice now, ToolbarTexts const& t)
     {
         int chosen = Show(owner, anchor, { { t.ruler, now.ruler }, { t.protractor, now.protractor } });

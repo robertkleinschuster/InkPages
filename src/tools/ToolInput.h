@@ -41,10 +41,19 @@ namespace inkpages::detail
         std::function<void(StrokeSelection const&, std::vector<PointF> const& polygon)> selected;
         std::function<void()> cleared;
         std::function<void(bool taken)> penTaken;
+        /// Ink thread: a pen tap with the Text tool (document point).
+        std::function<void(PointF at)> textTapped;
+        /// Any thread: the view's zoom now (taps are measured on the screen).
+        std::function<float()> zoom;
 
         void SetTool(ToolSettings settings);
+        /// The running gesture ends (its pointer was lost, the pages changed under it): no shape, no selection; what an
+        /// exact erase took stays, as its own undo step.
+        void Cancel();
         /// The selection's frame as the UI shows it (strokes and pictures), or none.
         void SetFrame(std::optional<SelectionFrame> frame);
+        /// The text box being edited (document), or none: the pen hovering over it goes to the window (it edits there).
+        void SetTextBox(std::optional<RectF> box);
         /// The window's pen left the selection: the presenter gets it back.
         void GiveBackPen();
         /// The mouse (window input, it never reaches the presenter) selects as the selection tool does, whatever tool
@@ -58,7 +67,7 @@ namespace inkpages::detail
         Stencils& Stencil() { return stencils; }
 
     private:
-        enum class Gesture { None, Erase, Select, Shape };
+        enum class Gesture { None, Erase, Select, Shape, Text };
         struct Hover
         {
             PointF at;
@@ -72,6 +81,7 @@ namespace inkpages::detail
         void Move(std::vector<PointF> const& path);
         void Release(PointF at);
         bool DropTap(InkStroke const& stroke);
+        float Zoom() const { return zoom ? zoom() : 1; }
         void Recognize(std::vector<Placed> const& placed);
 
         InkLayer& ink;
@@ -83,6 +93,9 @@ namespace inkpages::detail
         Stencils stencils;
         ToolSettings settings;
         std::optional<SelectionFrame> frame;
+        std::optional<RectF> textBox;
+        PointF textPress;
+        uint64_t textPressMs = 0;
         bool eraserEndTaken = false;
         bool penTakenNow = false;
         Gesture gesture = Gesture::None;

@@ -2,7 +2,8 @@
 
 // The surface's DirectComposition tree (UI thread):
 //   root (clipped to the window) -> [DirectManipulation's visuals] -> content (DIPs -> pixels) ->
-//     sheets (paper) -> page layers (the app's content) -> overlay (tools' feedback) -> ink (the presenter's root)
+//     sheets (paper) -> page layers (the app's content) -> texts (the edited text box) -> overlay (tools' feedback) ->
+//     ink (the presenter's root)
 // AddVisual(v, FALSE, nullptr) puts v above its siblings: the ink is on top - measured: under an opaque sheet it got no
 // pen input. Sheets and the overlay are drawn at the settled zoom's resolution, near the view only.
 
@@ -28,6 +29,7 @@ namespace inkpages::detail
         IDCompositionVisual* Content() const { return content.get(); }
         IDCompositionVisual* Ink() const { return ink.get(); }
         IDCompositionVisual* PageLayer(int page) const;
+        IDCompositionVisual* TextLayer() const { return texts.get(); }
         OverlayLayer& Overlay() { return *overlay; }
 
         void SetScale(float pixelsPerDip);
@@ -47,7 +49,7 @@ namespace inkpages::detail
     private:
         Graphics graphics;
         winrt::com_ptr<IDCompositionTarget> target;
-        winrt::com_ptr<IDCompositionVisual> root, content, sheets, layers, ink;
+        winrt::com_ptr<IDCompositionVisual> root, content, sheets, layers, texts, ink;
         std::unique_ptr<OverlayLayer> overlay;
         std::vector<std::unique_ptr<PaperLayer>> papers;
         std::vector<winrt::com_ptr<IDCompositionVisual>> pageLayers;

@@ -8,7 +8,7 @@ namespace inkpages::detail
     namespace Glyph // Segoe Fluent Icons
     {
         constexpr wchar_t Undo = 0xE7A7, Redo = 0xE7A6, Pen = 0xE76D, Highlighter = 0xE7E6, Eraser = 0xE75C,
-            WholeStrokes = 0xED62, Lasso = 0xF1BE, Shapes = 0, Ruler = 0xED5E, Cut = 0xE8C6, Copy = 0xE8C8,
+            WholeStrokes = 0xED62, Lasso = 0xF1BE, Shapes = 0, Text = 0xE8D2, Ruler = 0xED5E, Cut = 0xE8C6, Copy = 0xE8C8,
             Paste = 0xE77F, Duplicate = 0xF413, Delete = 0xE74D, SelectAll = 0xE8B3;
     }
 
@@ -30,6 +30,7 @@ namespace inkpages::detail
         b.push_back({ ButtonId::WholeStrokes, Glyph::WholeStrokes, std::nullopt, CheckWithMenu });
         b.push_back({ ButtonId::Select, Glyph::Lasso, std::nullopt, CheckWithMenu, true });
         b.push_back({ ButtonId::Shape, Glyph::Shapes, std::nullopt, CheckWithMenu });
+        b.push_back({ ButtonId::Text, Glyph::Text, Palette::Pens[std::clamp(choices.textColor, 0, 9)], CheckWithMenu });
         b.push_back({ ButtonId::Ruler, Glyph::Ruler, std::nullopt, CheckWithMenu });
         b.push_back({ ButtonId::Cut, Glyph::Cut, std::nullopt, Command, true });
         b.push_back({ ButtonId::Copy, Glyph::Copy });
@@ -61,6 +62,7 @@ namespace inkpages::detail
         case ButtonId::WholeStrokes: return c.wholeStrokeErasing;
         case ButtonId::Select: return c.tool == Tool::Select;
         case ButtonId::Shape: return c.tool == Tool::Shape;
+        case ButtonId::Text: return c.tool == Tool::Text;
         case ButtonId::Ruler: return s.ruler || s.protractor;
         default: return false;
         }
@@ -104,6 +106,7 @@ namespace inkpages::detail
         case ButtonId::WholeStrokes: return t.wholeStrokeErase;
         case ButtonId::Select: return t.select;
         case ButtonId::Shape: return t.shapes;
+        case ButtonId::Text: return t.text;
         case ButtonId::Ruler: return t.ruler;
         default: return TipOf(id, c, t, extensions); // the commands' tips are their names
         }
@@ -131,6 +134,7 @@ namespace inkpages::detail
         case ButtonId::WholeStrokes: return t.wholeStrokeEraseTip;
         case ButtonId::Select: return t.selectTip;
         case ButtonId::Shape: return t.shapesTip;
+        case ButtonId::Text: return t.textTip;
         case ButtonId::Ruler: return t.rulerTip;
         case ButtonId::Cut: return t.cut;
         case ButtonId::Copy: return t.copy;

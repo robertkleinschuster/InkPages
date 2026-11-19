@@ -9,6 +9,7 @@
 
 #include "inkpages/model/Geometry.h"
 #include "inkpages/model/Paper.h"
+#include "inkpages/model/Text.h"
 
 namespace inkpages
 {
@@ -73,7 +74,7 @@ namespace inkpages
         friend bool operator==(PenPreset const&, PenPreset const&) = default;
     };
 
-    enum class Tool { Pen, Highlighter, Eraser, Select, Shape };
+    enum class Tool { Pen, Highlighter, Eraser, Select, Shape, Text };
 
     enum class SelectMode { Lasso, Rectangle };
 
@@ -94,14 +95,18 @@ namespace inkpages
         ShapeKind shape = ShapeKind::Line;
         bool recognizeShapes = false;         // shapes drawn freehand with the pen become clean ones
         int preset = 0;                       // the active pen or highlighter preset
+        int textFont = 0;                     // the Text tool: TextFonts::Faces index, size, Palette::Pens index
+        float textSize = 12;
+        int textColor = 0;
 
         static std::vector<PenPreset> DefaultPens() { return { { 0, DefaultPenWidth }, { 1, DefaultPenWidth }, { 2, DefaultPenWidth } }; }
         static std::vector<PenPreset> DefaultHighlighters() { return { { 0, DefaultHighlighterWidth }, { 1, DefaultHighlighterWidth } }; }
         std::vector<PenPreset> PensOrDefault() const { return pens.empty() ? DefaultPens() : pens; }
         std::vector<PenPreset> HighlightersOrDefault() const { return highlighters.empty() ? DefaultHighlighters() : highlighters; }
+        TextStyle Text() const;
 
         /// One line of text ("pens=0:1.41,1:1.41;highlighters=...;eraser=4;whole=0;tool=0;preset=0;select=0;shape=0;
-        /// recognize=0"); `Parse` reads it
+        /// recognize=0;text=0:12:0"); `Parse` reads it
         /// back - what it does not understand keeps its default.
         std::string Serialize() const;
         static ToolChoices Parse(std::string const& text);

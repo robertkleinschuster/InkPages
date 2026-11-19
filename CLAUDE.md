@@ -75,12 +75,12 @@ modules (see "Structure").
 Folders are modules; each has a narrow interface and **dependencies point downwards only**:
 
 ```
-toolbar  ->  surface  ->  tools  ->  ink  ->  render  ->  model        (base: Log, used by all)
+toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (base: Log, used by all)
 ```
 
 - `include/inkpages/` – the public API: `WritingSurface.h` (the surface, its tools and callbacks), `Toolbar.h`,
-  `Pictures.h` (the app's pictures in the selection), `Log.h`; `include/inkpages/model/` – pure data and logic the
-  API uses (`Paper`, `PageLayout`, `ViewMath`, `Pens`, `Geometry`, `StrokeEraser`, `UndoHistory`, `StrokeKeys`).
+  `Pictures.h` (the app's pictures in the selection), `Texts.h` (the app's texts for the Text tool), `Log.h`; `include/inkpages/model/` – pure data and logic the
+  API uses (`Paper`, `PageLayout`, `ViewMath`, `Pens`, `Geometry`, `StrokeEraser`, `UndoHistory`, `StrokeKeys`, `PageMap`, `PathData`, `TapGesture`, `Text`).
 - `src/base` – `Log`.
 - `src/model` – pure logic, no Win32/WinRT (unit-tested: `tests/GeometryTests`, `ToolTests`, `ToolGeometryTests`,
   `StrokeKeysTests`): page layout, view math (zoom, fit width, zoom rectangles kept on the content, lazy pages), paper
@@ -96,16 +96,22 @@ toolbar  ->  surface  ->  tools  ->  ink  ->  render  ->  model        (base: Lo
 - `src/tools` – each tool in its own unit (ink thread): `ToolInput` (routes unprocessed input and hover, presenter
   mode, eraser-end and selection takeovers, taps beside the selection, recognition), `ExactEraser`, `InkSelection`
   (select/preview/commit/delete/duplicate/clipboard of strokes), `ShapeTool`, `ShapeRecognizer` (InkAnalyzer),
-  `Stencils` (ruler, protractor), `PictureEdit` (the app's pictures in an undo step).
+  `Stencils` (ruler, protractor), `PictureEdit` (the app's pictures in an undo step), `TextEdit` (a text in an undo
+  step).
+- `src/text` – editing one text (UI thread): `RichEditBox` (windowless RichEdit: ITextServices2 + our ITextHost2,
+  TxDrawD2D; headless unit tests `tests/RichEditBoxTests`), `TextBoxVisual` (its DComp visual in the text layer,
+  caret, frame).
 - `src/surface` – the window (UI thread): `Surface` (implements WritingSurface, wires the modules, hands work between
   threads), `SurfaceWindow` (window procedure: input to the module it belongs to), `Composition` (visual tree, sheets,
   page layers, overlay), `Viewport` (DirectManipulation), `SelectionController` (selection with the app's pictures,
-  window pointer drags, auto-scroll, commands).
+  window pointer drags, auto-scroll, commands), `MouseSelect`, `TouchTaps`, `TextEditor` (the Text tool: begin/end,
+  keyboard and the pen's mouse messages to the RichEdit, the result to the app's TextHost and the history).
 - `src/toolbar` – `Toolbar` (comctl32 toolbar in its own container window), `ToolbarModel` (buttons, states, tips –
   no Win32, unit-tested), `ToolbarMenus` (popup menus), `Icons` (Segoe Fluent Icons glyphs, swatches).
-- `demo/` – `main.cpp` (only the public API; German toolbar texts), `DemoPictures` (cards in page layers: the picture
-  extension point), `cursors/` + `tools/make_cursors.py` (a dot cursor per palette color × width step, ids 1000/2000 +
-  color × 10 + step), `UiTests/` (`SurfaceTest`, `BoundaryTest`, `ToolsTest`, `SelectionTest`, `RulerTouchTest`). `tools/cursorprobe.cpp`:
+- `demo/` – `main.cpp` (only the public API; German toolbar texts), `DemoPictures` (cards and texts in page layers: the picture
+  and text extension points), `cursors/` + `tools/make_cursors.py` (a dot cursor per palette color × width step, ids 1000/2000 +
+  color × 10 + step), `UiTests/` (`SurfaceTest`, `BoundaryTest`, `ToolsTest`, `SelectionTest`, `RulerTouchTest`, `PagesTest`,
+  `MouseTest`, `TextTest`). `tools/cursorprobe.cpp`:
   DXGI Desktop Duplication probe – the pointer as the screen draws it; `build.ps1` puts it in `.local-build\tools`.
 
 ## Writing surface (phase 1, measured 2026-11-19; sandbox = Windows Sandbox 1514x900 at 150 %)
@@ -246,6 +252,40 @@ toolbar  ->  surface  ->  tools  ->  ink  ->  render  ->  model        (base: Lo
   leaves DirectManipulation READY; a pan goes RUNNING within ~40 ms of the down, which cancels the tap (`TouchTaps`;
   WM_POINTERCAPTURECHANGED cancels too). Measured: mouse drag with the pen tool = no ink, lasso; click on the card
   selects it; click beside clears (no tap); click on nothing, finger tap = `tapped`; a finger pan = no tap, still pans.
+- **Text tool** (2026-11-19, sandbox `TextTest.ps1`; technique from the probe `D:\src\feature-probes\textedit`):
+  a windowless RichEdit (msftedit.dll `CreateTextServices`, ITextServices2 + our ITextHost2, plain text, multi-line,
+  no wrapping, `TxDrawD2D`) drawn into a DComp surface in the composition's text layer (above the page layers, below
+  overlay and ink): it pans and zooms with the pages. [measured, probe] The render target's DPI must be the window's,
+  the bounds given to TxDrawD2D are surface pixels, while the client rectangle, mouse and caret are client pixels. So
+  the box is laid out at the settled zoom: RichEdit's font is `RichEditText::Twips(size, zoom)` = size x zoom x 72/96
+  points (a page unit shows as DPI scale x zoom pixels, RichEdit draws a point as DPI/72 pixels). [measured, unit test]
+  `OnTxPropertyBitsChange` must announce the host's bits after `OnTxInPlaceActivate` (before, Enter did not make a new
+  line), the char format goes to the text with `EM_SETCHARFORMAT SCF_ALL` too, and `TxGetNaturalSize` needs the extent
+  in HIMETRIC of the offered size (with {-1,-1} it returned sizes ~130x too large). Enter arrives as WM_KEYDOWN +
+  WM_CHAR, as typing sends it. The caret is drawn by the box (blinking with `GetCaretBlinkTime`); the system caret
+  (`CreateCaret`, hidden under the composition) is set too for Magnifier/Narrator. The pen: the Text tool puts the
+  presenter in mode None; a pen tap (unprocessed input, `Tap` rules) goes to `TextEditor::Tap`; while a box is edited
+  the pen hovering over it is taken from the presenter (`ToolInput::SetTextBox`, as over the selection frame) and its
+  presses reach RichEdit as the mouse messages Windows makes from them (`GetMessageExtraInfo` signature; elsewhere
+  they are ignored). The surface's window takes the focus while editing and gives it back after. End: a tap beside,
+  Escape, another tool, undo/redo, a selection, a page operation, `SetTextHost`, the surface going. The result goes to
+  the app's `TextHost` (`Add`/`Change`/`Remove`; an empty new text is nothing, a text emptied is removed) and the
+  history (`TextEdit`, undo/redo call the host on the UI thread). Sandbox: a new text typed with umlauts and a second
+  line (`KEYEVENTF_UNICODE` injection: WM_CHAR whatever the layout), ended by a tap beside, edited again (End, " neu"),
+  change undone/redone, an empty text left nothing, a mouse lasso selected the text (through `PictureHost`), moved it,
+  undo; at zoom 2 the box lay exactly on the text. Not done: `IRicheditWindowlessAccessibility::CreateProvider` (a UIA
+  provider of the surface window would have to host it) - so the touch keyboard does not come up by itself in tablet
+  posture: a device check.
+- **Undo after undo** (review 2026-11-19): undo/redo bring strokes back as `Clone()`s; edits recorded earlier name the
+  original, so `InkState::Current` follows `Replaced` copies (undo/redo, relocation) - draw, erase, undo, undo, redo
+  and draw, move, undo, undo, redo leave exactly one stroke (`tests/StrokeEditTests`, real Windows ink objects).
+- **InkHost::Run** carries the work's exception to the caller and throws on its timeout; shutdown waits without a
+  timeout (the work refers to the surface). `StrokesOf` returns none for a page whose ink is not in the presenter and
+  throws when the ink thread fails or does not answer.
+- **Page operations** also end running gestures and the ink-side selection inside the rearrange work item; a tool's
+  result made before the ink thread applied every issued page operation is dropped (generation counted on both
+  threads). Sheets of pages that stay keep their drawing (`PaperLayer::MoveTo`). Taps are measured on the screen
+  (`Tap::MaxDistanceDip` / zoom); a finger that stops the pages' inertia is no tap (device check).
 - **Underlay:** the app draws under the ink with D2D (`drawUnderlay(page, dc, area)`, page coordinates) into the
   sheet's virtual surface, over the Paper; `InvalidatePage` redraws it; page layers (`PageLayer`) are DComp visuals for
   live content (pictures dragged by the selection).

@@ -290,6 +290,24 @@ public static class Inj
         KeyEvent(vk, false); KeyEvent(vk, true);
     }
 
+    /// <summary>Types text as Unicode characters (KEYEVENTF_UNICODE: WM_CHAR whatever the keyboard layout).</summary>
+    public static void TypeText(string text)
+    {
+        foreach (char c in text)
+        {
+            if (c == '\n') { Key(0x0D); continue; }
+            foreach (bool up in new[] { false, true })
+            {
+                var i = new INPUT();
+                i.type = 1;
+                i.u.ki.wScan = c;
+                i.u.ki.dwFlags = 0x4u | (up ? 0x2u : 0u); // UNICODE | KEYUP
+                SendInput(1, new[] { i }, Marshal.SizeOf(typeof(INPUT)));
+            }
+            Thread.Sleep(30);
+        }
+    }
+
     public static void Ctrl(ushort vk)
     {
         KeyEvent(0x11, false); KeyEvent(vk, false); KeyEvent(vk, true); KeyEvent(0x11, true);

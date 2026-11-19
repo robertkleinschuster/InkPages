@@ -2,6 +2,7 @@
 
 #include <d2d1_1.h>
 #include <d2d1_1helper.h>
+#include <dwrite.h>
 
 #include <cmath>
 #include <format>
@@ -13,16 +14,89 @@ using namespace inkpages;
 namespace
 {
     constexpr float Resolution = 3; // pixels per page unit: sharp enough for the demo's zoom range
+
+    IDWriteFactory* DWrite()
+    {
+        static winrt::com_ptr<IDWriteFactory> factory = [] {
+            winrt::com_ptr<IDWriteFactory> f;
+            winrt::check_hresult(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(f.put())));
+            return f;
+        }();
+        return factory.get();
+    }
+
+    // A text laid out as the demo draws it: its font size in page units (as RichEdit edits it), no wrapping.
+    winrt::com_ptr<IDWriteTextLayout> LayoutOf(Text const& text, float pixelsPerUnit)
+    {
+        winrt::com_ptr<IDWriteTextFormat> format;
+        winrt::check_hresult(DWrite()->CreateTextFormat(text.style.font.c_str(), nullptr, DWRITE_FONT_WEIGHT_NORMAL,
+            DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, text.style.size * pixelsPerUnit, L"de-de", format.put()));
+        winrt::check_hresult(format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP));
+        winrt::com_ptr<IDWriteTextLayout> layout;
+        winrt::check_hresult(DWrite()->CreateTextLayout(text.content.c_str(), static_cast<UINT32>(text.content.size()),
+            format.get(), 100000, 100000, layout.put()));
+        return layout;
+    }
 }
 
 void DemoPictures::Add(RectF bounds, Color color)
 {
-    Card card{ bounds, color, surface.Layout().NearestPage({ bounds.left, bounds.top }).value_or(0) };
+    Place(Card{ bounds, color, surface.Layout().NearestPage({ bounds.left, bounds.top }).value_or(0) });
+}
+
+void DemoPictures::Remap(PageMap const& map, PageLayout const& before)
+{
+    for (auto it = cards.begin(); it != cards.end();)
+    {
+        Card& card = it->second;
+        int to = map(card.page);
+        if (to < 0) // its page is gone (its layer with it)
+        {
+            it = cards.erase(it);
+            continue;
+        }
+        RectF from = before.Page(card.page), now = surface.Layout().Page(to);
+        float dx = now.left - from.left, dy = now.top - from.top;
+        card.bounds = { card.bounds.left + dx, card.bounds.top + dy, card.bounds.right + dx, card.bounds.bottom + dy };
+        card.page = to;
+        if (card.text) card.text->page = to;
+        Show(card, {});
+        ++it;
+    }
+}
+
+PictureId DemoPictures::Place(Card card)
+{
+    Measure(card);
     winrt::check_hresult(surface.CompositionDevice()->CreateVisual(card.visual.put()));
     Draw(card);
     winrt::check_hresult(surface.PageLayer(card.page)->AddVisual(card.visual.get(), FALSE, nullptr));
-    auto [it, inserted] = cards.emplace(next++, std::move(card));
+    PictureId id = next++;
+    auto [it, inserted] = cards.emplace(id, std::move(card));
     Show(it->second, {});
+    return id;
+}
+
+// A text's bounds: where it lies (its top left) and what its layout takes.
+void DemoPictures::Measure(Card& card)
+{
+    if (!card.text) return;
+    DWRITE_TEXT_METRICS metrics{};
+    winrt::check_hresult(LayoutOf(*card.text, 1)->GetMetrics(&metrics));
+    RectF page = surface.Layout().Page(card.text->page);
+    float left = page.left + card.text->at.x, top = page.top + card.text->at.y;
+    card.bounds = { left, top, left + std::max(metrics.widthIncludingTrailingWhitespace, 1.f), top + std::max(metrics.height, 1.f) };
+    card.page = card.text->page;
+}
+
+void DemoPictures::Relayer(Card& card, int page)
+{
+    if (page != card.page && card.shown)
+    {
+        winrt::check_hresult(surface.PageLayer(card.page)->RemoveVisual(card.visual.get()));
+        winrt::check_hresult(surface.PageLayer(page)->AddVisual(card.visual.get(), FALSE, nullptr));
+    }
+    card.page = page;
 }
 
 void DemoPictures::Draw(Card& card)
@@ -38,6 +112,16 @@ void DemoPictures::Draw(Card& card)
     winrt::check_hresult(dc->CreateSolidColorBrush(D2D1::ColorF(card.color.r / 255.f, card.color.g / 255.f, card.color.b / 255.f, 0.85f), fill.put()));
     winrt::check_hresult(dc->CreateSolidColorBrush(D2D1::ColorF(0.2f, 0.2f, 0.2f), border.put()));
     dc->Clear(D2D1::ColorF(0, 0, 0, 0));
+    if (card.text)
+    {
+        Color c = card.text->style.color;
+        winrt::com_ptr<ID2D1SolidColorBrush> ink;
+        winrt::check_hresult(dc->CreateSolidColorBrush(D2D1::ColorF(c.r / 255.f, c.g / 255.f, c.b / 255.f), ink.put()));
+        dc->DrawTextLayout({ 0, 0 }, LayoutOf(*card.text, Resolution).get(), ink.get());
+        winrt::check_hresult(drawing->EndDraw());
+        winrt::check_hresult(card.visual->SetContent(drawing.get()));
+        return;
+    }
     dc->FillRectangle({ 0, 0, static_cast<float>(w), static_cast<float>(h) }, fill.get());
     dc->DrawRectangle({ 1, 1, w - 1.f, h - 1.f }, border.get(), 2);
     winrt::check_hresult(drawing->EndDraw());
@@ -113,14 +197,19 @@ void DemoPictures::Transform(std::vector<PictureId> const& pictures, Affine cons
         auto it = cards.find(id);
         if (it == cards.end()) continue;
         Card& card = it->second;
+        RectF before = card.bounds;
         card.bounds = m.Bounds(card.bounds);
         int page = surface.Layout().NearestPage({ (card.bounds.left + card.bounds.right) / 2, (card.bounds.top + card.bounds.bottom) / 2 }).value_or(0);
-        if (page != card.page && card.shown) // onto another page: into its layer
+        Relayer(card, page); // onto another page: into its layer
+        if (card.text) // a text keeps its top left; scaling scales its size
         {
-            winrt::check_hresult(surface.PageLayer(card.page)->RemoveVisual(card.visual.get()));
-            winrt::check_hresult(surface.PageLayer(page)->AddVisual(card.visual.get(), FALSE, nullptr));
+            RectF r = surface.Layout().Page(page);
+            card.text->page = page;
+            card.text->at = { card.bounds.left - r.left, card.bounds.top - r.top };
+            if (before.Width() > 0) card.text->style.size *= card.bounds.Width() / before.Width();
+            Measure(card);
+            Draw(card);
         }
-        card.page = page;
         Show(card, {});
     }
     Log(std::format("demo: {} pictures transformed", pictures.size()));
@@ -162,10 +251,69 @@ std::vector<PictureId> DemoPictures::Duplicate(std::vector<PictureId> const& pic
     {
         auto it = cards.find(id);
         if (it == cards.end()) continue;
-        RectF b = m.Bounds(it->second.bounds);
-        Color c = it->second.color;
-        copies.push_back(next);
-        Add(b, c);
+        Card copy{ m.Bounds(it->second.bounds), it->second.color, it->second.page };
+        copy.page = surface.Layout().NearestPage({ copy.bounds.left, copy.bounds.top }).value_or(0);
+        if (auto text = it->second.text)
+        {
+            RectF r = surface.Layout().Page(copy.page);
+            text->page = copy.page;
+            text->at = { copy.bounds.left - r.left, copy.bounds.top - r.top };
+            copy.text = text;
+        }
+        copies.push_back(Place(std::move(copy)));
     }
     return copies;
+}
+
+std::optional<TextId> DemoPictures::TextAt(PointF point)
+{
+    std::optional<TextId> top;
+    for (auto& [id, card] : cards)
+    {
+        RectF b = card.bounds;
+        if (card.text && card.shown && point.x >= b.left && point.x <= b.right && point.y >= b.top && point.y <= b.bottom) top = id;
+    }
+    return top;
+}
+
+Text DemoPictures::Get(TextId id)
+{
+    auto it = cards.find(id);
+    return it != cards.end() && it->second.text ? *it->second.text : Text{};
+}
+
+// The edited text is the library's to show meanwhile: its visual is hidden.
+void DemoPictures::SetEditing(std::optional<TextId> text)
+{
+    auto show = [this](std::optional<TextId> id, bool shown) {
+        if (!id) return;
+        if (auto it = cards.find(*id); it != cards.end()) winrt::check_hresult(it->second.visual.as<IDCompositionVisual3>()->SetOpacity(shown ? 1.f : 0.f));
+    };
+    show(editing, true);
+    editing = text;
+    show(editing, false);
+    surface.Commit();
+    Log(std::format("demo: editing text {}", text ? std::to_string(*text) : std::string("none")));
+}
+
+TextId DemoPictures::Add(Text const& text)
+{
+    Card card{ {}, text.style.color, text.page };
+    card.text = text;
+    TextId id = Place(std::move(card));
+    Log(std::format("demo: text {} added on page {} ({} characters)", id, text.page, text.content.size()));
+    return id;
+}
+
+void DemoPictures::Change(TextId id, Text const& text)
+{
+    auto it = cards.find(id);
+    if (it == cards.end()) return;
+    Card& card = it->second;
+    Relayer(card, text.page);
+    card.text = text;
+    Measure(card);
+    Draw(card);
+    Show(card, {});
+    Log(std::format("demo: text {} changed ({} characters)", id, text.content.size()));
 }

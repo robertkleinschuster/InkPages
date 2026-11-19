@@ -26,12 +26,14 @@ namespace inkpages::tests
     // ---- Tap (ported from TapTests)
     TEST(Tap, OnlyAShortStillPressIsATap)
     {
-        EXPECT_TRUE(Tap::IsTap(0, 120));
-        EXPECT_TRUE(Tap::IsTap(2.5f, 250));
-        EXPECT_FALSE(Tap::IsTap(0.5f, 600)) << "a slow tiny drag improves a sketch: it moves";
-        EXPECT_FALSE(Tap::IsTap(2.9f, 300));
-        EXPECT_FALSE(Tap::IsTap(3, 50));
-        EXPECT_FALSE(Tap::IsTap(40, 100));
+        EXPECT_TRUE(Tap::IsTap(0, 120, 1));
+        EXPECT_TRUE(Tap::IsTap(2.5f, 250, 1));
+        EXPECT_FALSE(Tap::IsTap(0.5f, 600, 1)) << "a slow tiny drag improves a sketch: it moves";
+        EXPECT_FALSE(Tap::IsTap(2.9f, 300, 1));
+        EXPECT_FALSE(Tap::IsTap(3, 50, 1));
+        EXPECT_FALSE(Tap::IsTap(40, 100, 1));
+        EXPECT_TRUE(Tap::IsTap(5, 100, 0.5f)) << "zoomed out: 5 page units are 2.5 DIPs on the screen";
+        EXPECT_FALSE(Tap::IsTap(2, 100, 2)) << "zoomed in: 2 page units are 4 DIPs";
     }
 
     TEST(SelectionFrame, HandlesMoveAndProportionalScale)

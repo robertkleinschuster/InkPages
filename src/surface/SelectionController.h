@@ -34,6 +34,7 @@ namespace inkpages::detail
         std::function<float()> scale;                // pixels per DIP
         std::function<PageLayout const&()> layout;
         std::function<void()> changed;               // the selection changed
+        std::function<bool(PointF document)> keepsPen; // the window keeps the pen there too (the edited text box)
         WritingSurface* surface = nullptr;           // the app's clipboard callbacks
     };
 

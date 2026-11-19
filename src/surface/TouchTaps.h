@@ -16,8 +16,9 @@ namespace inkpages::detail
     class TouchTaps
     {
     public:
-        TouchTaps(std::function<PointF(POINT client)> toDocument, std::function<void(PointF document)> tapped)
-            : toDocument(std::move(toDocument)), tapped(std::move(tapped)) {}
+        TouchTaps(std::function<PointF(POINT client)> toDocument, std::function<float()> zoom,
+            std::function<void(PointF document)> tapped)
+            : toDocument(std::move(toDocument)), zoom(std::move(zoom)), tapped(std::move(tapped)) {}
 
         void Down(UINT32 pointer, POINT client);
         void Update(UINT32 pointer, POINT client);
@@ -27,6 +28,7 @@ namespace inkpages::detail
 
     private:
         std::function<PointF(POINT)> toDocument;
+        std::function<float()> zoom;
         std::function<void(PointF)> tapped;
         TapGesture gesture;
     };

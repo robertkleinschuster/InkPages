@@ -1,6 +1,6 @@
 // The writing surface's window procedure: input to the module it belongs to - touch and touchpad to DirectManipulation
 // (finger taps watched by TouchTaps), the pen given to the window to the selection, the mouse to the selection and
-// then to MouseSelect, the wheel to DirectManipulation - and the UI thread's handed-over work.
+// then to MouseSelect, a text being edited first to the TextEditor, the wheel to DirectManipulation - and the UI thread's handed-over work.
 
 #include "surface/Surface.h"
 
@@ -70,12 +70,19 @@ namespace inkpages::detail
 
     LRESULT Surface::Handle(UINT message, WPARAM wp, LPARAM lp)
     {
+        // A text being edited takes the keyboard and the mouse (and the pen's mouse messages) in its box first.
+        if (textEditor && textEditor->Editing())
+        {
+            LRESULT result = 0;
+            if (textEditor->OnMessage(message, wp, lp, result)) return result;
+        }
         switch (message)
         {
         case WM_POINTERDOWN:
             if (viewport && viewport->OnPointer(wp)) // touch and touchpad pan and zoom
             {
-                if (TypeOf(wp) == PT_TOUCH) touchTaps->Down(GET_POINTERID_WPARAM(wp), ClientOf(window, lp));
+                // A finger that stops the pages' inertia (or joins a running pan) is no tap.
+                if (TypeOf(wp) == PT_TOUCH && !viewport->Moving()) touchTaps->Down(GET_POINTERID_WPARAM(wp), ClientOf(window, lp));
                 return 0;
             }
             if (IsPen(wp) && selection->OnPointer(message, wp, lp)) return 0;
@@ -99,6 +106,7 @@ namespace inkpages::detail
             touchTaps->Cancel("DirectManipulation took the contact");
             break;
         case WM_LBUTTONDOWN:
+        case WM_LBUTTONDBLCLK: // (the class has CS_DBLCLKS for the text box: outside it a press is a press)
         {
             if (!IsRealMouse()) break;
             bool had = selection->HasSelection();

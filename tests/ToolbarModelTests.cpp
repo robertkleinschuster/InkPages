@@ -16,7 +16,7 @@ namespace inkpages::tests
         for (auto const& b : buttons) ids.push_back(b.id);
         std::vector<int> expected{ ButtonId::Undo, ButtonId::Redo, ButtonId::Pen, ButtonId::Pen + 1, ButtonId::Pen + 2,
             ButtonId::Highlighter, ButtonId::Highlighter + 1, ButtonId::Eraser, ButtonId::WholeStrokes, ButtonId::Select,
-            ButtonId::Shape, ButtonId::Ruler, ButtonId::Cut, ButtonId::Copy, ButtonId::Paste, ButtonId::Duplicate,
+            ButtonId::Shape, ButtonId::Text, ButtonId::Ruler, ButtonId::Cut, ButtonId::Copy, ButtonId::Paste, ButtonId::Duplicate,
             ButtonId::Delete, ButtonId::SelectAll, ButtonId::Extension };
         EXPECT_EQ(expected, ids);
         EXPECT_EQ(Palette::Pens[1], buttons[3].bar.value()) << "the blue preset shows its color";

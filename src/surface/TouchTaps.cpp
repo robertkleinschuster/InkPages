@@ -8,7 +8,7 @@ namespace inkpages::detail
 {
     void TouchTaps::Down(UINT32 pointer, POINT client)
     {
-        gesture.Press(pointer, toDocument(client), GetTickCount64());
+        gesture.Press(pointer, toDocument(client), GetTickCount64(), zoom());
         Log(std::format("touch: contact {} down", pointer));
     }
 

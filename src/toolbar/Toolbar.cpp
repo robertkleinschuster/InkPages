@@ -201,6 +201,7 @@ namespace inkpages
             state.selectMode = choices.selectMode;
             state.shape = choices.shape;
             state.recognizeShapes = choices.recognizeShapes;
+            state.text = choices.Text();
             // Shapes and recognition draw with the last pen preset's look.
             Tool look = choices.tool == Tool::Highlighter ? Tool::Highlighter : Tool::Pen;
             auto presets = look == Tool::Pen ? choices.PensOrDefault() : choices.HighlightersOrDefault();
@@ -251,6 +252,7 @@ namespace inkpages
                 break;
             case ButtonId::Select: choose(Tool::Select, choices.preset); break;
             case ButtonId::Shape: choose(Tool::Shape, choices.preset); break;
+            case ButtonId::Text: choose(Tool::Text, choices.preset); break;
             case ButtonId::Ruler:
                 stencils.ruler = !stencils.ruler;
                 surface.SetRuler(stencils.ruler);
@@ -283,6 +285,7 @@ namespace inkpages
             else if (id == ButtonId::WholeStrokes) next = RadiusMenu(container, anchor, choices, texts);
             else if (id == ButtonId::Select) next = SelectModeMenu(container, anchor, choices, texts);
             else if (id == ButtonId::Shape) next = ShapeMenu(container, anchor, choices, texts);
+            else if (id == ButtonId::Text) next = TextMenu(container, anchor, choices, texts);
             else if (id == ButtonId::Ruler)
             {
                 if (auto chosen = StencilMenu(container, anchor, stencils, texts))

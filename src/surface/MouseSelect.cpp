@@ -12,7 +12,7 @@ namespace inkpages::detail
     {
         PointF at = toDocument(client);
         gesture = {};
-        gesture.Press(0, at, GetTickCount64());
+        gesture.Press(0, at, GetTickCount64(), zoom());
         path = { at };
         lassoing = false;
         consumed = clearedSelection;
@@ -50,14 +50,14 @@ namespace inkpages::detail
         End(true, at);
         ReleaseCapture();
         if (wasLasso || !tap) return;
+        if (selection.SelectPictureAt(*tap)) // also when the press cleared a selection: one click, as the pen's tap
+        {
+            Log("mouse: the click selected a picture");
+            return;
+        }
         if (consumed)
         {
             Log("mouse: the click cleared the selection");
-            return;
-        }
-        if (selection.SelectPictureAt(*tap))
-        {
-            Log("mouse: the click selected a picture");
             return;
         }
         Log(std::format("mouse: tap at {:.1f},{:.1f}", tap->x, tap->y));

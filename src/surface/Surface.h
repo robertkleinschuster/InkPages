@@ -17,6 +17,7 @@
 #include "surface/Composition.h"
 #include "surface/MouseSelect.h"
 #include "surface/SelectionController.h"
+#include "surface/TextEditor.h"
 #include "surface/TouchTaps.h"
 #include "surface/Viewport.h"
 #include "tools/ToolInput.h"
@@ -47,6 +48,9 @@ namespace inkpages::detail
         float RenderScale() const override { return sheetScale; }
         void Commit() override { composition->Commit(); }
         void SetPictureHost(PictureHost* picturesOfApp) override { pictureHost = picturesOfApp; }
+        void SetTextHost(TextHost* textsOfApp) override;
+        bool EditingText() const override { return textEditor && textEditor->Editing(); }
+        void EndTextEditing() override { if (textEditor) textEditor->End(); }
         void InvalidatePage(int page) override;
 
         void SetTool(ToolState tool) override;
@@ -69,7 +73,7 @@ namespace inkpages::detail
         void MarkSaved() override;
         bool AtSavePoint() const override { return ink->Edits().State().atSavePoint; }
 
-        std::vector<KeyedStroke> StrokesOf(int page) override;
+        std::optional<std::vector<KeyedStroke>> StrokesOf(int page) override;
         void Hold(int page, bool hold) override;
 
         static LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wp, LPARAM lp);
@@ -105,6 +109,12 @@ namespace inkpages::detail
         std::unique_ptr<SelectionController> selection;
         std::unique_ptr<MouseSelect> mouse;
         std::unique_ptr<TouchTaps> touchTaps;
+        std::unique_ptr<TextEditor> textEditor;
+        TextHost* textHost = nullptr;
+        TextStyle textStyle; // the Text tool's
+        // Page operations issued (UI thread) and applied on the ink thread: a tool's result made before the ink thread
+        // applied every issued one refers to the old pages and is dropped.
+        std::atomic<unsigned> pagesGeneration = 0, inkPagesGeneration = 0;
         PictureHost* pictureHost = nullptr;
         std::vector<PageSpec> pages;
         PageLayout layout;

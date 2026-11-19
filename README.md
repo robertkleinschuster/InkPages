@@ -66,14 +66,20 @@ toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize(
 - **The app's content:** `drawUnderlay` + `InvalidatePage` (D2D, page coordinates, under the ink), `PageLayer(page)`
   (DComp visual for live content), `PictureHost` (`Pictures.h`: your pictures selected, moved, scaled, deleted,
   duplicated with the strokes; undo calls back).
+- **Texts:** `SetTextHost` (`Texts.h`). The Text tool: a pen tap writes a text there or edits the text there (the
+  keyboard types, a windowless RichEdit on the page), a tap beside it, Escape or another tool ends it; the result comes
+  back as `Add`/`Change`/`Remove` and is one undo step. Your texts are drawn by you (left out while `SetEditing` names
+  one) and selected, moved, scaled, deleted through your `PictureHost` (same id space). `EditingText`,
+  `textEditingChanged` (leave your key shortcuts alone meanwhile), `EndTextEditing` (e.g. before saving). Plain text,
+  one font, size and color per text, as Xournal++'s `<text>`.
 - **Tools:** `SetTool(ToolState)` (the toolbar does it): pen, highlighter, eraser (whole strokes or exact circle),
-  select (lasso/rectangle; the barrel lassos with any tool), shapes (+ recognition), `SetRuler`/`SetProtractor`. The
+  select (lasso/rectangle; the barrel lassos with any tool), shapes (+ recognition), text, `SetRuler`/`SetProtractor`. The
   pen's eraser end erases with any tool. Pen cursor: a cursor resource of the app's exe (`cursorFor`).
 - **Selection:** `Cut`, `Copy`, `Paste`, `Duplicate`, `DeleteSelection`, `SelectAll`, `ClearSelection`,
   `selectionChanged`; Windows ink's clipboard, or your own format with `copyToClipboard`/`pasteFromClipboard` (`Clip`).
 - **History:** `Undo`, `Redo`, `historyChanged`, `MarkSaved`/`AtSavePoint` – one history across pages.
 - **Toolbar:** comctl32, Segoe Fluent icons, menus at the presets (color, width), at the eraser toggle (size), at
-  select (lasso/rectangle), shapes (kind, recognition) and the ruler; `ToolbarTexts` in your language; app buttons
+  select (lasso/rectangle), shapes (kind, recognition), text (font, size, color) and the ruler; `ToolbarTexts` in your language; app buttons
   (`ToolbarButton`: a Segoe Fluent glyph or a vector `path` in XAML path syntax, `pathSize` = its box; `name` = the
   accessible name; `groupStart` = a separator before it). Every button has an accessible name (MSAA, so native UI Automation and Narrator find it).
 

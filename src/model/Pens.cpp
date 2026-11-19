@@ -64,14 +64,42 @@ namespace inkpages
         }
     }
 
+    namespace
+    {
+        // "font:size:color"; damaged parts keep their defaults.
+        void ParseText(std::string const& text, ToolChoices& c)
+        {
+            std::stringstream parts(text);
+            std::string font, size, color;
+            std::getline(parts, font, ':');
+            std::getline(parts, size, ':');
+            std::getline(parts, color, ':');
+            int i = 0;
+            float f = 0;
+            if (Number(font, i) && i >= 0 && i < static_cast<int>(TextFonts::Faces.size())) c.textFont = i;
+            if (Number(size, f) && f >= 1 && f <= 200) c.textSize = f;
+            if (Number(color, i) && i >= 0 && i < static_cast<int>(Palette::Pens.size())) c.textColor = i;
+        }
+    }
+
     int PenWidths::StepOf(float width) { return Nearest(Steps, width); }
     int HighlighterWidths::StepOf(float width) { return Nearest(Steps, width); }
 
+    TextStyle ToolChoices::Text() const
+    {
+        TextStyle style;
+        style.font = TextFonts::Faces[std::clamp(textFont, 0, static_cast<int>(TextFonts::Faces.size()) - 1)];
+        style.size = textSize;
+        style.color = Palette::Pens[std::clamp(textColor, 0, static_cast<int>(Palette::Pens.size()) - 1)];
+        return style;
+    }
+
     std::string ToolChoices::Serialize() const
     {
-        return std::format("pens={};highlighters={};eraser={};whole={};tool={};preset={};select={};shape={};recognize={}",
+        return std::format("pens={};highlighters={};eraser={};whole={};tool={};preset={};select={};shape={};recognize={};"
+            "text={}:{}:{}",
             Presets(pens), Presets(highlighters), eraserRadius, wholeStrokeErasing ? 1 : 0, static_cast<int>(tool), preset,
-            static_cast<int>(selectMode), static_cast<int>(shape), recognizeShapes ? 1 : 0);
+            static_cast<int>(selectMode), static_cast<int>(shape), recognizeShapes ? 1 : 0, textFont, textSize, textColor);
     }
 
     ToolChoices ToolChoices::Parse(std::string const& text)
@@ -90,7 +118,8 @@ namespace inkpages
             else if (key == "highlighters") c.highlighters = ParsePresets(value, Palette::Highlighters.size());
             else if (key == "eraser" && Number(value, f)) c.eraserRadius = std::clamp(f, 1.f, 20.f);
             else if (key == "whole" && Number(value, i)) c.wholeStrokeErasing = i != 0;
-            else if (key == "tool" && Number(value, i) && i >= 0 && i <= 4) c.tool = static_cast<Tool>(i);
+            else if (key == "tool" && Number(value, i) && i >= 0 && i <= 5) c.tool = static_cast<Tool>(i);
+            else if (key == "text") ParseText(value, c);
             else if (key == "select" && Number(value, i) && i >= 0 && i <= 1) c.selectMode = static_cast<SelectMode>(i);
             else if (key == "shape" && Number(value, i) && i >= 0 && i <= 3) c.shape = static_cast<ShapeKind>(i);
             else if (key == "recognize" && Number(value, i)) c.recognizeShapes = i != 0;

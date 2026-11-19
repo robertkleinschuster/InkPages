@@ -7,7 +7,7 @@
 
 namespace inkpages
 {
-    void TapGesture::Press(uint32_t pointer, PointF at, uint64_t ms)
+    void TapGesture::Press(uint32_t pointer, PointF at, uint64_t ms, float zoomNow)
     {
         if (down++ > 0)
         {
@@ -15,6 +15,7 @@ namespace inkpages
             return;
         }
         first = pointer;
+        zoom = zoomNow;
         cancelled = false;
         start = at;
         began = ms;
@@ -29,7 +30,7 @@ namespace inkpages
 
     bool TapGesture::Moved() const
     {
-        return down > 0 && farthest >= Tap::MaxDistance;
+        return down > 0 && farthest >= Tap::MaxDistance(zoom);
     }
 
     std::optional<PointF> TapGesture::Release(uint32_t pointer, PointF at, uint64_t ms)
@@ -37,7 +38,7 @@ namespace inkpages
         if (down == 0) return std::nullopt;
         Move(pointer, at);
         bool tap = down == 1 && pointer == first && !cancelled && ms >= began &&
-            Tap::IsTap(farthest, static_cast<unsigned>(std::min<uint64_t>(ms - began, UINT32_MAX)));
+            Tap::IsTap(farthest, static_cast<unsigned>(std::min<uint64_t>(ms - began, UINT32_MAX)), zoom);
         if (pointer != first) cancelled = true;
         if (--down > 0) return std::nullopt;
         return tap ? std::optional(start) : std::nullopt;

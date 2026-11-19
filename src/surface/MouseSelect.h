@@ -23,9 +23,10 @@ namespace inkpages::detail
     {
     public:
         MouseSelect(HWND window, InkHost& host, std::function<ToolInput*()> tools, SelectionController& selection,
-            std::function<PointF(POINT client)> toDocument, std::function<void(PointF document)> tapped)
+            std::function<PointF(POINT client)> toDocument, std::function<float()> zoom,
+            std::function<void(PointF document)> tapped)
             : window(window), host(host), tools(std::move(tools)), selection(selection), toDocument(std::move(toDocument)),
-              tapped(std::move(tapped)) {}
+              zoom(std::move(zoom)), tapped(std::move(tapped)) {}
 
         /// The left button went down beside the selection; `clearedSelection`: the press cleared one (then it is no tap).
         void Press(POINT client, bool clearedSelection);
@@ -42,6 +43,7 @@ namespace inkpages::detail
         std::function<ToolInput*()> tools;
         SelectionController& selection;
         std::function<PointF(POINT)> toDocument;
+        std::function<float()> zoom;
         std::function<void(PointF)> tapped;
         TapGesture gesture;
         std::vector<PointF> path; // until it is a drag

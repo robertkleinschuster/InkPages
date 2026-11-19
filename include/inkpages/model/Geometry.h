@@ -33,9 +33,12 @@ namespace inkpages
     /// (improving a sketch needs moves of a fraction of a line width).
     struct Tap
     {
-        static constexpr float MaxDistance = 3;     // page units, |dx| + |dy|
+        static constexpr float MaxDistanceDip = 3;  // on the screen, |dx| + |dy|: the same for the hand at any zoom
         static constexpr unsigned MaxDurationMs = 300;
-        static bool IsTap(float farthest, unsigned durationMs) { return farthest < MaxDistance && durationMs < MaxDurationMs; }
+        /// The tap distance in page units at a zoom (a page unit is `zoom` DIPs on the screen).
+        static float MaxDistance(float zoom) { return MaxDistanceDip / zoom; }
+        /// `farthest`: how far the pointer went, page units.
+        static bool IsTap(float farthest, unsigned durationMs, float zoom) { return farthest < MaxDistance(zoom) && durationMs < MaxDurationMs; }
     };
 
     enum class Handle { None, Move, TopLeft, TopRight, BottomRight, BottomLeft };

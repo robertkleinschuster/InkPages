@@ -3,7 +3,7 @@
 // graph paper, a status bar.
 // The demo also places a few colored cards (its "pictures", DemoPictures) that the selection takes along.
 // Keys: Ctrl+Z / Ctrl+Y undo/redo, Ctrl+X/C/V/D, Del, Ctrl+A (selection); tools (test hooks): 1/2/3 pens,
-//       4/5 highlighters, 0 eraser, X erase whole strokes, 6 select, 7 shapes, 8 ruler, 9 rectangle selection,
+//       4/5 highlighters, 0 eraser, X erase whole strokes, 6 select, 7 shapes, S text, 8 ruler, 9 rectangle selection,
 //       R recognize drawn shapes;
 //       Q/W/E/T zoom 0.5/1/2/4, F fit width, Page Down/Up next/previous page, Home first page.
 // Environment: INKPAGES_DEMO_LOG (log file), INKPAGES_DEMO_PAGES (page count, default 4),
@@ -75,7 +75,9 @@ namespace
     void InsertPage()
     {
         int at = surface->PageInView().value_or(0) + 1; // after the page in view
+        inkpages::PageLayout before = surface->Layout();
         surface->InsertPages(at, { A4() });
+        pictures->Remap(inkpages::PageMap::Insert(before.Count(), at, 1), before); // the cards and texts follow their pages
         inkpages::Log(std::format("demo: page inserted at {}", at));
     }
 
@@ -89,7 +91,9 @@ namespace
             L"Das kann nicht rückgängig gemacht werden.", TDCBF_YES_BUTTON | TDCBF_NO_BUTTON, TD_WARNING_ICON, &button);
         if (FAILED(hr)) inkpages::LogHr("TaskDialog", hr);
         if (button != IDYES) return;
+        inkpages::PageLayout before = surface->Layout();
         surface->RemovePage(page);
+        pictures->Remap(inkpages::PageMap::Remove(before.Count(), page), before);
         inkpages::Log(std::format("demo: page {} removed", page));
     }
 
@@ -97,7 +101,9 @@ namespace
     {
         int page = surface->PageInView().value_or(0);
         if (page + 1 >= surface->Layout().Count()) return;
+        inkpages::PageLayout before = surface->Layout();
         surface->MovePage(page, page + 1);
+        pictures->Remap(inkpages::PageMap::Move(before.Count(), page, page + 1), before);
         inkpages::Log(std::format("demo: page {} moved down", page));
     }
 
@@ -128,6 +134,9 @@ namespace
         t.rectangle = L"Rechteck";
         t.shapes = L"Formen";
         t.shapesTip = L"Formen: Linie, Pfeil, Rechteck, Ellipse (der Pfeil); gezeichnete Formen können erkannt werden";
+        t.text = L"Text";
+        t.textTip = L"Text: auf die Seite tippen und schreiben (Tastatur), einen Text antippen zum Ändern, daneben tippen "
+            L"zum Beenden. Der Pfeil: Schrift, Größe und Farbe";
         t.shapeKinds = { L"Linie", L"Pfeil", L"Rechteck", L"Ellipse" };
         t.recognizeShapes = L"Gezeichnete Formen erkennen";
         t.ruler = L"Lineal";
@@ -229,6 +238,7 @@ namespace
             toolbar->Choose(choices);
         }
         else if (key == '7') ChooseTool(inkpages::Tool::Shape, 0);
+        else if (key == 'S') ChooseTool(inkpages::Tool::Text, 0);
         else if (key == '8') surface->SetRuler(ruler = !ruler);
         else if (key == 'R')
         {
@@ -271,6 +281,7 @@ namespace
                 return 0;
             case WM_DESTROY:
                 toolbar.reset();
+                if (surface) surface->SetTextHost(nullptr); // ends editing while the texts are still there
                 if (surface) surface->SetPictureHost(nullptr);
                 pictures.reset();
                 surface.reset();
@@ -349,6 +360,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
         pictures->Add({ 84, 444, 244, 524 }, { 0xFF, 0x7F, 0xC8, 0xF0 });
         pictures->Add({ 300, 444, 400, 524 }, { 0xFF, 0xF0, 0xC0, 0x7F });
         surface->SetPictureHost(pictures.get());
+        surface->SetTextHost(pictures.get());
 
         ShowWindow(window, show == SW_SHOWDEFAULT ? SW_SHOWMAXIMIZED : show);
         Layout(window);

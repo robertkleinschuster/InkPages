@@ -86,14 +86,7 @@ namespace inkpages::detail
         });
         events.PointerLost([this, guard](InkUnprocessedInput const&, PointerEventArgs const&) {
             guard("lost", [&] {
-                ink.Host().Post("tool lost", [this] {
-                    shapes.Cancel(); // a lost pointer leaves no shape; a lost erase keeps what it erased
-                    lasso.clear();
-                    overlay.SetLasso({});
-                    mouseGesture = false;
-                    if (eraser.Running()) ink.Edits().Push(eraser.End());
-                    gesture = Gesture::None;
-                });
+                ink.Host().Post("tool lost", [this] { Cancel(); });
             });
         });
         // The presenter's hover (Windows' input thread): read the point here, act on the ink thread.
@@ -121,6 +114,16 @@ namespace inkpages::detail
         });
     }
 
+    void ToolInput::Cancel()
+    {
+        shapes.Cancel(); // a lost pointer leaves no shape; a lost erase keeps what it erased
+        lasso.clear();
+        overlay.SetLasso({});
+        mouseGesture = false;
+        if (eraser.Running()) ink.Edits().Push(eraser.End());
+        gesture = Gesture::None;
+    }
+
     void ToolInput::SetTool(ToolSettings next)
     {
         settings = next;
@@ -137,7 +140,8 @@ namespace inkpages::detail
         {
         case Tool::Eraser: mode = settings.wholeStrokeErasing ? InkInputProcessingMode::Erasing : InkInputProcessingMode::None; break;
         case Tool::Select:
-        case Tool::Shape: mode = InkInputProcessingMode::None; break;
+        case Tool::Shape:
+        case Tool::Text: mode = InkInputProcessingMode::None; break;
         default: mode = eraserEndTaken ? InkInputProcessingMode::None : InkInputProcessingMode::Inking; break;
         }
         ink.SetMode(mode);
@@ -147,7 +151,13 @@ namespace inkpages::detail
     {
         frame = f;
         overlay.SetFrame(f);
-        if (!f) GiveBackPen();
+        if (!f && !textBox) GiveBackPen();
+    }
+
+    void ToolInput::SetTextBox(std::optional<RectF> box)
+    {
+        textBox = box;
+        if (!box && !frame) GiveBackPen();
     }
 
     void ToolInput::GiveBackPen()
@@ -172,8 +182,11 @@ namespace inkpages::detail
             Log(std::format("tools: the pen's eraser end {}", take ? "taken (exact eraser)" : "given back"));
             ApplyMode();
         }
-        // Over the selection the tip (or the barrel) moves and scales it: the pen goes to the window.
-        if (frame && !h.inverted && frame->At(h.at) != Handle::None && !penTakenNow)
+        // Over the selection the tip (or the barrel) moves and scales it, over the edited text box it edits there: the
+        // pen goes to the window.
+        bool overSelection = frame && frame->At(h.at) != Handle::None;
+        bool overText = textBox && textBox->Contains(h.at);
+        if ((overSelection || overText) && !h.inverted && !penTakenNow)
         {
             penTakenNow = true;
             ink.SetPenTaken(true);
@@ -211,6 +224,12 @@ namespace inkpages::detail
         {
             gesture = Gesture::Shape;
             shapes.Begin(at, settings.shape);
+        }
+        else if (settings.tool == Tool::Text)
+        {
+            gesture = Gesture::Text; // a tap places or edits a text
+            textPress = at;
+            textPressMs = GetTickCount64();
         }
     }
 
@@ -282,6 +301,13 @@ namespace inkpages::detail
             ink.Edits().Push(edit);
             break;
         }
+        case Gesture::Text:
+        {
+            float moved = std::abs(at.x - textPress.x) + std::abs(at.y - textPress.y);
+            unsigned ms = static_cast<unsigned>(GetTickCount64() - textPressMs);
+            if (Tap::IsTap(moved, ms, Zoom()) && textTapped) textTapped(textPress);
+            break;
+        }
         case Gesture::Select:
         {
             std::vector<PointF> polygon = rectangle ? RectanglePolygon(lasso.front(), at) : lasso;
@@ -309,7 +335,7 @@ namespace inkpages::detail
         }
         auto duration = stroke.StrokeDuration();
         unsigned ms = duration ? static_cast<unsigned>(duration.Value().count() / 10000) : 0;
-        if (!Tap::IsTap(farthest, ms)) return false;
+        if (!Tap::IsTap(farthest, ms, Zoom())) return false;
         Log("tools: a tap beside the selection clears it");
         selection.Clear();
         if (cleared) cleared();

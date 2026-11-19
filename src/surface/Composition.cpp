@@ -6,11 +6,12 @@ namespace inkpages::detail
     {
         auto& dc = graphics.dcomp;
         winrt::check_hresult(dc->CreateTargetForHwnd(window, TRUE, target.put()));
-        for (auto* visual : { &root, &content, &sheets, &layers, &ink }) winrt::check_hresult(dc->CreateVisual(visual->put()));
+        for (auto* visual : { &root, &content, &sheets, &layers, &texts, &ink }) winrt::check_hresult(dc->CreateVisual(visual->put()));
         overlay = std::make_unique<OverlayLayer>(graphics);
         winrt::check_hresult(root->AddVisual(content.get(), FALSE, nullptr));
         winrt::check_hresult(content->AddVisual(sheets.get(), FALSE, nullptr));
         winrt::check_hresult(content->AddVisual(layers.get(), FALSE, nullptr));
+        winrt::check_hresult(content->AddVisual(texts.get(), FALSE, nullptr));
         winrt::check_hresult(content->AddVisual(overlay->Visual(), FALSE, nullptr));
         winrt::check_hresult(content->AddVisual(ink.get(), FALSE, nullptr));
         winrt::check_hresult(target->SetRoot(root.get()));
@@ -68,8 +69,22 @@ namespace inkpages::detail
         std::function<void(int, ID2D1DeviceContext*, RectF)> underlay)
     {
         auto oldLayers = std::move(pageLayers);
-        SetPages(newLayout, paper, std::move(underlay)); // new sheets and empty layers
+        auto oldPapers = std::move(papers);
+        SetPages(newLayout, paper, underlay); // new sheets and empty layers
         std::vector<int> old = map.OldIndex();
+        // Pages that stay keep their sheet and its drawing (only inserted pages draw anew).
+        winrt::check_hresult(sheets->RemoveAllVisuals());
+        for (int i = 0; i < newLayout.Count(); ++i)
+        {
+            if (old[i] >= 0 && old[i] < static_cast<int>(oldPapers.size()) && oldPapers[old[i]])
+            {
+                Underlay pageUnderlay;
+                if (underlay) pageUnderlay = [underlay, i](ID2D1DeviceContext* dc, RectF area) { underlay(i, dc, area); };
+                oldPapers[old[i]]->MoveTo(newLayout.Page(i), std::move(pageUnderlay));
+                papers[i] = std::move(oldPapers[old[i]]);
+            }
+            winrt::check_hresult(sheets->AddVisual(papers[i]->Visual(), FALSE, nullptr));
+        }
         for (int i = 0; i < newLayout.Count(); ++i)
         {
             if (old[i] < 0 || old[i] >= static_cast<int>(oldLayers.size())) continue;
