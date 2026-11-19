@@ -19,11 +19,13 @@
 #include <format>
 #include <fstream>
 #include <map>
+#include <mutex>
 #include <memory>
 #include <string>
 
 #include "inkpages/Log.h"
 #include "inkpages/Toolbar.h"
+#include "inkpages/model/PageMap.h"
 #include "inkpages/WritingSurface.h"
 #include "DemoPictures.h"
 
@@ -40,6 +42,65 @@ namespace
 
     // Lazy pages: the strokes of pages far from the view (page coordinates); used on the ink thread only.
     std::map<int, std::vector<Stroke>> parked;
+    std::mutex parkedLock; // page operations remap it from the UI thread
+
+    // The app's page icons (Xournal Studio's AppToolbar.cs): a sheet with a plus or minus badge, nonzero fill.
+    constexpr wchar_t Sheet[] = L"F1 M5,9.3 V3.5 L5.6,2.1 L7,1.5 H12 L17,6.5 V17 L16.4,18.4 L15,19 H10.7 V17.6 H15 "
+        L"L15.4,17.4 L15.6,17 V7.1 L11.4,2.9 H7 L6.6,3.1 L6.4,3.5 V9.3 Z M10.9,2.2 H12.3 V5.5 H16.3 V6.9 H10.9 Z "
+        L"M5,10.5 A4.5,4.5 0 1 1 5,19.5 A4.5,4.5 0 1 1 5,10.5 Z ";
+    std::wstring const InsertPageIcon = std::wstring(Sheet) + L"M4.3,12.25 V14.3 H2.25 V15.7 H4.3 V17.75 H5.7 V15.7 H7.75 V14.3 H5.7 V12.25 Z";
+    std::wstring const DeletePageIcon = std::wstring(Sheet) + L"M2.75,14.3 V15.7 H7.25 V14.3 Z";
+
+    void RemapParked(inkpages::PageMap const& map)
+    {
+        std::scoped_lock guard(parkedLock);
+        std::map<int, std::vector<Stroke>> moved;
+        for (auto& [page, strokes] : parked)
+        {
+            if (int to = map(page); to >= 0) moved[to] = std::move(strokes);
+        }
+        parked = std::move(moved);
+    }
+
+    inkpages::PageSpec A4()
+    {
+        inkpages::PageSpec a4;
+        a4.paper.kind = inkpages::PaperKind::Graph;
+        a4.paper.spacing = 5 * 72 / 25.4f; // 5 mm squares (page units are points)
+        return a4;
+    }
+
+    void InsertPage()
+    {
+        int at = surface->PageInView().value_or(0) + 1; // after the page in view
+        RemapParked(inkpages::PageMap::Insert(surface->Layout().Count(), at, 1));
+        surface->InsertPages(at, { A4() });
+        inkpages::Log(std::format("demo: page inserted at {}", at));
+    }
+
+    void DeletePage()
+    {
+        int page = surface->PageInView().value_or(0);
+        if (surface->Layout().Count() <= 1) return;
+        // Removing a page cannot be undone: ask first (TaskDialog: Windows' own dialog).
+        int button = 0;
+        HRESULT hr = TaskDialog(surface->Window(), nullptr, L"InkPages Demo", L"Seite löschen?",
+            L"Das kann nicht rückgängig gemacht werden.", TDCBF_YES_BUTTON | TDCBF_NO_BUTTON, TD_WARNING_ICON, &button);
+        if (FAILED(hr)) inkpages::LogHr("TaskDialog", hr);
+        if (button != IDYES) return;
+        RemapParked(inkpages::PageMap::Remove(surface->Layout().Count(), page));
+        surface->RemovePage(page);
+        inkpages::Log(std::format("demo: page {} removed", page));
+    }
+
+    void MovePageDown()
+    {
+        int page = surface->PageInView().value_or(0);
+        if (page + 1 >= surface->Layout().Count()) return;
+        RemapParked(inkpages::PageMap::Move(surface->Layout().Count(), page, page + 1));
+        surface->MovePage(page, page + 1);
+        inkpages::Log(std::format("demo: page {} moved down", page));
+    }
 
     std::wstring Environment(wchar_t const* name)
     {
@@ -256,6 +317,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
         surface->viewChanged = UpdateStatus;
         surface->historyChanged = UpdateStatus; // before the toolbar: it chains this handler
         surface->load = [](int page) {
+            std::scoped_lock guard(parkedLock);
             std::vector<Stroke> strokes;
             if (auto it = parked.find(page); it != parked.end())
             {
@@ -265,19 +327,22 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
             return strokes;
         };
         surface->store = [](int page, std::vector<Stroke> strokes) {
+            std::scoped_lock guard(parkedLock);
             if (!strokes.empty()) parked[page] = std::move(strokes);
         };
 
         choicesFile = Environment(L"INKPAGES_DEMO_CHOICES");
-        toolbar = inkpages::Toolbar::Create(window, *surface, LoadChoices(), German(), CursorFor);
+        std::vector<inkpages::ToolbarButton> pageButtons{
+            { 1, 0, L"Seite einfügen (nach der Seite im Blick)", InsertPage, L"Seite einfügen", InsertPageIcon },
+            { 2, 0, L"Seite löschen (fragt vorher)", DeletePage, L"Seite löschen", DeletePageIcon },
+            { 3, 0xE74B, L"Seite nach unten verschieben", MovePageDown, L"Seite nach unten" },
+        };
+        toolbar = inkpages::Toolbar::Create(window, *surface, LoadChoices(), German(), CursorFor, pageButtons);
         toolbar->choicesChanged = SaveChoices;
 
         int count = 4;
         if (auto value = Environment(L"INKPAGES_DEMO_PAGES"); !value.empty()) count = std::max(1, _wtoi(value.c_str()));
-        inkpages::PageSpec a4;
-        a4.paper.kind = inkpages::PaperKind::Graph;
-        a4.paper.spacing = 5 * 72 / 25.4f; // 5 mm squares (page units are points)
-        surface->SetPages(std::vector<inkpages::PageSpec>(count, a4));
+        surface->SetPages(std::vector<inkpages::PageSpec>(count, A4()));
         pictures = std::make_unique<DemoPictures>(*surface);
         pictures->Add({ 84, 444, 244, 524 }, { 0xFF, 0x7F, 0xC8, 0xF0 });
         pictures->Add({ 300, 444, 400, 524 }, { 0xFF, 0xF0, 0xC0, 0x7F });
