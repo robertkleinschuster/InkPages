@@ -313,31 +313,33 @@ namespace inkpages::detail
         PushWith([m](ToolInput& t) { return t.Selection().Duplicate(m); }, pictureEdit, true);
     }
 
-    void SelectionController::Copy()
+    bool SelectionController::Copy()
     {
-        if (!HasSelection() || !frame) return;
+        if (!HasSelection() || !frame) return false;
         if (c.surface && c.surface->copyToClipboard)
         {
+            // Waits for the strokes' copies: the app gets the clip before anything else happens to the selection (Cut
+            // deletes it right after; the app reads its pictures while they are still on their pages).
             RectF bounds = frame->bounds;
-            auto picked = pictures;
-            c.host->Post("selection copy", [this, bounds, picked, tools = c.tools, ui = c.ui] {
-                ToolInput* t = tools();
-                if (!t) return;
-                auto copies = t->Selection().Copies({ bounds.left, bounds.top });
-                ui->Post([this, copies, picked, bounds] {
-                    if (c.surface->copyToClipboard) c.surface->copyToClipboard(Clip{ copies, picked, bounds });
-                });
+            auto copies = std::make_shared<std::vector<InkStroke>>(); // held by the work (Run's timeout: it may run later)
+            c.host->Run("selection copy", [copies, bounds, tools = c.tools] {
+                if (ToolInput* t = tools()) *copies = t->Selection().Copies({ bounds.left, bounds.top });
             });
-            return;
+            return c.surface->copyToClipboard(Clip{ *copies, pictures, bounds });
         }
         c.host->Post("selection copy", [tools = c.tools] {
             if (ToolInput* t = tools()) t->Selection().CopyToClipboard();
         });
+        return true;
     }
 
     void SelectionController::Cut()
     {
-        Copy();
+        if (!Copy())
+        {
+            Log("selection: cut - nothing copied, the selection stays");
+            return;
+        }
         Delete();
     }
 
@@ -349,13 +351,15 @@ namespace inkpages::detail
         Clear();
         if (c.surface && c.surface->pasteFromClipboard)
         {
-            auto clip = c.surface->pasteFromClipboard(at);
-            if (!clip) return;
-            pictures = clip->pictures;
-            auto pictureEdit = PictureStep(static_cast<int>(PictureEdit::Kind::Added), pictures, {}, 0, {});
-            auto relative = clip->strokes;
-            PushWith([relative, at](ToolInput& t) { return t.Selection().Add(relative, at); }, pictureEdit, true);
-            return;
+            if (auto clip = c.surface->pasteFromClipboard(at))
+            {
+                pictures = clip->pictures;
+                auto pictureEdit = PictureStep(static_cast<int>(PictureEdit::Kind::Added), pictures, {}, 0, {});
+                auto relative = clip->strokes;
+                PushWith([relative, at](ToolInput& t) { return t.Selection().Add(relative, at); }, pictureEdit, true);
+                return;
+            }
+            // Nothing of the app's on the clipboard: Windows ink (ink copied in other apps) is pasted as before.
         }
         PushWith([at](ToolInput& t) { return t.Selection().PasteFromClipboard(at); }, nullptr, true);
     }

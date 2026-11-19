@@ -176,8 +176,11 @@ namespace inkpages
         virtual void SelectAll() = 0;            // the page in view
         virtual void ClearSelection() = 0;
         /// The app's own clipboard format (unset: Windows ink's clipboard). `pasteFromClipboard` gets the document
-        /// point to paste at; the app adds the clip's pictures there itself and returns their ids with the strokes.
-        std::function<void(Clip const&)> copyToClipboard;
+        /// point to paste at; the app adds the clip's pictures there itself and returns their ids with the strokes; nothing:
+        /// Windows ink's clipboard is pasted (ink of other apps). Copy calls `copyToClipboard` before it returns, while
+        /// the app's pictures are still on their pages (Cut deletes the selection right after - only when it returned
+        /// true: false = nothing copied, the selection stays).
+        std::function<bool(Clip const&)> copyToClipboard;
         std::function<std::optional<Clip>(PointF at)> pasteFromClipboard;
 
         // ---- history

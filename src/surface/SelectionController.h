@@ -60,7 +60,7 @@ namespace inkpages::detail
 
         void Clear();
         void Cut();
-        void Copy();
+        bool Copy(); // false: nothing copied (no selection, or the app's copy failed)
         void Paste();
         void Duplicate();
         void Delete();
