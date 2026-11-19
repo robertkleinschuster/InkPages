@@ -208,6 +208,21 @@ toolbar  ->  surface  ->  tools  ->  ink  ->  render  ->  model        (base: Lo
 - **Stroke keys** (`StrokeKeys`, `KeyedStroke`): load/store/StrokesOf carry the app's key and the transform since
   loading; followed through `Clone()` in undo, moves (`Moved`), lazy copies; new ink, erased pieces, cuts, duplicates,
   pastes have key 0.
+- **Page operations** (`InsertPages`, `RemovePage`, `MovePage`, 2026-11-19): one `PageMap` (new index by old, -1 =
+  removed) drives everything: `UndoHistory::RemapPages` drops the edits of a removed page and remaps the others, the ink
+  thread rebuilds the strokes of moved pages at their new place (`InkState::BeginRelocation`/`Relocated`, stroke keys
+  follow with `Moved`), lazy pages (`PageStore::Remap`) and page layers (`Composition::Rearrange`, visuals reused) follow;
+  the selection is cleared. Sandbox `PagesTest.ps1`: insert after page 2 then undo/redo, move page 1 down then undo
+  twice - the strokes come and go on the right pages.
+- **Toolbar accessibility** [measured 2026-11-19]: comctl32 exposes a button's text as its MSAA name; with
+  `TBSTYLE_EX_MIXEDBUTTONS` the text is not drawn without `BTNS_SHOWTEXT`, so every button gets its name as text and
+  the tooltip (`TBN_GETINFOTIP`) stays the long tip. Native UI Automation (`IUIAutomation`, as Narrator uses it) shows a
+  ToolBar with Button/CheckBox children and names; the **managed** `System.Windows.Automation` client of Windows
+  PowerShell (TestKit's `Find`) sees comctl32 toolbars and status bars as an empty pane. There are no automation ids
+  (MSAA has none; they would need an own UIA provider). UI tests find buttons with `tools/uiaprobe.exe` (native UIA,
+  per-monitor DPI aware - unaware it returns coordinates scaled to 96 DPI): pass it with `-Data .local-build\tools\uiaprobe.exe`.
+- **Path icons:** app buttons may bring XAML/SVG path data (`F0`/`F1`, M L H V C A Z, absolute/relative; `model/PathData`,
+  unit-tested), drawn with D2D into the button's bitmap in the font glyphs' color and size.
 - **Underlay:** the app draws under the ink with D2D (`drawUnderlay(page, dc, area)`, page coordinates) into the
   sheet's virtual surface, over the Paper; `InvalidatePage` redraws it; page layers (`PageLayer`) are DComp visuals for
   live content (pictures dragged by the selection).

@@ -52,7 +52,9 @@ auto toolbar = inkpages::Toolbar::Create(parentWindow, *surface, choices, texts,
 toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize()); };
 ```
 
-- **Pages and view:** `SetPages`, `ZoomTo`, `FitWidth`, `ScrollToPage`, `PageInView`, `Layout`, `viewChanged`.
+- **Pages and view:** `SetPages`, `InsertPages(index, specs)`, `RemovePage(index)`, `MovePage(from, to)` (the history,
+  strokes, stroke keys and page layers follow; edits of a removed page are dropped; remap your own per-page data with
+  `model/PageMap.h`), `ZoomTo`, `FitWidth`, `ScrollToPage`, `PageInView`, `Layout`, `viewChanged`.
   Finger/touchpad pan and pinch, wheel scrolls, Ctrl+wheel zooms; pen and mouse buttons never pan.
 - **Strokes:** `KeyedStroke` = `InkStroke` (points with pressure, tilt, time; drawing attributes) in page
   coordinates + the app's key + the transform since loading. Lazy pages: `load`/`store` (ink thread); `StrokesOf(page)`
@@ -67,7 +69,9 @@ toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize(
   `selectionChanged`; Windows ink's clipboard, or your own format with `copyToClipboard`/`pasteFromClipboard` (`Clip`).
 - **History:** `Undo`, `Redo`, `historyChanged`, `MarkSaved`/`AtSavePoint` – one history across pages.
 - **Toolbar:** comctl32, Segoe Fluent icons, menus at the presets (color, width), at the eraser toggle (size), at
-  select (lasso/rectangle), shapes (kind, recognition) and the ruler; `ToolbarTexts` in your language; app buttons.
+  select (lasso/rectangle), shapes (kind, recognition) and the ruler; `ToolbarTexts` in your language; app buttons
+  (`ToolbarButton`: a Segoe Fluent glyph or a vector `path` in XAML path syntax, `pathSize` = its box; `name` = the
+  accessible name). Every button has an accessible name (MSAA, so native UI Automation and Narrator find it).
 
 ## Layout
 
