@@ -40,6 +40,14 @@ namespace inkpages
         return { left, top, left + viewportPx.width / zoom, top + viewportPx.height / zoom };
     }
 
+    RectF KeepOnContent(RectF rect, SizeF content)
+    {
+        float w = rect.Width(), h = rect.Height();
+        float left = w >= content.width ? (content.width - w) / 2 : std::clamp(rect.left, 0.f, content.width - w);
+        float top = h >= content.height ? 0 : std::clamp(rect.top, 0.f, content.height - h);
+        return { left, top, left + w, top + h };
+    }
+
     RectF ScrollRect(SizeF viewportPx, View view, float scale, float documentTop)
     {
         float left = -view.dx / view.zoom, top = documentTop * scale;

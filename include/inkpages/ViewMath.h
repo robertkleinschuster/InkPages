@@ -32,6 +32,12 @@ namespace inkpages
     /// zoom becomes `zoom` and the document point under `anchorPx` stays where it is.
     RectF ZoomRect(SizeF viewportPx, View view, float zoom, PointF anchorPx);
 
+    /// A rectangle to zoom to, kept on the content (content pixels, `content` = its size): a side longer than the
+    /// content is centered on it (horizontally) or starts at its top (vertically); a shorter one is moved inside it.
+    /// DirectManipulation's ZoomToRect does not do that itself (measured: zooming out at the top left the content
+    /// 144 px below the view's top).
+    RectF KeepOnContent(RectF rect, SizeF content);
+
     /// The content rectangle that shows `documentTop` at the viewport's top at the current zoom, left as it is.
     RectF ScrollRect(SizeF viewportPx, View view, float scale, float documentTop);
 

@@ -20,17 +20,28 @@ add_library(InkPages STATIC
     src/Paper.cpp
     src/PageLayout.cpp
     src/ViewMath.cpp
+    src/Graphics.cpp
+    src/Viewport.cpp
+    src/PaperLayer.cpp
+    src/InkLayer.cpp
+    src/WritingSurface.cpp
 )
 target_include_directories(InkPages PUBLIC include)
 target_compile_options(InkPages PRIVATE ${INKPAGES_COMPILE_OPTIONS})
 target_compile_definitions(InkPages PUBLIC ${INKPAGES_DEFINITIONS})
-target_link_libraries(InkPages PUBLIC windowsapp)
+target_link_libraries(InkPages PUBLIC windowsapp d3d11 dxgi d2d1 dcomp)
 
 # The demo and development app (UI tests in Windows Sandbox run against it).
 add_executable(InkPagesDemo WIN32 demo/main.cpp demo/app.rc)
 target_compile_options(InkPagesDemo PRIVATE ${INKPAGES_COMPILE_OPTIONS})
 target_link_options(InkPagesDemo PRIVATE /MANIFEST:NO) # the manifest is a resource (app.manifest)
 target_link_libraries(InkPagesDemo PRIVATE InkPages comctl32)
+
+# Test tool (sandbox UI tests): the pointer as the screen draws it, from DXGI Desktop Duplication.
+add_executable(cursorprobe tools/cursorprobe.cpp)
+target_compile_options(cursorprobe PRIVATE ${INKPAGES_COMPILE_OPTIONS})
+target_compile_definitions(cursorprobe PRIVATE ${INKPAGES_DEFINITIONS})
+target_link_libraries(cursorprobe PRIVATE d3d11 dxgi)
 
 # Unit tests: GoogleTest (fetched once at configure time, pinned release; only for the tests, never in an app),
 # run by CTest. (Microsoft's CppUnitTest found no tests in a CMake-built DLL under vstest.console – 2026-11-19.)

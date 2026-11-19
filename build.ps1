@@ -14,9 +14,13 @@ if ($LASTEXITCODE) { throw "configure failed ($LASTEXITCODE)" }
 if ($LASTEXITCODE) { throw "build failed ($LASTEXITCODE)" }
 
 $demo = Join-Path $PSScriptRoot '.local-build\demo'
+if (Test-Path $demo) { Remove-Item -Recurse -Force $demo }   # only the demo's own files go to the sandbox
 New-Item -ItemType Directory -Force $demo | Out-Null
 Copy-Item (Join-Path $build "$Config\InkPagesDemo.exe") $demo -Force
-"demo: $demo\InkPagesDemo.exe"
+$tools = Join-Path $PSScriptRoot '.local-build\tools'
+New-Item -ItemType Directory -Force $tools | Out-Null
+Copy-Item (Join-Path $build "$Config\cursorprobe.exe") $tools -Force   # test tool (sandbox -Data)
+"demo: $demo\InkPagesDemo.exe; tools: $tools"
 
 if (-not $NoTests) {
     $ctest = Join-Path (Split-Path $cmake) 'ctest.exe'

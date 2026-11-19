@@ -18,7 +18,7 @@ if (Test-Path $Work) { Remove-Item -Recurse -Force $Work }
 New-Item -ItemType Directory -Force "$Work\data", "$Work\out" | Out-Null
 robocopy $App "$Work\app" /MIR /NFL /NDL /NJH /NJS /MT:16 | Out-Null
 foreach ($file in $Data) { Copy-Item $file "$Work\data" }
-Copy-Item "$PSScriptRoot\Inj.cs", "$PSScriptRoot\TestKit.ps1" $Work
+Copy-Item "$PSScriptRoot\*.cs", "$PSScriptRoot\TestKit.ps1" $Work   # Inj.cs, Finger.cs, CursorShot.cs
 Copy-Item $Test "$Work\test.ps1"
 
 $id = (wsb start --raw | ConvertFrom-Json).Id

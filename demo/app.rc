@@ -1,4 +1,13 @@
 #include <winres.h>
+#include "resource.h"
 
 // The app manifest as a resource: comctl32 v6 (visual styles), PerMonitorV2 DPI awareness, Windows 10/11.
 CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "app.manifest"
+
+// Pen cursors: a dot in the pen's color and width (the library sets them as the ink presenter's PointerCursor).
+IDC_DOT_BLACK_SMALL CURSOR "cursors/dot_black_small.cur"
+IDC_DOT_BLACK_LARGE CURSOR "cursors/dot_black_large.cur"
+IDC_DOT_BLUE_SMALL  CURSOR "cursors/dot_blue_small.cur"
+IDC_DOT_BLUE_LARGE  CURSOR "cursors/dot_blue_large.cur"
+IDC_DOT_RED_SMALL   CURSOR "cursors/dot_red_small.cur"
+IDC_DOT_RED_LARGE   CURSOR "cursors/dot_red_large.cur"

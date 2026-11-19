@@ -126,6 +126,15 @@ namespace inkpages::tests
         EXPECT_FLOAT_EQ(-50, s.left);
     }
 
+    TEST(ViewMath, ZoomRectsStayOnTheContent)
+    {
+        SizeF content{ 1000, 5000 };
+        EXPECT_EQ((RectF{ 0, 0, 400, 300 }), KeepOnContent({ -50, -100, 350, 200 }, content)) << "moved inside";
+        EXPECT_EQ((RectF{ 600, 4700, 1000, 5000 }), KeepOnContent({ 700, 4900, 1100, 5200 }, content));
+        EXPECT_EQ((RectF{ -500, 0, 1500, 6000 }), KeepOnContent({ -100, -300, 1900, 5700 }, content))
+            << "wider: centered; taller: from the top";
+    }
+
     TEST(ViewMath, LivePagesComeNearAndGoFarWithHeldPagesKept)
     {
         std::vector<SizeF> sizes(40, SizeF{ 595, 842 });
