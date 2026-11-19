@@ -30,6 +30,7 @@
 
 #include "inkpages/Pictures.h"
 #include "inkpages/model/PageLayout.h"
+#include "inkpages/model/PageMap.h"
 #include "inkpages/model/Paper.h"
 #include "inkpages/model/Pens.h"
 #include "inkpages/model/ViewMath.h"
@@ -99,7 +100,8 @@ namespace inkpages
         virtual void SetPages(std::vector<PageSpec> pages) = 0;
         /// Page operations that keep the history: edits of other pages follow them; edits of a removed page are dropped
         /// (removing a page cannot be undone - ask first). Strokes, stroke keys, lazy pages and page layers follow too;
-        /// the app changes its own pages the same way (indices of later pages shift).
+        /// the app changes its own pages the same way (indices of later pages shift): its UI-side data now, the strokes it
+        /// keeps for `store`d pages in `pagesRemapped` (ink thread, in order with load/store).
         virtual void InsertPages(int index, std::vector<PageSpec> pages) = 0;
         virtual void RemovePage(int index) = 0;
         virtual void MovePage(int from, int to) = 0;
@@ -178,5 +180,10 @@ namespace inkpages
         /// coordinates).
         std::function<std::vector<KeyedStroke>(int page)> load;
         std::function<void(int page, std::vector<KeyedStroke> strokes)> store;
+        /// Ink thread, in order with `load`/`store`: InsertPages/RemovePage/MovePage reached the ink thread - every
+        /// `load`/`store` before this call used the old page indices, every one after it uses the new ones. Remap the
+        /// strokes you keep for `store`d pages here (`map(oldPage)` = new index, -1: removed); the app's UI-side data
+        /// is remapped on the UI thread when it calls the page operation.
+        std::function<void(PageMap const& map)> pagesRemapped;
     };
 }

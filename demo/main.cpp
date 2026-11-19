@@ -52,6 +52,7 @@ namespace
     std::wstring const InsertPageIcon = std::wstring(Sheet) + L"M4.3,12.25 V14.3 H2.25 V15.7 H4.3 V17.75 H5.7 V15.7 H7.75 V14.3 H5.7 V12.25 Z";
     std::wstring const DeletePageIcon = std::wstring(Sheet) + L"M2.75,14.3 V15.7 H7.25 V14.3 Z";
 
+    // Ink thread (pagesRemapped): in order with load/store, so a page parked just before the operation follows it.
     void RemapParked(inkpages::PageMap const& map)
     {
         std::scoped_lock guard(parkedLock);
@@ -74,7 +75,6 @@ namespace
     void InsertPage()
     {
         int at = surface->PageInView().value_or(0) + 1; // after the page in view
-        RemapParked(inkpages::PageMap::Insert(surface->Layout().Count(), at, 1));
         surface->InsertPages(at, { A4() });
         inkpages::Log(std::format("demo: page inserted at {}", at));
     }
@@ -89,7 +89,6 @@ namespace
             L"Das kann nicht rückgängig gemacht werden.", TDCBF_YES_BUTTON | TDCBF_NO_BUTTON, TD_WARNING_ICON, &button);
         if (FAILED(hr)) inkpages::LogHr("TaskDialog", hr);
         if (button != IDYES) return;
-        RemapParked(inkpages::PageMap::Remove(surface->Layout().Count(), page));
         surface->RemovePage(page);
         inkpages::Log(std::format("demo: page {} removed", page));
     }
@@ -98,7 +97,6 @@ namespace
     {
         int page = surface->PageInView().value_or(0);
         if (page + 1 >= surface->Layout().Count()) return;
-        RemapParked(inkpages::PageMap::Move(surface->Layout().Count(), page, page + 1));
         surface->MovePage(page, page + 1);
         inkpages::Log(std::format("demo: page {} moved down", page));
     }
@@ -329,6 +327,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
             }
             return strokes;
         };
+        surface->pagesRemapped = RemapParked;
         surface->store = [](int page, std::vector<Stroke> strokes) {
             std::scoped_lock guard(parkedLock);
             if (!strokes.empty()) parked[page] = std::move(strokes);

@@ -261,6 +261,9 @@ namespace inkpages::detail
             ink->Edits().RemapPages(map);
             state.EndRelocation();
             if (pageStore) pageStore->Remap(map);
+            // The app's stored strokes follow in the same work item: load/store queued before it carry the old
+            // indices, those after it the new ones.
+            if (pagesRemapped) pagesRemapped(map);
             ink->SetLayout(layout);
         });
         composition->Rearrange(layout, papers, map, [this](int page, ID2D1DeviceContext* dc, RectF area) {
