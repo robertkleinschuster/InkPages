@@ -41,6 +41,7 @@ namespace inkpages::detail
         std::function<float()> renderScale;          // pixels per page unit at the settled zoom
         std::function<PageLayout const&()> layout;
         std::function<void()> commit;                // the composition
+        class SurfaceAutomation* automation = nullptr; // UI Automation of the window (the edited box as its focus)
     };
 
     class TextEditor
@@ -57,6 +58,8 @@ namespace inkpages::detail
         void Tap(PointF at, TextStyle const& style);
         /// Ends editing: the result goes to the app and the history.
         void End();
+        /// A finger tap into the edited box (the finger never reaches RichEdit: it pans): the caret goes there.
+        void PlaceCaret(PointF document);
         /// The toolbar's text style changed: the edited text takes it.
         void SetStyle(TextStyle const& style);
         /// The edited box (with its frame) covers a document point.

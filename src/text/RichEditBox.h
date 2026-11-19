@@ -8,12 +8,16 @@
 
 #include <windows.h>
 #include <d2d1_1.h>
+#include <ole2.h> // before uiautomation.h: WIN32_LEAN_AND_MEAN leaves out what it needs
+#include <uiautomation.h> // before textserv.h: its accessibility interfaces use the UIA types
 #include <richedit.h>
 #include <textserv.h>
 
 #include <functional>
 #include <memory>
 #include <string>
+
+#include <winrt/base.h>
 
 #include "inkpages/model/Text.h"
 
@@ -56,6 +60,10 @@ namespace inkpages::detail
         };
         Caret CaretNow() const;
         bool HasCapture() const;
+
+        /// RichEdit's own UI Automation provider (an edit control with the text pattern) for the host's tree: `site`
+        /// gives its parent and runtime id ([doc] IRicheditWindowlessAccessibility::CreateProvider).
+        winrt::com_ptr<IRawElementProviderSimple> AutomationProvider(IRawElementProviderWindowlessSite* site);
 
         /// RichEdit wants to be drawn again (text, selection or caret changed).
         std::function<void()> invalidated;

@@ -90,11 +90,12 @@ namespace inkpages::detail
             [this](PointF at) { Tapped(at, PointerKind::Mouse); });
         touchTaps = std::make_unique<TouchTaps>(toDocument, zoom, [this](PointF at) { Tapped(at, PointerKind::Touch); });
 
+        automation = std::make_unique<SurfaceAutomation>(window);
         textEditor = std::make_unique<TextEditor>(TextEditorContext{ window, &composition->Devices(),
             composition->TextLayer(), &host, ui.get(), [this] { return ink.get(); }, [this] { return tools.get(); },
             [this] { return textHost; }, [this] { return CurrentView(); }, [this] { return scale; },
             [this] { return sheetScale; }, [this]() -> PageLayout const& { return layout; },
-            [this] { composition->Commit(); } });
+            [this] { composition->Commit(); }, automation.get() });
         textEditor->editingChanged = [this](bool editing) { if (textEditingChanged) textEditingChanged(editing); };
 
         ink = std::make_unique<InkLayer>(host, composition->Ink(),
@@ -119,6 +120,7 @@ namespace inkpages::detail
             selection.reset();
             viewport.reset();
             composition.reset();
+            automation.reset();
         }
         catch (...)
         {
@@ -135,6 +137,11 @@ namespace inkpages::detail
 
     void Surface::Tapped(PointF document, PointerKind kind)
     {
+        if (kind == PointerKind::Touch && textEditor->Contains(document))
+        {
+            textEditor->PlaceCaret(document); // a finger tap into the edited text is the text's, not the app's
+            return;
+        }
         auto page = layout.PageAt(document);
         if (!page || !tapped) return; // beside the pages
         RectF r = layout.Page(*page);

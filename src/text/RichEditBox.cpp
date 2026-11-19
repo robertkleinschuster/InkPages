@@ -271,6 +271,15 @@ namespace inkpages::detail
         Send(WM_TIMER, id - timerBase, 0);
     }
 
+    winrt::com_ptr<IRawElementProviderSimple> RichEditBox::AutomationProvider(IRawElementProviderWindowlessSite* site)
+    {
+        winrt::com_ptr<IRicheditWindowlessAccessibility> accessibility;
+        winrt::check_hresult(services->QueryInterface(__uuidof(IRicheditWindowlessAccessibility), accessibility.put_void()));
+        winrt::com_ptr<IRawElementProviderSimple> provider;
+        winrt::check_hresult(accessibility->CreateProvider(site, provider.put()));
+        return provider;
+    }
+
     RichEditBox::Caret RichEditBox::CaretNow() const { return host->caret; }
     bool RichEditBox::HasCapture() const { return host->capture; }
 }

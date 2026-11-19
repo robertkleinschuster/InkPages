@@ -88,3 +88,18 @@ toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize(
 - `include/inkpages/` public headers, `src/` the library (static), `demo/` the demo app, `tests/` unit tests,
   `UiTests/` the Windows Sandbox runner with synthetic pen and touch input (`TestKit.ps1`, `Inj.cs`, `Finger.cs`,
   `CursorShot.cs`), `tools/cursorprobe.cpp` (the pointer as the screen draws it, for the cursor test).
+
+## Device checks
+
+What the sandbox cannot show (no tablet posture, a keyboard attached, virtual pen/touch only) - check on the device:
+
+- **Touch keyboard in tablet posture:** fold the convertible into tablet posture (no keyboard), choose the Text tool,
+  tap the page with the pen: the touch keyboard should come up; typing on it writes into the box. Then tap into an
+  edited box with a finger: the caret goes there and the keyboard stays/comes up. If it does not come up: Settings >
+  Time & language > Typing > Touch keyboard > "Show the touch keyboard" - try "When no keyboard attached" and
+  "Always", and note which taps (pen on the page, pen into the box, finger into the box) bring it up.
+- **Narrator** (Ctrl+Win+Enter) while a text is edited: it should read the box as an editable document with its text;
+  typing should be echoed.
+- **Magnifier** follows the caret while typing.
+- **A finger on the pages while they coast** (inertia) stops them and is not a tap (no link opens).
+

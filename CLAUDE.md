@@ -273,9 +273,28 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   history (`TextEdit`, undo/redo call the host on the UI thread). Sandbox: a new text typed with umlauts and a second
   line (`KEYEVENTF_UNICODE` injection: WM_CHAR whatever the layout), ended by a tap beside, edited again (End, " neu"),
   change undone/redone, an empty text left nothing, a mouse lasso selected the text (through `PictureHost`), moved it,
-  undo; at zoom 2 the box lay exactly on the text. Not done: `IRicheditWindowlessAccessibility::CreateProvider` (a UIA
-  provider of the surface window would have to host it) - so the touch keyboard does not come up by itself in tablet
-  posture: a device check.
+  undo; at zoom 2 the box lay exactly on the text. UI Automation and the touch keyboard: see the next point.
+- **Text box in UI Automation** (2026-11-19, sandbox `KeyboardTest.ps1`): Microsoft's route for a windowless RichEdit
+  ([doc] https://learn.microsoft.com/windows/win32/api/textserv/nn-textserv-iricheditwindowlessaccessibility):
+  `SurfaceAutomation` answers WM_GETOBJECT (UiaRootObjectId) with a fragment root hosted on the window
+  (`UiaHostProviderFromHwnd`); while a text is edited its only child is RichEdit's own provider from
+  `IRicheditWindowlessAccessibility::CreateProvider`, given a site of ours (`IRawElementProviderWindowlessSite`: parent =
+  the root, runtime id prefix {UiaAppendRuntimeId, 1}; `IRichEditUiaInformation`: the box on the screen, visible). The
+  root's `GetFocus` is the box while the window has the focus; a focus-changed event is raised when editing begins, the
+  provider is disconnected when it ends. [measured, sandbox, native UIA client `uiaprobe --focus`] The focused element
+  while editing is RichEdit's: control type Document (50030), name "RichEdit Control", keyboard focus, the text pattern
+  with the typed text, the box's screen bounds; after editing the window again. Include order: `ole2.h` before
+  `uiautomation.h` (WIN32_LEAN_AND_MEAN), `uiautomation.h` and `richedit.h` before `textserv.h`. A finger tap into the
+  edited box puts the caret there (the finger never reaches RichEdit; the tap is not the app's).
+  **Touch keyboard:** [doc] it comes up when the user taps into the focused element that has an editable text pattern
+  (not on programmatic focus); a hardware keyboard keeps it away unless "Show the touch keyboard" is "Always". [measured,
+  sandbox] It did not show - neither by default nor with `TabletTip\1.7\TouchKeyboardTapInvoke = 2` ("Always"; set in
+  the test, TextInputHost restarted; a sign-out may be needed) after pen taps and a finger tap into the box: the
+  TextInputHost window "Windows-Eingabeerfahrung" stayed cloaked. The sandbox has a keyboard attached and only virtual
+  pen/touch devices, so this is a device check (see README "Device checks"). The documented explicit route, if
+  auto-invoke does not come: `IInputPaneInterop::GetForWindow(surface window)` -> `InputPane.TryShow()` (the text probe
+  saw it return true with Visible = false while a hardware keyboard was attached) - not built; Windows' auto-invoke is
+  the intended route.
 - **Undo after undo** (review 2026-11-19): undo/redo bring strokes back as `Clone()`s; edits recorded earlier name the
   original, so `InkState::Current` follows `Replaced` copies (undo/redo, relocation) - draw, erase, undo, undo, redo
   and draw, move, undo, undo, redo leave exactly one stroke (`tests/StrokeEditTests`, real Windows ink objects).

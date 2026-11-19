@@ -17,6 +17,7 @@
 #include "surface/Composition.h"
 #include "surface/MouseSelect.h"
 #include "surface/SelectionController.h"
+#include "surface/SurfaceAutomation.h"
 #include "surface/TextEditor.h"
 #include "surface/TouchTaps.h"
 #include "surface/Viewport.h"
@@ -109,6 +110,7 @@ namespace inkpages::detail
         std::unique_ptr<SelectionController> selection;
         std::unique_ptr<MouseSelect> mouse;
         std::unique_ptr<TouchTaps> touchTaps;
+        std::unique_ptr<SurfaceAutomation> automation;
         std::unique_ptr<TextEditor> textEditor;
         TextHost* textHost = nullptr;
         TextStyle textStyle; // the Text tool's

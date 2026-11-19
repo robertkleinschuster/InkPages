@@ -134,6 +134,12 @@ namespace inkpages::detail
             if (viewport && viewport->OnWheel(msg)) return 0;
             break;
         }
+        case WM_GETOBJECT:
+        {
+            LRESULT result = 0;
+            if (automation && automation->OnGetObject(wp, lp, result)) return result;
+            break;
+        }
         case WM_SIZE:
             Resized();
             return 0;

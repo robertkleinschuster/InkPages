@@ -9,6 +9,7 @@
 
 #include "ink/InkLayer.h"
 #include "inkpages/Log.h"
+#include "surface/SurfaceAutomation.h"
 #include "tools/TextEdit.h"
 #include "tools/ToolInput.h"
 
@@ -106,6 +107,14 @@ namespace inkpages::detail
         Layout();
         focusBefore = SetFocus(c.window);
         box->Focus(true);
+        if (c.automation) // the edited box as UI Automation's focused text control (touch keyboard, Narrator)
+        {
+            c.automation->TextBoxBegins(*box, [this] {
+                RECT r = ClientOfText();
+                MapWindowPoints(c.window, nullptr, reinterpret_cast<POINT*>(&r), 2);
+                return r;
+            });
+        }
         // The caret where the pen tapped (a new text: at its start).
         PointF px = DocumentToViewport(caretAt, c.view(), c.scale());
         POINTL p{ std::lround(px.x), std::lround(px.y) };
@@ -173,6 +182,19 @@ namespace inkpages::detail
         float render = c.renderScale() > 0 ? c.renderScale() : c.scale();
         if (render != laidOutAt) Layout();
         else box->SetClientRect(ClientOfText());
+    }
+
+    void TextEditor::PlaceCaret(PointF at)
+    {
+        if (!box) return;
+        PointF px = DocumentToViewport(at, c.view(), c.scale());
+        POINTL p{ std::lround(px.x), std::lround(px.y) };
+        LRESULT index = 0;
+        box->Send(EM_CHARFROMPOS, 0, reinterpret_cast<LPARAM>(&p), &index);
+        box->Send(EM_SETSEL, static_cast<WPARAM>(index), index);
+        Log(std::format("text: a finger tap puts the caret at {}", index));
+        caretOn = true;
+        ScheduleDraw();
     }
 
     void TextEditor::SetStyle(TextStyle const& style)
@@ -248,6 +270,8 @@ namespace inkpages::detail
         }
         case WM_SETFOCUS:
         case WM_KILLFOCUS:
+            Log(std::format("text: the surface {} the keyboard focus (other window {})", message == WM_SETFOCUS ? "got" : "lost",
+                reinterpret_cast<void*>(wp)));
             box->Focus(message == WM_SETFOCUS);
             ScheduleDraw();
             return false;
@@ -261,6 +285,7 @@ namespace inkpages::detail
         if (!box) return;
         now.content = box->Text();
         KillTimer(c.window, CaretTimer);
+        if (c.automation) c.automation->TextBoxEnds();
         box->Focus(false);
         box.reset();
         visual.reset();

@@ -1,6 +1,7 @@
 // The windowless RichEdit the Text tool edits with, without a screen: text in and out, typing, its size.
 #include <gtest/gtest.h>
 
+#include "surface/SurfaceAutomation.h"
 #include "text/RichEditBox.h"
 
 namespace inkpages::tests
@@ -56,5 +57,23 @@ namespace inkpages::tests
         EXPECT_GT(wide.cx, narrow.cx * 2);
         EXPECT_GT(tall.cy, narrow.cy * 3 / 2);
         EXPECT_GT(big.cy, tall.cy * 3 / 2);
+    }
+}
+
+namespace inkpages::tests
+{
+    TEST_F(RichEditBoxTest, TypingWorksWithItsAutomationProvider)
+    {
+        RichEditBox box(window, 0x1000);
+        box.SetClientRect({ 0, 0, 300, 100 });
+        box.SetFormat(L"Arial", 240, { 0xFF, 0, 0, 0 });
+        detail::SurfaceAutomation automation(window);
+        box.Focus(true);
+        automation.TextBoxBegins(box, [] { return RECT{ 0, 0, 300, 100 }; });
+        for (wchar_t c : std::wstring(L"Hallo")) box.Send(WM_CHAR, c, 1);
+        EXPECT_EQ(L"Hallo", box.Text());
+        SIZE s = box.NaturalSize();
+        EXPECT_GT(s.cx, 10);
+        automation.TextBoxEnds();
     }
 }
