@@ -41,6 +41,16 @@ namespace inkpages::tests
         EXPECT_TRUE(IsEnabled(ButtonId::Paste, status));
     }
 
+    TEST(ToolbarModel, EveryButtonHasAName)
+    {
+        ToolbarTexts texts;
+        std::vector<ToolbarButton> app{ { 7, 0, L"Insert a page after the page in view", {}, L"Insert page", L"M0,0 L1,1 Z" } };
+        for (auto const& b : ToolbarButtons(ToolChoices{}, app)) EXPECT_FALSE(NameOf(b.id, ToolChoices{}, texts, app).empty()) << b.id;
+        EXPECT_EQ(L"Pen – Black", NameOf(ButtonId::Pen, ToolChoices{}, texts, app));
+        EXPECT_EQ(L"Eraser", NameOf(ButtonId::Eraser, ToolChoices{}, texts, app));
+        EXPECT_EQ(L"Insert page", NameOf(ButtonId::Extension, ToolChoices{}, texts, app));
+    }
+
     TEST(ToolbarModel, SizesUseTheTextsDecimalSeparator)
     {
         ToolbarTexts texts;

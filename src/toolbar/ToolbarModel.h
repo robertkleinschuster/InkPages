@@ -45,6 +45,8 @@ namespace inkpages::detail
     bool IsEnabled(int id, SurfaceStatus const& status);
     /// A width or size in the texts' number format ("0,85 pt" with a decimal comma).
     std::wstring FormatSize(ToolbarTexts const& texts, float value);
+    /// The button's accessible name (button text: UI Automation and Narrator read it; never shown on the button).
+    std::wstring NameOf(int id, ToolChoices const& choices, ToolbarTexts const& texts, std::vector<ToolbarButton> const& extensions);
     std::wstring TipOf(int id, ToolChoices const& choices, ToolbarTexts const& texts, std::vector<ToolbarButton> const& extensions);
     inline bool IsPreset(int id, int base) { return id >= base && id < base + ButtonId::PresetRange; }
 }

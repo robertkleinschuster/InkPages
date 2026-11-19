@@ -44,6 +44,7 @@ namespace inkpages
             void UpdateStates();
             SurfaceStatus Status() const;
             RECT ButtonRect(int id) const;
+            HBITMAP IconOf(ButtonSpec const& spec, int size) const;
 
             WritingSurface& surface;
             ToolChoices choices;
@@ -51,6 +52,7 @@ namespace inkpages
             std::function<UINT(Tool, PenPreset const&)> cursorFor;
             std::vector<ToolbarButton> extensions;
             StencilChoice stencils;
+            std::vector<std::wstring> names; // the buttons' texts (accessible names), alive as long as the buttons
             HWND container = nullptr, bar = nullptr;
             HIMAGELIST images = nullptr;
         };
@@ -74,12 +76,14 @@ namespace inkpages
             container = CreateWindowExW(0, ClassName, L"", WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN, 0, 0, 100, 40, parent,
                 nullptr, GetModuleHandleW(nullptr), this);
             winrt::check_pointer(container);
-            bar = CreateWindowExW(0, TOOLBARCLASSNAMEW, L"", WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS |
+            bar = CreateWindowExW(0, TOOLBARCLASSNAMEW, L"", WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_LIST | TBSTYLE_TOOLTIPS |
                 CCS_NODIVIDER | CCS_NORESIZE | CCS_NOPARENTALIGN, 0, 0, 100, 40, container, nullptr,
                 GetModuleHandleW(nullptr), nullptr);
             winrt::check_pointer(bar);
             SendMessageW(bar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
-            SendMessageW(bar, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_DRAWDDARROWS);
+            // Mixed buttons: a button's text is its accessible name (MSAA/UI Automation) but is not drawn without
+            // BTNS_SHOWTEXT (TBSTYLE_EX_MIXEDBUTTONS needs TBSTYLE_LIST).
+            SendMessageW(bar, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_DRAWDDARROWS | TBSTYLE_EX_MIXEDBUTTONS);
             Build();
             // Undo/redo and the selection's commands follow the surface (after the app's own handlers).
             for (auto* handler : { &surface.historyChanged, &surface.selectionChanged })
@@ -110,7 +114,10 @@ namespace inkpages
             while (SendMessageW(bar, TB_BUTTONCOUNT, 0, 0) > 0) SendMessageW(bar, TB_DELETEBUTTON, 0, 0);
             SendMessageW(bar, TB_SETIMAGELIST, 0, reinterpret_cast<LPARAM>(images));
             std::vector<TBBUTTON> buttons;
-            for (ButtonSpec const& spec : ToolbarButtons(choices, extensions))
+            auto specs = ToolbarButtons(choices, extensions);
+            names.clear();
+            names.reserve(specs.size()); // the toolbar keeps pointers into these
+            for (ButtonSpec const& spec : specs)
             {
                 if (spec.groupStart)
                 {
@@ -118,12 +125,14 @@ namespace inkpages
                     separator.fsStyle = BTNS_SEP;
                     buttons.push_back(separator);
                 }
-                HBITMAP icon = spec.glyph ? GlyphIcon(spec.glyph, Dark, spec.bar, size) : ShapesIcon(Dark, size);
+                HBITMAP icon = IconOf(spec, size);
                 TBBUTTON b{};
                 b.iBitmap = ImageList_Add(images, icon, nullptr);
                 DeleteObject(icon);
                 b.idCommand = spec.id;
                 b.fsState = TBSTATE_ENABLED;
+                names.push_back(NameOf(spec.id, choices, texts, extensions));
+                b.iString = reinterpret_cast<INT_PTR>(names.back().c_str());
                 b.fsStyle = static_cast<BYTE>(spec.kind == ButtonKind::Command ? BTNS_BUTTON
                     : spec.kind == ButtonKind::Check ? BTNS_CHECK : BTNS_CHECK | BTNS_DROPDOWN);
                 buttons.push_back(b);
@@ -131,6 +140,17 @@ namespace inkpages
             SendMessageW(bar, TB_ADDBUTTONSW, buttons.size(), reinterpret_cast<LPARAM>(buttons.data()));
             SendMessageW(bar, TB_AUTOSIZE, 0, 0);
             UpdateStates();
+        }
+
+        HBITMAP Bar::IconOf(ButtonSpec const& spec, int size) const
+        {
+            if (spec.glyph) return GlyphIcon(spec.glyph, Dark, spec.bar, size);
+            if (spec.id >= ButtonId::Extension)
+            {
+                ToolbarButton const& b = extensions[spec.id - ButtonId::Extension];
+                return PathIcon(b.path, b.pathSize, Dark, size);
+            }
+            return ShapesIcon(Dark, size);
         }
 
         int Bar::Height() const

@@ -6,6 +6,7 @@
 #include <windows.h>
 
 #include <optional>
+#include <string>
 
 #include "inkpages/model/Paper.h"
 
@@ -17,6 +18,10 @@ namespace inkpages::detail
     /// The shapes tool's icon (Segoe Fluent Icons has no shapes glyph): a square and a circle overlapping, outlined in
     /// the font's stroke weight, drawn with Direct2D.
     HBITMAP ShapesIcon(Color ink, int size);
+
+    /// An app's vector icon: path data (PathData) in a square of `pathSize` units, filled in `ink` (nothing drawn for
+    /// path data that does not parse - logged).
+    HBITMAP PathIcon(std::wstring const& path, float pathSize, Color ink, int size);
 
     /// A size x size swatch of the color with a thin gray border.
     HBITMAP Swatch(Color color, int size);

@@ -39,7 +39,7 @@ namespace inkpages::detail
         b.push_back({ ButtonId::SelectAll, Glyph::SelectAll });
         for (size_t i = 0; i < extensions.size(); ++i)
         {
-            b.push_back({ ButtonId::Extension + static_cast<int>(i), extensions[i].glyph, std::nullopt, Command, i == 0 });
+            b.push_back({ ButtonId::Extension + static_cast<int>(i), extensions[i].glyph, std::nullopt, Command, i == 0 }); // glyph 0: its path
         }
         return b;
     }
@@ -77,6 +77,35 @@ namespace inkpages::detail
         case ButtonId::Duplicate:
         case ButtonId::Delete: return s.hasSelection;
         default: return true;
+        }
+    }
+
+    std::wstring NameOf(int id, ToolChoices const& c, ToolbarTexts const& t, std::vector<ToolbarButton> const& extensions)
+    {
+        auto preset = [](std::wstring const& kind, std::wstring const& color) { return std::format(L"{} – {}", kind, color); };
+        if (IsPreset(id, ButtonId::Pen))
+        {
+            auto pens = c.PensOrDefault();
+            return id - ButtonId::Pen < static_cast<int>(pens.size()) ? preset(t.pen, t.penColors[pens[id - ButtonId::Pen].color]) : L"";
+        }
+        if (IsPreset(id, ButtonId::Highlighter))
+        {
+            auto hl = c.HighlightersOrDefault();
+            return id - ButtonId::Highlighter < static_cast<int>(hl.size()) ? preset(t.highlighter, t.highlighterColors[hl[id - ButtonId::Highlighter].color]) : L"";
+        }
+        if (id >= ButtonId::Extension && id - ButtonId::Extension < static_cast<int>(extensions.size()))
+        {
+            auto const& b = extensions[id - ButtonId::Extension];
+            return b.name.empty() ? b.tip : b.name;
+        }
+        switch (id)
+        {
+        case ButtonId::Eraser: return t.eraser;
+        case ButtonId::WholeStrokes: return t.wholeStrokeErase;
+        case ButtonId::Select: return t.select;
+        case ButtonId::Shape: return t.shapes;
+        case ButtonId::Ruler: return t.ruler;
+        default: return TipOf(id, c, t, extensions); // the commands' tips are their names
         }
     }
 
