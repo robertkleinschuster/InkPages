@@ -41,6 +41,15 @@ namespace inkpages::tests
         EXPECT_TRUE(IsEnabled(ButtonId::Paste, status));
     }
 
+    TEST(ToolbarModel, SizesUseTheTextsDecimalSeparator)
+    {
+        ToolbarTexts texts;
+        EXPECT_EQ(L"0.85 pt", FormatSize(texts, 0.85f));
+        texts.decimalSeparator = L',';
+        EXPECT_EQ(L"0,85 pt", FormatSize(texts, 0.85f));
+        EXPECT_EQ(L"4 pt", FormatSize(texts, 4));
+    }
+
     TEST(ToolbarModel, TipsNameThePresetAndTheAppsButtons)
     {
         ToolbarTexts texts;

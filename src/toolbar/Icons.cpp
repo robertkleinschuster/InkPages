@@ -1,5 +1,11 @@
 #include "toolbar/Icons.h"
 
+#include <d2d1.h>
+
+#include <winrt/base.h>
+
+#include "inkpages/Log.h"
+
 #include <algorithm>
 
 namespace inkpages::detail
@@ -59,6 +65,41 @@ namespace inkpages::detail
         if (bar) Box(bits, size, size - size / 4, size - 1, *bar);
         SelectObject(dc, oldFont);
         DeleteObject(font);
+        SelectObject(dc, old);
+        DeleteDC(dc);
+        return bitmap;
+    }
+
+    HBITMAP ShapesIcon(Color ink, int size)
+    {
+        uint32_t* bits = nullptr;
+        HBITMAP bitmap = Dib(size, bits);
+        if (!bitmap) return nullptr;
+        std::fill(bits, bits + size * size, 0u);
+        HDC dc = CreateCompatibleDC(nullptr);
+        HGDIOBJ old = SelectObject(dc, bitmap);
+        try
+        {
+            winrt::com_ptr<ID2D1Factory> factory;
+            winrt::check_hresult(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, factory.put()));
+            auto props = D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT,
+                D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+            winrt::com_ptr<ID2D1DCRenderTarget> target;
+            winrt::check_hresult(factory->CreateDCRenderTarget(&props, target.put()));
+            RECT all{ 0, 0, size, size };
+            winrt::check_hresult(target->BindDC(dc, &all));
+            winrt::com_ptr<ID2D1SolidColorBrush> brush;
+            winrt::check_hresult(target->CreateSolidColorBrush(D2D1::ColorF(ink.r / 255.f, ink.g / 255.f, ink.b / 255.f, ink.a / 255.f), brush.put()));
+            float s = static_cast<float>(size), w = s / 16; // Fluent's stroke: 1/16 of the icon
+            target->BeginDraw();
+            target->DrawRectangle({ s * 0.12f, s * 0.12f, s * 0.6f, s * 0.6f }, brush.get(), w);
+            target->DrawEllipse(D2D1::Ellipse({ s * 0.62f, s * 0.62f }, s * 0.26f, s * 0.26f), brush.get(), w);
+            winrt::check_hresult(target->EndDraw());
+        }
+        catch (...)
+        {
+            LogException("shapes icon");
+        }
         SelectObject(dc, old);
         DeleteDC(dc);
         return bitmap;

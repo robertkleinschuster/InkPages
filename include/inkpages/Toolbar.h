@@ -53,8 +53,9 @@ namespace inkpages
         std::wstring redo = L"Redo";
         std::wstring color = L"Color";
         std::wstring width = L"Width";
-        /// A width or size in the menus; {} is the number.
+        /// A width or size in the menus; {} is the number, written with `decimalSeparator`.
         std::wstring widthFormat = L"{} pt";
+        wchar_t decimalSeparator = L'.';
         std::array<std::wstring, 10> penColors{ L"Black", L"Blue", L"Red", L"Green", L"Gray", L"Light blue",
             L"Light green", L"Magenta", L"Orange", L"Yellow" };
         std::array<std::wstring, 5> highlighterColors{ L"Yellow", L"Green", L"Light blue", L"Magenta", L"Orange" };

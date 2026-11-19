@@ -118,7 +118,7 @@ namespace inkpages
                     separator.fsStyle = BTNS_SEP;
                     buttons.push_back(separator);
                 }
-                HBITMAP icon = GlyphIcon(spec.glyph, Dark, spec.bar, size);
+                HBITMAP icon = spec.glyph ? GlyphIcon(spec.glyph, Dark, spec.bar, size) : ShapesIcon(Dark, size);
                 TBBUTTON b{};
                 b.iBitmap = ImageList_Add(images, icon, nullptr);
                 DeleteObject(icon);

@@ -28,7 +28,7 @@ namespace inkpages::detail
     struct ButtonSpec
     {
         int id = 0;
-        wchar_t glyph = 0;
+        wchar_t glyph = 0;        // 0: a drawn icon (the shapes tool)
         std::optional<Color> bar; // a preset's color
         ButtonKind kind = ButtonKind::Command;
         bool groupStart = false;  // a separator before it
@@ -43,6 +43,8 @@ namespace inkpages::detail
     std::vector<ButtonSpec> ToolbarButtons(ToolChoices const& choices, std::vector<ToolbarButton> const& extensions);
     bool IsChecked(int id, ToolChoices const& choices, SurfaceStatus const& status);
     bool IsEnabled(int id, SurfaceStatus const& status);
+    /// A width or size in the texts' number format ("0,85 pt" with a decimal comma).
+    std::wstring FormatSize(ToolbarTexts const& texts, float value);
     std::wstring TipOf(int id, ToolChoices const& choices, ToolbarTexts const& texts, std::vector<ToolbarButton> const& extensions);
     inline bool IsPreset(int id, int base) { return id >= base && id < base + ButtonId::PresetRange; }
 }

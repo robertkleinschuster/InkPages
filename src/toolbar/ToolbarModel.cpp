@@ -1,5 +1,6 @@
 #include "toolbar/ToolbarModel.h"
 
+#include <algorithm>
 #include <format>
 
 namespace inkpages::detail
@@ -7,7 +8,7 @@ namespace inkpages::detail
     namespace Glyph // Segoe Fluent Icons
     {
         constexpr wchar_t Undo = 0xE7A7, Redo = 0xE7A6, Pen = 0xE76D, Highlighter = 0xE7E6, Eraser = 0xE75C,
-            WholeStrokes = 0xED62, Lasso = 0xF1BE, Shapes = 0xEC87, Ruler = 0xED5E, Cut = 0xE8C6, Copy = 0xE8C8,
+            WholeStrokes = 0xED62, Lasso = 0xF1BE, Shapes = 0, Ruler = 0xED5E, Cut = 0xE8C6, Copy = 0xE8C8,
             Paste = 0xE77F, Duplicate = 0xF413, Delete = 0xE74D, SelectAll = 0xE8B3;
     }
 
@@ -41,6 +42,13 @@ namespace inkpages::detail
             b.push_back({ ButtonId::Extension + static_cast<int>(i), extensions[i].glyph, std::nullopt, Command, i == 0 });
         }
         return b;
+    }
+
+    std::wstring FormatSize(ToolbarTexts const& texts, float value)
+    {
+        std::wstring number = std::format(L"{}", value);
+        std::replace(number.begin(), number.end(), L'.', texts.decimalSeparator);
+        return std::vformat(texts.widthFormat, std::make_wformat_args(number));
     }
 
     bool IsChecked(int id, ToolChoices const& c, SurfaceStatus const& s)

@@ -6,6 +6,7 @@
 
 #include "inkpages/Log.h"
 #include "toolbar/Icons.h"
+#include "toolbar/ToolbarModel.h"
 
 namespace inkpages::detail
 {
@@ -62,7 +63,7 @@ namespace inkpages::detail
             return static_cast<int>(chosen) - 1;
         }
 
-        std::wstring Size(ToolbarTexts const& t, float value) { return std::vformat(t.widthFormat, std::make_wformat_args(value)); }
+        std::wstring Size(ToolbarTexts const& t, float value) { return FormatSize(t, value); }
     }
 
     std::optional<ToolChoices> PresetMenu(HWND owner, RECT anchor, ToolChoices c, Tool tool, int index, ToolbarTexts const& t)
