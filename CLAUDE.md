@@ -52,8 +52,20 @@ modules (see "Structure").
 ```
 - Unit tests: GoogleTest (fetched once by CMake at configure time, pinned release; only for tests). Microsoft's
   CppUnitTest was tried first: vstest.console found no tests in the CMake-built DLL (2026-11-19, not pursued).
-- UI tests in Windows Sandbox (the sandbox window opens on the desktop – tell the user first):
-  `UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\<Test>.ps1`; in-sandbox scripts dot-source
+- UI tests in Windows Sandbox, on a desktop of their own (user, 2026-11-19: the sandbox window must not appear while
+  they work): `UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\<Test>.ps1` (`-Show`: the window
+  on the user's desktop to watch or debug – tell the user first). How: [doc] `wsb exec -r ExistingLogin` needs a user
+  session, which only `wsb connect` (a remote desktop window) creates
+  (https://learn.microsoft.com/windows/security/application-security/application-isolation/windows-sandbox/windows-sandbox-cli);
+  [measured] without it exec fails with 0x80070520 (no logon session); `wsb start` alone shows no window. So the runner
+  creates a Win32 desktop (`UiTests\HiddenDesktop.cs`: `CreateDesktop` + `STARTUPINFO.lpDesktop`, [doc]
+  https://learn.microsoft.com/windows/win32/winstation/desktops) and starts `wsb connect` on it; the client
+  (`WindowsSandboxRemoteSession.exe`, wsb's child) opens its window there. [measured 2026-11-19] Inside the sandbox
+  nothing changes: 1514x900 at 144 DPI, screenshots, synthetic pen/mouse/keys, UI Automation (PagesTest: same log, uia
+  tree and screenshots as with the window shown; only the app window's default position differs). The runner checks
+  every 2 s with `EnumWindows` that no sandbox window is visible on the user's desktop and prints the result. Not
+  virtual desktops: no public API creates one, and [measured] `IVirtualDesktopManager::MoveWindowToDesktop` on another
+  process' window returns E_ACCESSDENIED (own window: S_OK). In-sandbox scripts dot-source
   `C:\sbx\TestKit.ps1` (start the app, UI Automation, synthetic pen/touch with `Inj.cs`: hover ~100 ms before a press,
   a sample every ~4 DIPs). The demo logs to `INKPAGES_DEMO_LOG` (TestKit sets `out\demo.log`).
 - Synthetic input fails with ERROR_ACCESS_DENIED while the host session is locked (Win32 demo, 2026-11-19).
