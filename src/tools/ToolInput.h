@@ -35,6 +35,7 @@ namespace inkpages::detail
     {
     public:
         ToolInput(InkLayer& ink, OverlayModel& overlay);
+        ~ToolInput();
 
         /// Ink thread: a selection was made with the lasso or rectangle (strokes and the polygon, for the app's
         /// pictures); the selection was cleared by writing or tapping beside it; the pen goes to the window / comes back.
@@ -78,6 +79,7 @@ namespace inkpages::detail
         };
 
         void Subscribe();
+        void Unsubscribe() noexcept;
         void ApplyMode();
         void OnHover(Hover const& h);
         void Press(PointF at, bool barrel);
@@ -88,6 +90,11 @@ namespace inkpages::detail
         void Recognize(std::vector<Placed> const& placed);
 
         InkLayer& ink;
+        struct PointerDispatch;
+        std::shared_ptr<PointerDispatch> pointerDispatch;
+        winrt::Windows::UI::Input::Inking::InkUnprocessedInput events{ nullptr };
+        std::optional<winrt::event_token> pressed, moved, released, lost;
+        std::optional<winrt::event_token> entering, hovering, exiting, moving;
         OverlayModel& overlay;
         ExactEraser eraser;
         InkSelection selection;

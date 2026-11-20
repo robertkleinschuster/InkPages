@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
+#include <mutex>
 
 #include <winrt/Windows.Devices.Input.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -41,74 +42,135 @@ namespace inkpages::detail
         std::vector<PointF> RectanglePolygon(PointF a, PointF b) { return { a, { b.x, a.y }, b, { a.x, b.y } }; }
     }
 
+    struct ToolInput::PointerDispatch : std::enable_shared_from_this<PointerDispatch>
+    {
+        explicit PointerDispatch(ToolInput& tools) : target(&tools), host(tools.ink.Host()) {}
+
+        template<class Work>
+        void Post(char const* name, Work work)
+        {
+            auto invoke = [state = shared_from_this(), work = std::move(work)] {
+                if (state->target) work(*state->target);
+            };
+            if (GetCurrentThreadId() == inkThread)
+            {
+                // Inline work may call the presenter, which can raise pointer events on its input thread.
+                invoke();
+                return;
+            }
+            std::scoped_lock lock(mutex);
+            if (target) host.Post(name, std::move(invoke));
+        }
+
+        void Close()
+        {
+            std::scoped_lock lock(mutex);
+            target = nullptr;
+        }
+
+        // Only the ink thread changes target. Other threads may test it under the lock before queueing.
+        ToolInput* target;
+        InkHost& host;
+        const DWORD inkThread = GetCurrentThreadId();
+        std::mutex mutex;
+    };
+
     ToolInput::ToolInput(InkLayer& ink, OverlayModel& overlay)
         : ink(ink), overlay(overlay), eraser(ink.State()), selection(ink.State()), shapes(ink.State(), overlay),
           recognizer(ink.Host()), stencils(ink.Presenter())
     {
-        ink.drop = [this](InkStroke const& stroke) { return DropTap(stroke); };
-        ink.collected = [this](std::vector<Placed> const& placed) {
-            if (frame && cleared) // writing beside the selection clears it
-            {
-                selection.Clear();
-                cleared();
-            }
-            Recognize(placed);
-        };
-        Subscribe();
-        ApplyMode();
+        pointerDispatch = std::make_shared<PointerDispatch>(*this);
+        try
+        {
+            ink.drop = [this](InkStroke const& stroke) { return DropTap(stroke); };
+            ink.collected = [this](std::vector<Placed> const& placed) {
+                if (frame && cleared) // writing beside the selection clears it
+                {
+                    selection.Clear();
+                    cleared();
+                }
+                Recognize(placed);
+            };
+            Subscribe();
+            ApplyMode();
+        }
+        catch (...)
+        {
+            Unsubscribe();
+            throw;
+        }
+    }
+
+    ToolInput::~ToolInput() { Unsubscribe(); }
+
+    void ToolInput::Unsubscribe() noexcept
+    {
+        pointerDispatch->Close();
+        ink.drop = {};
+        ink.collected = {};
+        if (pressed) events.PointerPressed(*pressed);
+        if (moved) events.PointerMoved(*moved);
+        if (released) events.PointerReleased(*released);
+        if (lost) events.PointerLost(*lost);
+        auto const& input = ink.Input();
+        if (entering) input.PointerEntering(*entering);
+        if (hovering) input.PointerHovering(*hovering);
+        if (exiting) input.PointerExiting(*exiting);
+        if (moving) input.PointerMoving(*moving);
     }
 
     void ToolInput::Subscribe()
     {
-        auto events = ink.Presenter().UnprocessedInput();
+        events = ink.Presenter().UnprocessedInput();
+        auto dispatch = pointerDispatch;
         auto guard = [](char const* what, auto&& f) {
             try { f(); } catch (...) { LogException(std::format("tools: {}", what)); }
         };
-        events.PointerPressed([this, guard](InkUnprocessedInput const&, PointerEventArgs const& e) {
+        pressed = events.PointerPressed([dispatch, guard](InkUnprocessedInput const&, PointerEventArgs const& e) {
             guard("pressed", [&] {
                 auto p = e.CurrentPoint();
                 PointF at = At(p);
                 bool barrel = IsBarrel(p);
-                ink.Host().Post("tool press", [this, at, barrel] { Press(at, barrel); });
+                dispatch->Post("tool press", [at, barrel](ToolInput& tools) { tools.Press(at, barrel); });
             });
         });
-        events.PointerMoved([this, guard](InkUnprocessedInput const&, PointerEventArgs const& e) {
+        moved = events.PointerMoved([dispatch, guard](InkUnprocessedInput const&, PointerEventArgs const& e) {
             guard("moved", [&] {
                 auto path = Path(e);
-                ink.Host().Post("tool move", [this, path] { Move(path); });
+                dispatch->Post("tool move", [path = std::move(path)](ToolInput& tools) { tools.Move(path); });
             });
         });
-        events.PointerReleased([this, guard](InkUnprocessedInput const&, PointerEventArgs const& e) {
+        released = events.PointerReleased([dispatch, guard](InkUnprocessedInput const&, PointerEventArgs const& e) {
             guard("released", [&] {
                 PointF at = At(e.CurrentPoint());
-                ink.Host().Post("tool release", [this, at] { Release(at); });
+                dispatch->Post("tool release", [at](ToolInput& tools) { tools.Release(at); });
             });
         });
-        events.PointerLost([this, guard](InkUnprocessedInput const&, PointerEventArgs const&) {
+        lost = events.PointerLost([dispatch, guard](InkUnprocessedInput const&, PointerEventArgs const&) {
             guard("lost", [&] {
-                ink.Host().Post("tool lost", [this] { Cancel(); });
+                dispatch->Post("tool lost", [](ToolInput& tools) { tools.Cancel(); });
             });
         });
         // The presenter's hover (Windows' input thread): read the point here, act on the ink thread.
-        auto hover = [this, guard](PointerEventArgs const& e, bool leaving, char const* what) {
+        auto hover = [dispatch, guard](PointerEventArgs const& e, bool leaving, char const* what) {
             guard(what, [&] {
                 auto p = e.CurrentPoint();
                 if (p.IsInContact()) return;
                 Hover h{ At(p), IsPen(p), IsEraserEnd(p), leaving, IsBarrel(p) };
-                ink.Host().Post("tool hover", [this, h] { OnHover(h); });
+                dispatch->Post("tool hover", [h](ToolInput& tools) { tools.OnHover(h); });
             });
         };
         auto input = ink.Input();
-        input.PointerEntering([hover](auto&&, PointerEventArgs const& e) { hover(e, false, "entering"); });
-        input.PointerHovering([hover](auto&&, PointerEventArgs const& e) { hover(e, false, "hovering"); });
-        input.PointerExiting([hover](auto&&, PointerEventArgs const& e) { hover(e, true, "exiting"); });
-        input.PointerMoving([this, guard](auto&&, PointerEventArgs const& e) {
+        entering = input.PointerEntering([hover](auto&&, PointerEventArgs const& e) { hover(e, false, "entering"); });
+        hovering = input.PointerHovering([hover](auto&&, PointerEventArgs const& e) { hover(e, false, "hovering"); });
+        exiting = input.PointerExiting([hover](auto&&, PointerEventArgs const& e) { hover(e, true, "exiting"); });
+        moving = input.PointerMoving([dispatch, guard](auto&&, PointerEventArgs const& e) {
             guard("moving", [&] {
                 auto p = e.CurrentPoint();
                 if (!p.IsInContact()) return;
                 PointF at = At(p);
-                ink.Host().Post("circle", [this, at] {
-                    if (gesture == Gesture::Erase) overlay.SetCircle(at, settings.eraserRadius);
+                dispatch->Post("circle", [at](ToolInput& tools) {
+                    if (tools.gesture == Gesture::Erase) tools.overlay.SetCircle(at, tools.settings.eraserRadius);
                 });
             });
         });

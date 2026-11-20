@@ -188,6 +188,7 @@ namespace inkpages::detail
             if (ink)
             {
                 host.Run("tools shutdown", [this] {
+                    ink->UnsubscribeStrokes();
                     tools.reset();
                     pageStore.reset();
                 }, INFINITE); // the work refers to this surface: it must have run before the members go

@@ -10,6 +10,9 @@
 
 #include <atomic>
 #include <functional>
+#include <memory>
+#include <mutex>
+#include <optional>
 
 #include <winrt/Windows.UI.Input.Inking.Core.h>
 
@@ -44,6 +47,8 @@ namespace inkpages::detail
 
         // Call after the owner has stored this layer, before posting other presenter work.
         void Start(IDCompositionVisual* root);
+        // On the ink thread, before destroying the tools that consume collected strokes.
+        void UnsubscribeStrokes();
 
         InkPresenter const& Presenter() const { return presenter; }
         CoreInkIndependentInputSource const& Input() const { return input; }
@@ -75,11 +80,18 @@ namespace inkpages::detail
         winrt::com_ptr<IInkPresenterDesktop> desktop;
         InkPresenter presenter{ nullptr };
         CoreInkIndependentInputSource input{ nullptr };
+        std::optional<winrt::event_token> strokesCollected, strokesErased, pointerEntering;
         InkState ink;
         History history;
         PenLook pen;
         bool penTaken = false;
         UINT cursor = 0;
-        std::atomic<bool> inputActive = false; // the presenter's first pointer event came (Windows' input thread)
+        struct CursorInput
+        {
+            std::mutex mutex;
+            bool closed = false;
+            std::atomic<bool> active = false;
+        };
+        std::shared_ptr<CursorInput> cursorInput = std::make_shared<CursorInput>();
     };
 }

@@ -30,11 +30,17 @@ namespace inkpages::detail
 
     InkLayer::~InkLayer()
     {
+        {
+            std::scoped_lock lock(cursorInput->mutex);
+            cursorInput->closed = true;
+        }
         // The presenter's objects are released on their own thread - waited for without a timeout: the work refers to
         // this layer, which must not go before it ran.
         try
         {
             host.Run("release presenter", [this] {
+                UnsubscribeStrokes();
+                if (pointerEntering) input.PointerEntering(*pointerEntering);
                 history.Clear();
                 ink.container = nullptr;
                 input = nullptr;
@@ -71,7 +77,7 @@ namespace inkpages::detail
 
     void InkLayer::Subscribe()
     {
-        presenter.StrokesCollected([this](InkPresenter const&, InkStrokesCollectedEventArgs const& e) {
+        strokesCollected = presenter.StrokesCollected([this](InkPresenter const&, InkStrokesCollectedEventArgs const& e) {
             try
             {
                 auto edit = std::make_shared<StrokeEdit>(ink);
@@ -105,7 +111,7 @@ namespace inkpages::detail
             }
         });
         // Windows ink's own eraser (whole strokes): the eraser tool erasing whole strokes, or the pen's eraser end.
-        presenter.StrokesErased([this](InkPresenter const&, InkStrokesErasedEventArgs const& e) {
+        strokesErased = presenter.StrokesErased([this](InkPresenter const&, InkStrokesErasedEventArgs const& e) {
             try
             {
                 auto edit = std::make_shared<StrokeEdit>(ink);
@@ -125,10 +131,12 @@ namespace inkpages::detail
         // Measured (2026-11-19): setting PointerCursor while Windows still activates the presenter's input context kills
         // the process (fail-fast 0xC0000409, CInputContext::_RunOnInkThreadSync E_UNEXPECTED). The presenter's first
         // pointer event shows its input is active.
-        input.PointerEntering([this](auto&&, PointerEventArgs const&) {
+        pointerEntering = input.PointerEntering([this, state = cursorInput](auto&&, PointerEventArgs const&) {
             try
             {
-                if (inputActive.exchange(true)) return;
+                if (state->active) return;
+                std::scoped_lock lock(state->mutex);
+                if (state->closed || state->active.exchange(true)) return;
                 Log("ink: the presenter's input is active (first pointer event)");
                 host.Post("cursor", [this] { ApplyCursor(); });
             }
@@ -137,6 +145,14 @@ namespace inkpages::detail
                 LogException("ink: pointer entering");
             }
         });
+    }
+
+    void InkLayer::UnsubscribeStrokes()
+    {
+        if (strokesCollected) presenter.StrokesCollected(*strokesCollected);
+        if (strokesErased) presenter.StrokesErased(*strokesErased);
+        strokesCollected.reset();
+        strokesErased.reset();
     }
 
     void InkLayer::SetLayout(PageLayout layout)
@@ -197,7 +213,7 @@ namespace inkpages::detail
 
     void InkLayer::ApplyCursor()
     {
-        if (!input || !inputActive) return;
+        if (!input || !cursorInput->active) return;
         input.PointerCursor(cursor ? CoreCursor(CoreCursorType::Custom, cursor) : nullptr);
         Log(std::format("ink: pen cursor {}", cursor));
     }
