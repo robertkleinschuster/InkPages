@@ -9,6 +9,8 @@
 //   - Text tool: a pen tap or mouse click writes a text there (or edits the text there), the keyboard types (TextHost,
 //     Texts.h); a pen drag writes nothing, a mouse drag still selects.
 //   - Taps: a mouse click or finger tap that no selection gesture took is the app's (`tapped`: links).
+//   - The app's mouse gestures: a drag or double/triple click where the app claims the mouse (`mouseClaims`) is the
+//     app's (`mouseGesture`) - e.g. selecting a PDF's text. Ink, pictures and the selection go first.
 //   - Pen: the active tool (ToolState): pen, highlighter, eraser (whole strokes or exactly the circle), selection
 //     (lasso or rectangle; the barrel button lassos with any tool; the pen over the selection moves and scales it),
 //     shapes (and recognition of drawn shapes). The pen's eraser end erases with any tool. Windows' ruler/protractor.
@@ -83,6 +85,18 @@ namespace inkpages
 
     enum class PointerKind { Mouse, Touch };
 
+    enum class MousePhase { Begin, Move, End, Cancel };
+
+    /// A mouse gesture the app claimed (WritingSurface::mouseGesture).
+    struct MouseGesture
+    {
+        MousePhase phase = MousePhase::Begin;
+        int page = 0;   // the page of the press; every point of the gesture is in its coordinates (also beyond its edges)
+        PointF point;   // Begin: the press point; Move/End: the mouse now; Cancel: the last point
+        int clicks = 1; // 1: a drag (begins once the mouse left the tap distance); 2, 3: a double or triple click (begins
+                        // at the press - a drag after it goes on as Move)
+    };
+
     /// A selection as the app's clipboard keeps it: strokes relative to the selection's top left, the app's pictures.
     struct Clip
     {
@@ -130,6 +144,14 @@ namespace inkpages
         /// selection gesture took (a click beside the selection clears it, a click on a picture selects it). `point`:
         /// page coordinates of the press. For the app's links; the pen never taps here.
         std::function<void(int page, PointF point, PointerKind kind)> tapped;
+        /// The app's own mouse gestures on its content (e.g. selecting a PDF's text): asked when a mouse press becomes a
+        /// drag or a double/triple click, only where nothing of the library's lies - not on the selection's frame, not on
+        /// a picture of the PictureHost, not in the edited text box, not on ink (a drag starting on ink selects it).
+        /// `point`: page coordinates. A claimed gesture is the app's alone (`mouseGesture`, the mouse captured): no
+        /// lasso, no tap. A single click stays the library's (picture, Text tool, `tapped`) - the first click of a
+        /// double click too.
+        std::function<bool(int page, PointF point)> mouseClaims;
+        std::function<void(MouseGesture const& gesture)> mouseGesture;
 
         // ---- the app's content below the ink
         /// The underlay of a page: what lies under the ink (background and ruling, a rendered PDF page, the app's

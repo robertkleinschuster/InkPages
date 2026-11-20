@@ -72,7 +72,7 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
 - `include/inkpages/` – the public API: `WritingSurface.h` (surface, tools, callbacks), `Toolbar.h`, `Pictures.h` (the
   app's pictures in the selection), `Texts.h` (the app's texts for the Text tool), `Log.h`; `include/inkpages/model/` –
   pure data and logic the API uses (`Paper`, `PageLayout`, `ViewMath`, `Pens`, `Geometry`, `StrokeEraser`,
-  `UndoHistory`, `StrokeKeys`, `PageMap`, `PathData`, `TapGesture`, `Text`).
+  `UndoHistory`, `StrokeKeys`, `PageMap`, `PathData`, `TapGesture`, `ClickCount`, `Text`).
 - `src/base` – `Log`.
 - `src/model` – pure logic, no Win32/WinRT (unit-tested: `tests/GeometryTests`, `ToolTests`, `ToolGeometryTests`,
   `StrokeKeysTests`): page layout, view math (zoom, fit width, zoom rectangles kept on the content, lazy pages), paper
@@ -275,6 +275,14 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   press takes over), a click selects the picture under it or, with the Text tool, writes/edits a text, else it is the
   app's `tapped`. `TapGesture` (unit-tested) decides taps; taps are measured on the screen (`Tap::MaxDistanceDip` /
   zoom); a finger that stops the inertia is no tap (device check).
+- **The app's mouse gestures** (2026-11-20, for Xournal Studio's PDF text selection): `mouseClaims(page, point)` +
+  `mouseGesture`. `MouseSelect` asks the app (through `Surface::AppClaims`: not on the selection's frame, a
+  `PictureHost::PictureAt` picture or the edited text box) at the press; once the press becomes a drag (tap distance)
+  or is the 2nd/3rd click of a series (`ClickCount`: Windows' double-click time and rectangle, `GetSystemMetricsForDpi`
+  - Windows only reports the 2nd click), it checks for ink at the press (`InkState::Touches`: `EraseCircle` with the
+  tap distance, a waited ink-thread call, 1 s; a failure counts as ink) - ink keeps the lasso. A claimed gesture is the
+  app's alone (no lasso, no tap); single clicks stay the library's (pictures, Text tool, `tapped`). The hover cursor
+  is a separate hook. Unit tests: `ClickCount` (TapGestureTests), `Touches` (StrokeEditTests).
 - **Text tool** (`TextTest`): mode None; a pen press without a drag (farthest movement under the tap distance, however
   long it rests – real pens hold deliberate taps longer than 300 ms) goes to `TextEditor::Tap`; while a box is edited the
   pen over it is taken from the presenter (`ToolInput::SetTextBox`) and its presses reach RichEdit as mouse messages; a

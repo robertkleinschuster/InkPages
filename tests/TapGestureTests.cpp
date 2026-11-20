@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "inkpages/model/ClickCount.h"
 #include "inkpages/model/TapGesture.h"
 
 namespace inkpages::tests
@@ -52,5 +53,18 @@ namespace inkpages::tests
         g.Cancel(); // no gesture: harmless
         g.Press(1, { 0, 0 }, 100);
         EXPECT_TRUE(g.Release(1, { 0, 0 }, 120).has_value());
+    }
+
+    TEST(ClickCount, PressesInTimeAndPlaceMakeDoubleAndTripleClicks)
+    {
+        ClickCount c;
+        EXPECT_EQ(1, c.Press({ 100, 100 }, 1000, 500, 6, 6));
+        EXPECT_EQ(2, c.Press({ 102, 99 }, 1300, 500, 6, 6)) << "within 500 ms and 3 px: a double click";
+        EXPECT_EQ(3, c.Press({ 103, 98 }, 1700, 500, 6, 6)) << "measured from the previous press";
+        EXPECT_EQ(1, c.Press({ 103, 98 }, 2300, 500, 6, 6)) << "too late: a new series";
+        EXPECT_EQ(1, c.Press({ 110, 98 }, 2400, 500, 6, 6)) << "too far: a new series";
+        c.Reset();
+        EXPECT_EQ(1, c.Press({ 110, 98 }, 2500, 500, 6, 6)) << "after a reset";
+        EXPECT_EQ(1, c.Press({ 110, 98 }, 100, 500, 6, 6)) << "a clock going back starts over";
     }
 }

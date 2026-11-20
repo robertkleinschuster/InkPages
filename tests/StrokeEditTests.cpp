@@ -72,4 +72,14 @@ namespace inkpages::tests
         ASSERT_EQ(1u, Count()) << "the moved stroke replaces the drawn one";
         EXPECT_GT(BoundsOf(ink.container.GetStrokes().GetAt(0)).left, 140.f);
     }
+
+    TEST_F(StrokeEditTest, TouchesFindsInkNearAPoint)
+    {
+        EXPECT_FALSE(ink.Touches({ 150, 105 }, 2)) << "no ink yet";
+        ink.Add(Line(), 0);
+        EXPECT_TRUE(ink.Touches({ 150, 105 }, 2)) << "on the line";
+        EXPECT_TRUE(ink.Touches({ 150, 107.5f }, 2)) << "within the radius plus half the drawn width";
+        EXPECT_FALSE(ink.Touches({ 150, 130 }, 2)) << "beside the line";
+        EXPECT_FALSE(ink.Touches({ 400, 120 }, 2)) << "beyond its end";
+    }
 }

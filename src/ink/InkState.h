@@ -53,6 +53,9 @@ namespace inkpages::detail
         void Remove(std::vector<InkStroke> const& strokes);
         std::vector<InkStroke> StrokesOn(int page) const;
         std::vector<InkStroke> Find(std::set<uint32_t> const& ids) const;
+        /// Whether ink lies within `radius` of a document point (the drawn width counts: the ink's edge, not its
+        /// centerline) - the mouse pressing on ink selects it, not the app's content under it.
+        bool Touches(PointF point, float radius) const;
 
         /// The stroke as it goes onto the pages: itself when it lies on one page, else its pieces cut at the pages'
         /// edges (each on its page; nothing of it in the gaps).

@@ -93,7 +93,9 @@ namespace inkpages::detail
                 if (currentTool != Tool::Text) return false;
                 textEditor->Tap(at, textStyle);
                 return true;
-            });
+            },
+            MouseClaims{ [this](PointF at) { return AppClaims(at); }, [this](PointF at) { return InkAt(at); },
+                [this](MousePhase phase, PointF press, PointF at, int clicks) { AppGesture(phase, press, at, clicks); } });
         touchTaps = std::make_unique<TouchTaps>(toDocument, zoom, [this](PointF at) { Tapped(at, PointerKind::Touch); });
 
         automation = std::make_unique<SurfaceAutomation>(window);
@@ -155,6 +157,43 @@ namespace inkpages::detail
         if (!page || !tapped) return; // beside the pages
         RectF r = layout.Page(*page);
         tapped(*page, { document.x - r.left, document.y - r.top }, kind);
+    }
+
+    bool Surface::AppClaims(PointF document) const
+    {
+        // Only where nothing of the library's lies: the selection's frame, the app's pictures, the edited text box.
+        if (!mouseClaims || selection->Grabs(document) || (textEditor && textEditor->Contains(document))) return false;
+        if (pictureHost && pictureHost->PictureAt(document)) return false;
+        auto page = layout.PageAt(document);
+        if (!page) return false;
+        RectF r = layout.Page(*page);
+        return mouseClaims(*page, { document.x - r.left, document.y - r.top });
+    }
+
+    bool Surface::InkAt(PointF document)
+    {
+        auto found = std::make_shared<std::atomic<bool>>(false); // the work may outlive a timeout
+        float radius = Tap::MaxDistance(viewport->Current().zoom);
+        try
+        {
+            host.Run("ink at the mouse", [this, found, document, radius] {
+                if (ink) found->store(ink->State().Touches(document, radius));
+            }, 1000);
+        }
+        catch (...)
+        {
+            LogException("surface: is there ink at the mouse (taken as yes: the library's selection)");
+            return true;
+        }
+        return found->load();
+    }
+
+    void Surface::AppGesture(MousePhase phase, PointF press, PointF document, int clicks)
+    {
+        auto page = layout.PageAt(press);
+        if (!page || !mouseGesture) return; // (a claimed press lies on a page)
+        RectF r = layout.Page(*page);
+        mouseGesture({ phase, *page, { document.x - r.left, document.y - r.top }, clicks });
     }
 
     // Ink thread, once: the tools and the lazy pages need the presenter.

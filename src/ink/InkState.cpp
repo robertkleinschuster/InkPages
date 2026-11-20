@@ -2,6 +2,8 @@
 
 #include <winrt/Windows.Foundation.Collections.h>
 
+#include "inkpages/model/Pens.h"
+
 namespace inkpages::detail
 {
     InkStroke InkState::Current(InkStroke const& stroke) const
@@ -45,6 +47,22 @@ namespace inkpages::detail
             if (PageOf(s) == page) strokes.push_back(s);
         }
         return strokes;
+    }
+
+    bool InkState::Touches(PointF point, float radius) const
+    {
+        if (!container) return false;
+        RectF near{ point.x - radius, point.y - radius, point.x + radius, point.y + radius };
+        for (InkStroke const& stroke : container.GetStrokes())
+        {
+            if (!BoundsOf(stroke).Intersects(near)) continue; // the bounds include the stroke's width
+            auto attributes = stroke.DrawingAttributes();
+            float size = attributes.Size().Width;
+            bool ignorePressure = attributes.IgnorePressure();
+            auto half = [size, ignorePressure](InkSample const& s) { return InkWidth::Drawn(size, ignorePressure, s.pressure) / 2.0; };
+            if (EraseCircle(SamplesOf(stroke), half, point, radius)) return true; // the circle touches the stroke
+        }
+        return false;
     }
 
     std::vector<InkStroke> InkState::Find(std::set<uint32_t> const& ids) const
