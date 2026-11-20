@@ -245,12 +245,12 @@ namespace inkpages::detail
         }
     }
 
-    void ToolInput::MouseSelectBegin(std::vector<PointF> const& path)
+    void ToolInput::MouseSelectBegin(std::vector<PointF> const& path, bool forceLasso)
     {
         if (path.empty() || gesture != Gesture::None) return; // the pen's gesture runs
         mouseGesture = true;
         gesture = Gesture::Select;
-        rectangle = settings.selectMode == SelectMode::Rectangle;
+        rectangle = !forceLasso && settings.selectMode == SelectMode::Rectangle;
         lasso = { path.front() };
         Move(path);
     }

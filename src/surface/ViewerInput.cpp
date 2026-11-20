@@ -46,14 +46,14 @@ namespace inkpages::detail
         return true;
     }
 
-    void ViewerInput::PanDown(POINT client)
+    void ViewerInput::PanDown(POINT client, bool middleButton)
     {
         panning = true;
         panFrom = client;
         panView = c.viewport->Current();
         SetCapture(c.window);
         SetCursor(LoadCursorW(nullptr, IDC_SIZEALL));
-        Log(std::format("viewer: middle-button pan from {},{}", client.x, client.y));
+        Log(std::format("viewer: {}-button pan from {},{}", middleButton ? "middle" : "left", client.x, client.y));
     }
 
     bool ViewerInput::PanMove(POINT client)

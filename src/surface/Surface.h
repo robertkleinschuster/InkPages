@@ -109,7 +109,6 @@ namespace inkpages::detail
         // The app's mouse gestures (mouseClaims/mouseGesture): its claim where nothing of the library's lies, ink at
         // a press (ink thread, waited for), a gesture to the app in the press page's coordinates.
         bool AppClaims(PointF document) const;
-        bool InkAt(PointF document);
         void AppGesture(MousePhase phase, PointF press, PointF document, int clicks);
 
         SurfaceOptions options;

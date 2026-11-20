@@ -36,8 +36,9 @@ are in the global CLAUDE.md ("WinUI 3"); what it taught that still holds is fold
 - **No app dependencies.** No file format, no app texts (apps pass their language). Small classes with one job; logic
   without UI is unit-tested.
 - Windows 11 (26200) only, x64. Right-handed: nothing interactive at the right edge. Touch and touchpad never draw: they
-  pan and zoom; the pen writes; the mouse never writes (user, 2026-11-19): a drag selects (with every tool), a click on
-  a picture selects it, a click with the Text tool writes or edits a text, otherwise a click is the app's tap (links).
+  pan and zoom; the pen writes. A mouse left drag selects with the selection tool, or pans and selects PDF text in
+  viewer mode. A right drag lassos with any tool, and a right click opens the app's context menu. A click on a picture
+  selects it. A click with the Text tool writes or edits a text, otherwise a click is the app's tap (links).
   No drawn-out text boxes (user, 2026-11-19): upstream `<text>` has no width, a drawn frame could not be kept.
 - Code, comments and commits in English. Breaking API changes: update Xournal Studio in the same session (commit and
   push here, then bump the submodule there). A WinUI fix for MatheTrainer would go on a branch from `winui-final`,
@@ -169,6 +170,10 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
 - Presenter state lives on the host thread: input events (Windows' input thread) and UI calls queue work items
   (`OnInkThread`, inline when already there). `InkHost::Run` carries the work's exception to the caller and throws on
   its timeout; shutdown waits without a timeout (the work refers to the surface).
+- [measured, 2026-11-20] Dropping the last ink host reference shuts its thread down asynchronously. Ending the
+  creating apartment immediately afterward can unload Windows.UI.Input.Inking.dll while the thread is still running
+  (0xC0000005, reproduced by the InkHost regression test). The host keeps a synchronizable thread handle and waits
+  after releasing the COM object. The thread's shutdown timing is observed behavior.
 - [measured] The presenter's visual sits inside DirectManipulation's content and follows its transform for drawing and
   input by itself: **ink lands under the pen** within 0.3 DIP at fit width, after finger pan, pinch to 3.66x,
   Ctrl+wheel, zoom 4 and on page 2; ink is drawn sharp at every zoom (no bitmap). The pen keeps writing while a finger
@@ -270,19 +275,17 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
 - **Shapes** on unprocessed input (preview in the overlay), one stroke of even width. **Recognition:**
   `InkAnalyzer.AnalyzeAsync` (Completed handler, result posted to the ink thread); the freehand stroke is replaced by
   the outline as its own undo step.
-- **Mouse and taps** (`MouseTest`): `SelectionController` gets a mouse press first (move/scale on the frame, a press
-  beside clears); else `MouseSelect`: a drag beyond the tap distance becomes the lasso/rectangle (any tool; the pen's
-  press takes over), a click selects the picture under it or, with the Text tool, writes/edits a text, else it is the
+- **Mouse and taps** (`MouseTest`): `SelectionController` gets a left press first (move/scale on the frame, a press
+  beside clears); else `MouseSelect` starts a drag at the DPI-aware system drag threshold. With the selection tool
+  left drags select using its mode. In viewer mode they pan or select app content. Right drags always lasso.
+  A left click selects the picture under it or, with the Text tool, writes/edits a text, else it is the
   app's `tapped`. `TapGesture` (unit-tested) decides taps; taps are measured on the screen (`Tap::MaxDistanceDip` /
   zoom); a finger that stops the inertia is no tap (device check).
 - **The app's mouse gestures** (2026-11-20, for Xournal Studio's PDF text selection): `mouseClaims(page, point)` +
   `mouseGesture`. `MouseSelect` asks the app (through `Surface::AppClaims`: not on the selection's frame, a
-  `PictureHost::PictureAt` picture or the edited text box) at the press; once the press becomes a drag (tap distance)
-  or is the 2nd/3rd click of a series (`ClickCount`: Windows' double-click time and rectangle, `GetSystemMetricsForDpi`
-  - Windows only reports the 2nd click), it checks for ink at the press (`InkState::Touches`: `EraseCircle` with the
-  tap distance, a waited ink-thread call, 1 s; a failure counts as ink) - ink keeps the lasso. A claimed gesture is the
-  app's alone (no lasso, no tap); single clicks stay the library's (pictures, Text tool, `tapped`). The hover cursor
-  is a separate hook. Unit tests: `ClickCount` (TapGestureTests), `Touches` (StrokeEditTests).
+  `PictureHost::PictureAt` picture or the edited text box) at a left press in viewer mode; ink is transparent to it.
+  A claimed drag or double/triple click goes to the app. `ClickCount` uses Windows' double-click time and DPI-aware
+  rectangle. Single clicks stay the library's (pictures, Text tool, `tapped`). The hover cursor is a separate hook.
 - **Text tool** (`TextTest`): mode None; a pen press without a drag (farthest movement under the tap distance, however
   long it rests – real pens hold deliberate taps longer than 300 ms) goes to `TextEditor::Tap`; while a box is edited the
   pen over it is taken from the presenter (`ToolInput::SetTextBox`) and its presses reach RichEdit as mouse messages; a

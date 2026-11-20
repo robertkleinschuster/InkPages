@@ -59,15 +59,16 @@ toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize(
   entries, links), `RevealRect(page, area)` (scrolls only as far as needed: search hits), `PageInView`, `Layout`, `viewChanged`.
   Finger/touchpad pan and pinch, wheel scrolls, Ctrl+wheel zooms; the middle mouse button dragged pans; with the
   keyboard focus (taken on a mouse press) DirectManipulation's keys, else arrows, Page Up/Down, (Shift+)Space, Home/End
-  scroll; `cursorAt(page, point)` gives the app's cursor over its places (links); pen and left/right mouse buttons never pan.
-- **Input:** only the pen writes. The mouse (and touchpad clicks) selects with any tool: a drag lassos (or draws the
-  rectangle, by the select mode), on the selection moves it, on a corner scales it; a click beside it clears it, on a
+  scroll; `cursorAt(page, point)` gives the app's cursor over its places (links).
+- **Input:** only the pen writes. A mouse left drag pans in viewer mode, uses the select mode with the selection
+  tool, moves an existing selection or scales it at a corner. A right drag lassos with any tool. A click beside a
+  selection clears it, on a
   picture selects it; with the Text tool a click writes or edits a text there (a click beside the box ends it).
   `tapped(page, point, PointerKind)`: a mouse click or finger tap no selection gesture took (for links); a finger pan
-  is no tap. The app's own mouse gestures (e.g. selecting a PDF's text): `mouseClaims(page, point)` is asked when a
-  press becomes a drag or a double/triple click where no ink, picture, selection frame or edited text lies; claimed,
+  is no tap. The app's own mouse gestures (e.g. selecting a PDF's text through ink): `mouseClaims(page, point)` is
+  asked at a left press in viewer mode outside pictures, the selection and the open text editor. Once claimed,
   the gesture goes to `mouseGesture` (Begin/Move/End/Cancel, page coordinates of the press page, click count) instead
-  of the lasso. A single click stays a click.
+  of panning. A single click stays a click.
 - **Strokes:** `KeyedStroke` = `InkStroke` (points with pressure, tilt, time; drawing attributes) in page
   coordinates + the app's key + the transform since loading. Lazy pages: `load`/`store` (ink thread); `StrokesOf(page)`
   to save live pages; `contentChanged(pages)` after every edit; `Hold(page)`.

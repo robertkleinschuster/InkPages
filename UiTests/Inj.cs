@@ -254,15 +254,25 @@ public static class Inj
     /// <summary>Left-button mouse drag through client DIP points (x0, y0, x1, y1, ...), a sample every ~4 DIPs.</summary>
     public static void MouseDrag(double[] pts)
     {
+        MouseDrag(pts, 0x2, 0x4);
+    }
+
+    public static void RightMouseDrag(double[] pts)
+    {
+        MouseDrag(pts, 0x8, 0x10);
+    }
+
+    static void MouseDrag(double[] pts, uint down, uint up)
+    {
         Mouse(0, P(pts[0], pts[1]));
-        Mouse(0x2, P(pts[0], pts[1]));
+        Mouse(down, P(pts[0], pts[1]));
         for (int i = 2; i + 1 < pts.Length; i += 2)
         {
             double x0 = pts[i - 2], y0 = pts[i - 1], x1 = pts[i], y1 = pts[i + 1];
             int n = Math.Max(1, (int)(Math.Sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)) / 4));
             for (int s = 1; s <= n; s++) Mouse(0, P(x0 + (x1 - x0) * s / n, y0 + (y1 - y0) * s / n));
         }
-        Mouse(0x4, P(pts[pts.Length - 2], pts[pts.Length - 1]));
+        Mouse(up, P(pts[pts.Length - 2], pts[pts.Length - 1]));
     }
 
     /// <summary>A finger tap at client DIPs (down and up at once).</summary>

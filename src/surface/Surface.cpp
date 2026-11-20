@@ -94,8 +94,12 @@ namespace inkpages::detail
                 textEditor->Tap(at, textStyle);
                 return true;
             },
-            MouseClaims{ [this](PointF at) { return AppClaims(at); }, [this](PointF at) { return InkAt(at); },
-                [this](MousePhase phase, PointF press, PointF at, int clicks) { AppGesture(phase, press, at, clicks); } });
+            MouseClaims{ [this](PointF at) { return AppClaims(at); },
+                [this](MousePhase phase, PointF press, PointF at, int clicks) { AppGesture(phase, press, at, clicks); },
+                [this](POINT press, POINT at) {
+                    viewer->PanDown(press, false);
+                    viewer->PanMove(at);
+                } });
         touchTaps = std::make_unique<TouchTaps>(toDocument, zoom, [this](PointF at) { Tapped(at, PointerKind::Touch); });
         viewer = std::make_unique<ViewerInput>(ViewerInputContext{ window, viewport.get(), [this] { return ClientSize(); },
             [this] { return scale; }, [this]() -> PageLayout const& { return layout; },
@@ -173,24 +177,6 @@ namespace inkpages::detail
         if (!page) return false;
         RectF r = layout.Page(*page);
         return mouseClaims(*page, { document.x - r.left, document.y - r.top });
-    }
-
-    bool Surface::InkAt(PointF document)
-    {
-        auto found = std::make_shared<std::atomic<bool>>(false); // the work may outlive a timeout
-        float radius = Tap::MaxDistance(viewport->Current().zoom);
-        try
-        {
-            host.Run("ink at the mouse", [this, found, document, radius] {
-                if (ink) found->store(ink->State().Touches(document, radius));
-            }, 1000);
-        }
-        catch (...)
-        {
-            LogException("surface: is there ink at the mouse (taken as yes: the library's selection)");
-            return true;
-        }
-        return found->load();
     }
 
     void Surface::AppGesture(MousePhase phase, PointF press, PointF document, int clicks)
@@ -566,7 +552,6 @@ namespace inkpages::detail
             ShapeLook{ state.shape, state.color, state.width }, state.recognizeShapes };
         PenLook look{ state.tool == Tool::Highlighter ? Tool::Highlighter : Tool::Pen, state.color, state.width };
         bool pens = state.tool == Tool::Pen || state.tool == Tool::Highlighter;
-        if (state.tool != Tool::Select) selection->Clear();
         textStyle = state.text;
         currentTool = state.tool;
         if (state.tool == Tool::Text) textEditor->SetStyle(state.text); // the edited text takes the menu's choice

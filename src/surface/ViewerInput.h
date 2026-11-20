@@ -40,7 +40,7 @@ namespace inkpages::detail
         bool OnKey(WPARAM key, LPARAM flags);
 
         /// WM_MBUTTONDOWN / WM_MOUSEMOVE / WM_MBUTTONUP of the real mouse; true when it is the pan's.
-        void PanDown(POINT client);
+        void PanDown(POINT client, bool middleButton = true);
         bool PanMove(POINT client);
         bool PanUp();
         void CaptureLost();      // WM_CAPTURECHANGED to another window: the pan ends

@@ -3,17 +3,17 @@
 // The writing surface: a child window the app places, showing the document's pages stacked vertically on their paper,
 // with Windows ink on them and the tools that work on it.
 //   - Finger and precision touchpad: pan with inertia, pinch zoom; mouse wheel scrolls, Ctrl+wheel zooms
-//     (DirectManipulation). Touch never draws; the pen and the left/right mouse buttons never pan.
+//     (DirectManipulation). Touch never draws.
 //   - A viewer's mouse and keys: the middle mouse button dragged pans; with the keyboard focus (the surface takes it on
 //     a mouse press) DirectManipulation's keys, else arrows scroll a line, Bild auf/ab and (Umschalt+)Leertaste a
 //     screen, Pos1/Ende go to the start/end; the app's cursor over its places (`cursorAt`: links).
-//   - Mouse (and touchpad clicks): never writes. A drag selects (lasso or rectangle by the select mode, with any tool),
-//     moves the selection or scales it at a corner; a click beside the selection clears it, on a picture selects it.
+//   - Mouse (and touchpad clicks): never writes. A left drag moves or scales the selection, selects with the selection
+//     tool, or pans in viewer mode. A right drag lassos with any tool. A right click opens the app's context menu.
 //   - Text tool: a pen tap or mouse click writes a text there (or edits the text there), the keyboard types (TextHost,
-//     Texts.h); a pen drag writes nothing, a mouse drag still selects.
+//     Texts.h); a pen drag writes nothing, a mouse drag outside the editor behaves as in the viewer.
 //   - Taps: a mouse click or finger tap that no selection gesture took is the app's (`tapped`: links).
 //   - The app's mouse gestures: a drag or double/triple click where the app claims the mouse (`mouseClaims`) is the
-//     app's (`mouseGesture`) - e.g. selecting a PDF's text. Ink, pictures and the selection go first.
+//     app's (`mouseGesture`) in viewer mode, e.g. selecting PDF text through ink.
 //   - Pen: the active tool (ToolState): pen, highlighter, eraser (whole strokes or exactly the circle), selection
 //     (lasso or rectangle; the barrel button lassos with any tool; the pen over the selection moves and scales it),
 //     shapes (and recognition of drawn shapes). The pen's eraser end erases with any tool. Windows' ruler/protractor.
@@ -158,9 +158,8 @@ namespace inkpages
         /// beside the pages, the pen or touch moved, or the mouse left the window). Returns the system cursor to show there
         /// (e.g. IDC_HAND over a link) or nullptr for the default. Called for every move: keep it fast.
         std::function<LPCWSTR(int page, PointF point)> cursorAt;
-        /// The app's own mouse gestures on its content (e.g. selecting a PDF's text): asked when a mouse press becomes a
-        /// drag or a double/triple click, only where nothing of the library's lies - not on the selection's frame, not on
-        /// a picture of the PictureHost, not in the edited text box, not on ink (a drag starting on ink selects it).
+        /// The app's own mouse gestures on its content (e.g. selecting PDF text through ink): asked at a left press
+        /// in viewer mode outside the selection, pictures and the open text editor.
         /// `point`: page coordinates. A claimed gesture is the app's alone (`mouseGesture`, the mouse captured): no
         /// lasso, no tap. A single click stays the library's (picture, Text tool, `tapped`) - the first click of a
         /// double click too.

@@ -1,4 +1,4 @@
-# The mouse never writes, it selects (whatever tool is active): a drag lassos, on the selection it moves it, a click
+# The mouse never writes: a right drag lassos, a left drag on the selection moves it, and a click
 # beside it clears it, a click on a picture selects it; a click on nothing and a finger tap are the app's taps, a finger
 # pan is no tap.
 #   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\MouseTest.ps1
@@ -30,7 +30,7 @@ Invoke-Test {
     Line 'stroke 2' 240 215 340 220
     Shot '00-content'
 
-    # 1. the pen tool is active: a mouse drag does not write (it lassos nothing here)
+    # 1. The pen tool is active: a left drag pans.
     MDrag 'with the pen tool' @(150, 120, 350, 125)
     Shot '01-mouse-drag-no-ink'
     # 2. a mouse click on a card selects it (as the barrel tap does); a click beside clears it (no tap)
@@ -40,7 +40,8 @@ Invoke-Test {
     # 3. a click on nothing (no selection) is the app's tap
     MClick 'nothing' 500 120
     # 4. a mouse lasso around the strokes and the card selects them, a drag on the selection moves them
-    MDrag 'lasso' @(230, 190, 350, 190, 350, 300, 230, 300, 230, 190)
+    [Inj]::RightMouseDrag(@(230, 190, 350, 190, 350, 300, 230, 300, 230, 190))
+    Start-Sleep -Milliseconds 700
     Shot '03-lasso'
     MDrag 'move' @(290, 240, 390, 240)
     Shot '04-moved'

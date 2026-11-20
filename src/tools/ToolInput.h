@@ -61,7 +61,7 @@ namespace inkpages::detail
         void GiveBackPen();
         /// The mouse (window input, it never reaches the presenter) selects as the selection tool does, whatever tool
         /// is active: a lasso or a rectangle by the tool's select mode. `path` = the points since the press.
-        void MouseSelectBegin(std::vector<PointF> const& path);
+        void MouseSelectBegin(std::vector<PointF> const& path, bool forceLasso);
         void MouseSelectMove(std::vector<PointF> const& path);
         void MouseSelectEnd(PointF at);
         void MouseSelectCancel();

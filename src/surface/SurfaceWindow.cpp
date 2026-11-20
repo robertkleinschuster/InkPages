@@ -117,11 +117,13 @@ namespace inkpages::detail
         case WM_LBUTTONDBLCLK: // (the class has CS_DBLCLKS for the text box: outside it a press is a press)
         {
             if (!IsRealMouse()) break;
+            if (viewer->Panning() || mouse->UsesRightButton()) return 0;
             TakeFocus(window);
             // A press that cleared the selection or ended a text's edit is no click of its own.
             bool had = selection->HasSelection() || (wasEditing && !textEditor->Editing());
             if (selection->OnPointer(message, wp, lp)) return 0; // on the selection: move or scale
-            mouse->Press({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) }, had);
+            mouse->Press({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) }, had,
+                currentTool == Tool::Select ? MouseSelect::Mode::Select : MouseSelect::Mode::Viewer);
             return 0;
         }
         case WM_MOUSEMOVE:
@@ -134,7 +136,7 @@ namespace inkpages::detail
             POINT at{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
             if (viewer->PanMove(at)) return 0;
             if (selection->OnPointer(message, wp, lp)) return 0;
-            if (wp & MK_LBUTTON) mouse->Move(at);
+            if (wp & (mouse->UsesRightButton() ? MK_RBUTTON : MK_LBUTTON)) mouse->Move(at);
             if (wp & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON | MK_XBUTTON1 | MK_XBUTTON2)) viewer->NotHovering();
             else viewer->Hover(at);
             return 0;
@@ -147,20 +149,30 @@ namespace inkpages::detail
             break;
         case WM_MBUTTONDOWN:
             if (!IsRealMouse()) break;
+            if (wp & (MK_LBUTTON | MK_RBUTTON)) return 0;
             TakeFocus(window);
             viewer->PanDown({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) });
             return 0;
         case WM_MBUTTONUP:
+            if (wp & MK_LBUTTON) return 0;
             if (viewer->PanUp()) return 0;
             break;
         case WM_RBUTTONDOWN:
-            if (IsRealMouse()) TakeFocus(window); // and the default: WM_CONTEXTMENU goes to the app (the parent)
+            if (!IsRealMouse()) break;
+            if (viewer->Panning() || (wp & MK_LBUTTON)) return 0;
+            TakeFocus(window);
+            mouse->Press({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) }, false, MouseSelect::Mode::Lasso);
+            return 0;
+        case WM_RBUTTONUP:
+            if (IsRealMouse() && mouse->UsesRightButton()
+                && mouse->Release({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) })) return 0;
             break;
         case WM_KEYDOWN:
             if (viewer->OnKey(wp, lp)) return 0;
             break;
         case WM_LBUTTONUP:
             if (!IsRealMouse()) break;
+            if (mouse->UsesRightButton()) return 0;
             if (selection->OnPointer(message, wp, lp)) return 0;
             mouse->Release({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) });
             return 0;
