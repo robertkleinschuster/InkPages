@@ -57,7 +57,38 @@ namespace inkpages::detail
     InkHost::InkHost()
     {
         host = winrt::create_instance<IInkDesktopHost>(__uuidof(InkDesktopHost), CLSCTX_INPROC_SERVER);
-        Post("thread", [this] { thread = GetCurrentThreadId(); });
+        struct ThreadInfo
+        {
+            winrt::handle handle;
+            DWORD id = 0;
+        };
+        auto info = std::make_shared<ThreadInfo>();
+        Run("thread", [info] {
+            if (!DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(),
+                info->handle.put(), SYNCHRONIZE, FALSE, 0))
+            {
+                winrt::throw_hresult(LogHr("ink: opening the ink thread", HRESULT_FROM_WIN32(GetLastError())));
+            }
+            info->id = GetCurrentThreadId();
+        });
+        threadHandle = std::move(info->handle);
+        thread = info->id;
+    }
+
+    InkHost::~InkHost()
+    {
+        if (OnThread())
+        {
+            LogError("ink: the ink host is destroyed on its own thread - its end cannot be waited for");
+            return;
+        }
+        host = nullptr; // the last reference: Windows ends the ink thread
+        if (!threadHandle) return;
+        // Measured (2026-11-20): the thread ends within milliseconds of the release; COM unloads its DLL when the
+        // creating apartment uninitializes, so it must have ended before that.
+        DWORD wait = WaitForSingleObject(threadHandle.get(), 5000);
+        if (wait == WAIT_FAILED) LogHr("ink: waiting for the ink thread's end", HRESULT_FROM_WIN32(GetLastError()));
+        else if (wait != WAIT_OBJECT_0) LogError("ink: the ink thread did not end within 5 s of the host's release");
     }
 
     void InkHost::Post(char const* name, std::function<void()> work)

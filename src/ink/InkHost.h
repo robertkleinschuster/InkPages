@@ -2,7 +2,9 @@
 
 // Windows' ink host (IInkDesktopHost): it runs the presenter on a thread of its own, the "ink thread". All presenter
 // calls and all ink state go through work items on that thread (QueueWorkItem); work posted from the ink thread itself
-// runs at once, in order.
+// runs at once, in order. Windows ends the ink thread after the host's last release, asynchronously; the thread runs
+// code of Windows.UI.Input.Inking.dll, which COM unloads when the apartment that created the host uninitializes - so the
+// host waits for the thread's end when it goes (otherwise the thread may run on in an unloaded DLL: access violation).
 
 #include <windows.h>
 #include <inkpresenterdesktop.h>
@@ -18,6 +20,9 @@ namespace inkpages::detail
     {
     public:
         InkHost();
+        ~InkHost();
+        InkHost(InkHost const&) = delete;
+        InkHost& operator=(InkHost const&) = delete;
 
         IInkDesktopHost* Get() const { return host.get(); }
         void Post(char const* name, std::function<void()> work);
@@ -30,6 +35,7 @@ namespace inkpages::detail
     private:
         winrt::com_ptr<IInkDesktopHost> host;
         std::atomic<DWORD> thread = 0;
+        winrt::handle threadHandle; // the ink thread (SYNCHRONIZE), waited for in the destructor
     };
 
     /// The presenter asks the app to commit its DirectComposition device (which belongs to the UI thread).
