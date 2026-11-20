@@ -86,9 +86,15 @@ namespace inkpages::detail
         if (!threadHandle) return;
         // Measured (2026-11-20): the thread ends within milliseconds of the release; COM unloads its DLL when the
         // creating apartment uninitializes, so it must have ended before that.
-        DWORD wait = WaitForSingleObject(threadHandle.get(), 5000);
-        if (wait == WAIT_FAILED) LogHr("ink: waiting for the ink thread's end", HRESULT_FROM_WIN32(GetLastError()));
-        else if (wait != WAIT_OBJECT_0) LogError("ink: the ink thread did not end within 5 s of the host's release");
+        HANDLE handle = threadHandle.get();
+        DWORD index = 0;
+        HRESULT hr = CoWaitForMultipleHandles(COWAIT_DEFAULT, INFINITE, 1, &handle, &index);
+        if (FAILED(hr))
+        {
+            LogHr("ink: COM wait for the ink thread", hr);
+            if (WaitForSingleObject(handle, INFINITE) == WAIT_FAILED)
+                LogHr("ink: waiting for the ink thread's end", HRESULT_FROM_WIN32(GetLastError()));
+        }
     }
 
     void InkHost::Post(char const* name, std::function<void()> work)

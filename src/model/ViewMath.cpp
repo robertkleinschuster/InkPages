@@ -85,6 +85,32 @@ namespace inkpages
         return { left, top, left + viewportPx.width / view.zoom, top + viewportPx.height / view.zoom };
     }
 
+    SizeF ViewportWithInputPane(SizeF client, RectF pane)
+    {
+        if (pane.top > 0 && pane.top < client.height && pane.left <= 0 &&
+            pane.right >= client.width && pane.bottom >= client.height)
+            client.height = pane.top;
+        return client;
+    }
+
+    PointF CaretScroll(SizeF viewport, RectF caret, RectF pane, float margin)
+    {
+        RectF wanted = caret.Inflated(margin, margin);
+        auto shift = [](float start, float end, float edge) {
+            if (start < 0) return start;
+            return std::max(0.f, end - edge);
+        };
+        PointF scroll{ shift(wanted.left, wanted.right, viewport.width),
+            shift(wanted.top, wanted.bottom, viewport.height) };
+        RectF shifted{ wanted.left - scroll.x, wanted.top - scroll.y, wanted.right - scroll.x, wanted.bottom - scroll.y };
+        if (shifted.Intersects(pane))
+        {
+            if (pane.top >= shifted.Height()) scroll.y += shifted.bottom - pane.top;
+            else if (viewport.height - pane.bottom >= shifted.Height()) scroll.y += shifted.top - pane.bottom;
+        }
+        return scroll;
+    }
+
     RectF KeyScrollRect(ScrollKey key, SizeF viewportPx, View view, float scale, float documentHeight, float linePx,
         float overlapPx)
     {

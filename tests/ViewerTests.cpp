@@ -28,6 +28,22 @@ namespace inkpages::tests
         EXPECT_FLOAT_EQ(Viewport.width / 2, moved.Width()) << "the zoom stays";
     }
 
+    TEST(Viewer, OnlyDockedInputPaneShortensViewport)
+    {
+        EXPECT_FLOAT_EQ(600, ViewportWithInputPane(Viewport, { 0, 600, 1000, 850 }).height);
+        EXPECT_FLOAT_EQ(800, ViewportWithInputPane(Viewport, { 600, 350, 950, 600 }).height);
+    }
+
+    TEST(Viewer, CaretScrollTracksTypingAndAvoidsFloatingInputPane)
+    {
+        SizeF docked{ 1000, 600 };
+        EXPECT_FLOAT_EQ(0, CaretScroll(docked, { 90, 548, 92, 568 }, { 0, 600, 1000, 800 }, 12).y);
+        EXPECT_FLOAT_EQ(40, CaretScroll(docked, { 90, 608, 92, 628 }, { 0, 600, 1000, 800 }, 12).y);
+        RectF floating{ 600, 350, 950, 600 };
+        EXPECT_FLOAT_EQ(0, CaretScroll(Viewport, { 400, 400, 402, 420 }, floating, 12).y);
+        EXPECT_FLOAT_EQ(82, CaretScroll(Viewport, { 700, 400, 702, 420 }, floating, 12).y);
+    }
+
     TEST(Viewer, ScrollKeysStepLinesPagesAndGoToTheEnds)
     {
         View view{ 1, 0, -1000 };

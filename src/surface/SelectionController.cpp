@@ -397,6 +397,12 @@ namespace inkpages::detail
         RECT rc;
         GetClientRect(c.window, &rc);
         PointF at = ToDocument({ rc.right / 2, rc.bottom / 2 });
+        if (c.surface && c.surface->deferPaste && c.surface->deferPaste(at)) return;
+        PasteAt(at);
+    }
+
+    void SelectionController::PasteAt(PointF at)
+    {
         Clear();
         if (c.surface && c.surface->pasteFromClipboard)
         {

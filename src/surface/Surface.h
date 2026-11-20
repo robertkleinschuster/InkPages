@@ -73,6 +73,7 @@ namespace inkpages::detail
         void Cut() override { selection->Cut(); }
         void Copy() override { selection->Copy(); }
         void Paste() override { selection->Paste(); }
+        void PasteAt(PointF document) override { selection->PasteAt(document); }
         void Duplicate() override { selection->Duplicate(); }
         void DeleteSelection() override { selection->Delete(); }
         void SelectAll() override;
@@ -94,7 +95,7 @@ namespace inkpages::detail
         LRESULT Handle(UINT message, WPARAM wp, LPARAM lp);   // SurfaceWindow.cpp
         void OnPresenterReady();                               // ink thread
         SizeF ClientSize() const;
-        RectF Visible() const;
+        RectF Visible() const override;
         void Resized();
         void SetScale();
         void Changed(bool settled);
@@ -112,6 +113,8 @@ namespace inkpages::detail
         void TouchTapped(PointF document);
         void EditChanged(bool editing);
         void InputPaneChanged(std::optional<RECT> screen);
+        std::optional<RectF> InputPaneInClient() const;
+        void RevealTextCaret();
         RECT EffectiveClient() const;
         bool AppClaims(PointF document) const;
         void AppGesture(MousePhase phase, PointF press, PointF document, int clicks);
@@ -141,6 +144,7 @@ namespace inkpages::detail
         std::unique_ptr<TextEditor> textEditor;
         std::unique_ptr<InputPane> inputPane;
         std::optional<RECT> inputPaneScreen;
+        bool revealCaretOnSettle = false;
         TextHost* textHost = nullptr;
         TextStyle textStyle; // the Text tool's
         Tool currentTool = Tool::Pen;

@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <format>
+#include <utility>
 
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.UI.ViewManagement.h>
@@ -24,9 +25,8 @@ namespace inkpages::detail
         constexpr UINT UiMessage = WM_APP + 0x101;   // UiThread's work
         constexpr UINT_PTR MotionTimer = 2;
         constexpr UINT MotionIntervalMs = 120;       // lazy pages and sheets while the view moves
+        constexpr float RevealMarginDip = 16;
 
-        // The sheets' render scale: quantized, so tiny zoom differences after a gesture do not redraw.
-        float Quantized(float scale, float zoom) { return std::round(scale * zoom * 64) / 64; }
     }
 
     Surface::Surface(HWND parent, SurfaceOptions options) : options(options)
@@ -70,6 +70,7 @@ namespace inkpages::detail
             if (!settled) return;
             KillTimer(window, MotionTimer);
             Changed(true);
+            if (std::exchange(revealCaretOnSettle, false)) RevealTextCaret();
             auto run = std::move(pending);
             pending.clear();
             for (auto& action : run) action();
@@ -139,6 +140,7 @@ namespace inkpages::detail
             [this] { return sheetScale; }, [this]() -> PageLayout const& { return layout; },
             [this] { composition->Commit(); }, automation.get() });
         textEditor->editingChanged = [this](bool editing) { EditChanged(editing); };
+        textEditor->caretMoved = [this] { RevealTextCaret(); };
 
         ink = std::make_unique<InkLayer>(host, composition->Ink(),
             [this] { OnPresenterReady(); }, [this] { ui->Post([this] { composition->Commit(); }); });
@@ -358,14 +360,21 @@ namespace inkpages::detail
     {
         RECT client{};
         winrt::check_bool(GetClientRect(window, &client));
-        if (!inputPaneScreen) return client;
+        if (auto pane = InputPaneInClient())
+            client.bottom = static_cast<LONG>(ViewportWithInputPane(
+                { static_cast<float>(client.right), static_cast<float>(client.bottom) }, *pane).height);
+        return client;
+    }
+
+    std::optional<RectF> Surface::InputPaneInClient() const
+    {
+        if (!inputPaneScreen) return std::nullopt;
         POINT topLeft{ inputPaneScreen->left, inputPaneScreen->top };
         POINT bottomRight{ inputPaneScreen->right, inputPaneScreen->bottom };
         winrt::check_bool(ScreenToClient(window, &topLeft));
         winrt::check_bool(ScreenToClient(window, &bottomRight));
-        if (topLeft.y > 0 && topLeft.y < client.bottom && bottomRight.x > 0 && topLeft.x < client.right)
-            client.bottom = topLeft.y;
-        return client;
+        return RectF{ static_cast<float>(topLeft.x), static_cast<float>(topLeft.y),
+            static_cast<float>(bottomRight.x), static_cast<float>(bottomRight.y) };
     }
 
     void Surface::EditChanged(bool editing)
@@ -398,13 +407,23 @@ namespace inkpages::detail
         if (!screen && !inputPaneScreen) return;
         inputPaneScreen = screen;
         Resized();
-        if (!screen) return;
-        RectF box = textEditor->DocumentBounds();
-        if (auto page = layout.PageAt({ box.left, box.top }))
+        RevealTextCaret();
+    }
+
+    void Surface::RevealTextCaret()
+    {
+        auto pane = InputPaneInClient();
+        if (!pane || !textEditor || !viewport) return;
+        if (viewport->Moving())
         {
-            RectF paper = layout.Page(*page);
-            RevealRect(*page, { box.left - paper.left, box.top - paper.top, box.right - paper.left, box.bottom - paper.top });
+            revealCaretOnSettle = true;
+            return;
         }
+        auto caret = textEditor->CaretInClient();
+        if (!caret) return;
+        SizeF client = ClientSize();
+        PointF scroll = CaretScroll(client, *caret, *pane, RevealMarginDip * scale);
+        if (scroll.x != 0 || scroll.y != 0) ZoomToRect(PanRect(client, CurrentView(), scroll.x, scroll.y));
     }
 
     void Surface::BuildLayout(std::vector<PageSpec> specs, std::vector<Paper>& papers)
@@ -516,7 +535,12 @@ namespace inkpages::detail
         if (layout.Count() == 0) return;
         RectF visible = Visible();
         float before = sheetScale;
-        if (settled || sheetScale <= 0) sheetScale = Quantized(scale, CurrentView().zoom);
+        float currentScale = scale * CurrentView().zoom;
+        // During a large zoom-out, refresh once the old surface is more than double the needed resolution.
+        // At rest draw on the final pixel grid, ignoring tiny transform noise from panning.
+        if (sheetScale <= 0 || currentScale < sheetScale * 0.5f ||
+            (settled && std::abs(currentScale - sheetScale) > currentScale * 0.0001f))
+            sheetScale = currentScale;
         composition->UpdateSheets(visible, sheetScale);
         ShowPageMark();
         if (sheetScale != before)
@@ -646,11 +670,6 @@ namespace inkpages::detail
             float top = std::max(0.f, layout.Page(page).top - options.gap / 2);
             ZoomToRect(ScrollRect(ClientSize(), CurrentView(), scale, top));
         });
-    }
-
-    namespace
-    {
-        constexpr float RevealMarginDip = 16; // around a point or area brought into view
     }
 
     void Surface::ScrollTo(int page, PointF point)

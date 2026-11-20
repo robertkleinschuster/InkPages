@@ -68,6 +68,7 @@ namespace inkpages::detail
         void Cut();
         bool Copy(); // false: nothing copied (no selection, or the app's copy failed)
         void Paste();
+        void PasteAt(PointF at);
         void Duplicate();
         void Delete();
         void SelectAll(int page);

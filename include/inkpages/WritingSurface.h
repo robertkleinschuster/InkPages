@@ -146,6 +146,7 @@ namespace inkpages
         virtual View CurrentView() const = 0;   // DirectManipulation's transform (pixels)
         virtual float Scale() const = 0;        // pixels per DIP (the window's DPI / 96)
         virtual std::optional<int> PageInView() const = 0;
+        virtual RectF Visible() const = 0;       // document coordinates
         /// Outlines the page in view in the system's accent color (2 page units wide, 3 away from the page, rounded) - an
         /// app turns it on for documents with more than one page. Off by default.
         virtual void MarkCurrentPage(bool mark) = 0;
@@ -212,6 +213,7 @@ namespace inkpages
         virtual void Cut() = 0;
         virtual void Copy() = 0;
         virtual void Paste() = 0;                // at the view's center, then selected
+        virtual void PasteAt(PointF document) = 0;
         virtual void Duplicate() = 0;
         virtual void DeleteSelection() = 0;
         virtual void SelectAll() = 0;            // the page in view
@@ -223,6 +225,7 @@ namespace inkpages
         /// true: false = nothing copied, the selection stays).
         std::function<bool(Clip const&)> copyToClipboard;
         std::function<std::optional<Clip>(PointF at)> pasteFromClipboard;
+        std::function<bool(PointF document)> deferPaste; // the app is still preparing its clipboard data
 
         // ---- history
         virtual void Undo() = 0;

@@ -72,6 +72,15 @@ namespace inkpages::detail
         return PtInRect(&r, client) != FALSE;
     }
 
+    std::optional<RectF> TextEditor::CaretInClient() const
+    {
+        if (!box) return std::nullopt;
+        auto caret = box->CaretNow();
+        if (!caret.shown || caret.size.cy <= 0) return std::nullopt;
+        return RectF{ static_cast<float>(caret.at.x), static_cast<float>(caret.at.y),
+            static_cast<float>(caret.at.x + caret.size.cx), static_cast<float>(caret.at.y + caret.size.cy) };
+    }
+
     void TextEditor::Tap(PointF at, TextStyle const& style)
     {
         Log(std::format("text: tap at {:.1f},{:.1f} (editing {}, text host {})", at.x, at.y, Editing(), c.texts() != nullptr));
@@ -202,6 +211,7 @@ namespace inkpages::detail
         box->Send(EM_CHARFROMPOS, 0, reinterpret_cast<LPARAM>(&p), &index);
         box->Send(EM_SETSEL, static_cast<WPARAM>(index), index);
         Log(std::format("text: a finger tap puts the caret at {}", index));
+        if (caretMoved) caretMoved();
         caretOn = true;
         ScheduleDraw();
     }
@@ -242,6 +252,7 @@ namespace inkpages::detail
                 caretOn = true; // typing shows the caret
                 now.content = box->Text();
                 Layout();
+                if (caretMoved) caretMoved();
             }
             return taken;
         }

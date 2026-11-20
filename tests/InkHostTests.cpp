@@ -50,10 +50,33 @@ namespace inkpages::tests
     {
         for (int round = 0; round < 5; ++round)
         {
-            Apartment apartment; // uninitialized at once after the host, as an app's last step
+            Apartment apartment;
             InkHost host;
             host.Run("work", [] {});
         }
         Sleep(200); // a thread left behind in the unloaded DLL crashes within this time
+    }
+
+    TEST(InkHost, DestructionWaitsForOutstandingWork)
+    {
+        Apartment apartment;
+        winrt::handle thread;
+        winrt::handle started(CreateEventW(nullptr, TRUE, FALSE, nullptr));
+        ASSERT_TRUE(static_cast<bool>(started));
+        {
+            InkHost host;
+            host.Run("capture thread handle", [&] {
+                winrt::check_bool(DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(),
+                    thread.put(), SYNCHRONIZE, FALSE, 0));
+            });
+            host.Post("outstanding work", [started = started.get()] {
+                winrt::check_bool(SetEvent(started));
+                Sleep(5500); // exceeds the former shutdown timeout
+            });
+            ASSERT_EQ(WAIT_OBJECT_0, WaitForSingleObject(started.get(), 2000));
+        }
+        EXPECT_EQ(WAIT_OBJECT_0, WaitForSingleObject(thread.get(), 0));
+        // Keep the apartment alive for the thread even when running this regression against the old implementation.
+        EXPECT_EQ(WAIT_OBJECT_0, WaitForSingleObject(thread.get(), 10000));
     }
 }

@@ -143,14 +143,20 @@ namespace inkpages::detail
             POINTER_INPUT_TYPE type = TypeOf(wp);
             if (type == PT_TOUCH)
             {
+                bool cancelled = IS_POINTER_CANCELED_WPARAM(wp);
                 if (touchSelection == GET_POINTERID_WPARAM(wp))
                 {
-                    if (message == WM_POINTERUP)
+                    if (message == WM_POINTERUP || cancelled)
                     {
                         touchSelection = 0;
-                        selection->EndTouchDrag(false);
+                        selection->EndTouchDrag(cancelled);
                     }
                     else selection->UpdateTouchDrag(ClientOf(window, lp));
+                    return 0;
+                }
+                if (cancelled)
+                {
+                    touchTaps->Cancel("Windows canceled the contact");
                     return 0;
                 }
                 if (message == WM_POINTERUP) touchTaps->Up(GET_POINTERID_WPARAM(wp), ClientOf(window, lp));

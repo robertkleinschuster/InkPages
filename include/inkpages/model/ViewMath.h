@@ -67,6 +67,9 @@ namespace inkpages
     /// over the document, the content up/left) - panning.
     RectF PanRect(SizeF viewportPx, View view, float dxPx, float dyPx);
 
+    SizeF ViewportWithInputPane(SizeF client, RectF pane);
+    PointF CaretScroll(SizeF viewport, RectF caret, RectF pane, float margin);
+
     /// The content rectangle for a scroll key at the current zoom: a line = `linePx` viewport pixels, a page = the view's
     /// height less `overlapPx` (what stays in view), Start/End = the document's top/bottom (`documentHeight` in DIPs).
     RectF KeyScrollRect(ScrollKey key, SizeF viewportPx, View view, float scale, float documentHeight, float linePx,

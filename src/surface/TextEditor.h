@@ -54,6 +54,7 @@ namespace inkpages::detail
 
         bool Editing() const { return box != nullptr; }
         RectF DocumentBounds() const { return docBox; }
+        std::optional<RectF> CaretInClient() const;
         /// The Text tool's pen tap (document point): ends editing when a text is edited; otherwise edits the text
         /// there, or starts a new one in `style`.
         void Tap(PointF at, TextStyle const& style);
@@ -72,6 +73,7 @@ namespace inkpages::detail
         void ViewChanged();
 
         std::function<void(bool editing)> editingChanged;
+        std::function<void()> caretMoved;
 
     private:
         void Begin(std::optional<TextId> id, Text text, PointF caretAt);
