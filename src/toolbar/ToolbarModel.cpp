@@ -15,7 +15,16 @@ namespace inkpages::detail
     std::vector<ButtonSpec> ToolbarButtons(ToolChoices const& choices, std::vector<ToolbarButton> const& extensions)
     {
         using enum ButtonKind;
-        std::vector<ButtonSpec> b{ { ButtonId::Undo, Glyph::Undo }, { ButtonId::Redo, Glyph::Redo } };
+        std::vector<ButtonSpec> b;
+        auto appButton = [&](size_t i, bool groupStart) { // glyph 0: its path
+            b.push_back({ ButtonId::Extension + static_cast<int>(i), extensions[i].glyph, std::nullopt, Command, groupStart });
+        };
+        for (size_t i = 0; i < extensions.size(); ++i)
+        {
+            if (extensions[i].atStart) appButton(i, !b.empty() && extensions[i].groupStart);
+        }
+        b.push_back({ ButtonId::Undo, Glyph::Undo, std::nullopt, Command, !b.empty() });
+        b.push_back({ ButtonId::Redo, Glyph::Redo });
         auto pens = choices.PensOrDefault();
         for (int i = 0; i < static_cast<int>(pens.size()); ++i)
         {
@@ -38,9 +47,12 @@ namespace inkpages::detail
         b.push_back({ ButtonId::Duplicate, Glyph::Duplicate });
         b.push_back({ ButtonId::Delete, Glyph::Delete });
         b.push_back({ ButtonId::SelectAll, Glyph::SelectAll });
+        bool first = true;
         for (size_t i = 0; i < extensions.size(); ++i)
         {
-            b.push_back({ ButtonId::Extension + static_cast<int>(i), extensions[i].glyph, std::nullopt, Command, i == 0 || extensions[i].groupStart }); // glyph 0: its path
+            if (extensions[i].atStart) continue;
+            appButton(i, first || extensions[i].groupStart);
+            first = false;
         }
         return b;
     }

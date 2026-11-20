@@ -64,7 +64,7 @@ namespace inkpages
         std::array<std::wstring, 5> highlighterColors{ L"Yellow", L"Green", L"Light blue", L"Magenta", L"Orange" };
     };
 
-    /// An app's own button at the end of the toolbar: a Segoe Fluent Icons glyph, or a vector path where the font has no
+    /// An app's own button at the end of the toolbar (or, with `atStart`, before undo/redo): a Segoe Fluent Icons glyph, or a vector path where the font has no
     /// fitting glyph (XAML/SVG path data with M L H V C A Z, absolute or relative, F0 even-odd / F1 nonzero fill, in a
     /// square of `pathSize` units).
     struct ToolbarButton
@@ -76,7 +76,9 @@ namespace inkpages
         std::wstring name;     // its accessible name (UI Automation, Narrator); empty: the tip
         std::wstring path;     // used when glyph is 0
         float pathSize = 20;
-        bool groupStart = false; // a separator before it (the first app button always has one)
+        bool groupStart = false; // a separator before it (the first app button at the end always has one)
+        bool atStart = false;    // placed at the toolbar's start, before undo/redo, as apps put Save and Export there;
+                                 // a separator follows the last of them
     };
 
     class Toolbar

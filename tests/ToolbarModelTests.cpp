@@ -24,6 +24,23 @@ namespace inkpages::tests
         EXPECT_EQ(6, groups);
     }
 
+    TEST(ToolbarModel, AppButtonsAtTheStartComeBeforeUndo)
+    {
+        std::vector<ToolbarButton> app{ { 1, 0xE74E, L"save" }, { 2, 0xE72D, L"export" }, { 3, 0xE710, L"page" } };
+        app[0].atStart = true;
+        app[1].atStart = true;
+        auto buttons = ToolbarButtons(ToolChoices{}, app);
+        ASSERT_GE(buttons.size(), 4u);
+        EXPECT_EQ(ButtonId::Extension, buttons[0].id);
+        EXPECT_FALSE(buttons[0].groupStart) << "nothing before the first button";
+        EXPECT_EQ(ButtonId::Extension + 1, buttons[1].id);
+        EXPECT_FALSE(buttons[1].groupStart);
+        EXPECT_EQ(ButtonId::Undo, buttons[2].id);
+        EXPECT_TRUE(buttons[2].groupStart) << "a separator between the app's buttons and undo";
+        EXPECT_EQ(ButtonId::Extension + 2, buttons.back().id) << "the others stay at the end, ids by their index";
+        EXPECT_TRUE(buttons.back().groupStart);
+    }
+
     TEST(ToolbarModel, StatesFollowTheChoicesAndTheSurface)
     {
         ToolChoices choices;
