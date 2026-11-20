@@ -61,6 +61,7 @@ namespace inkpages::detail
 
         ViewerInputContext c;
         bool panning = false;
+        bool middlePan = false;
         bool panMoved = false;
         POINT panFrom{};
         View panView;

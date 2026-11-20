@@ -204,17 +204,16 @@ namespace inkpages::detail
             break;
         case WM_MBUTTONDOWN:
             if (!IsRealMouse()) break;
-            if (wp & (MK_LBUTTON | MK_RBUTTON)) return 0;
+            if (touchSelection || (wp & (MK_LBUTTON | MK_RBUTTON))) return 0;
             TakeFocus(window);
             viewer->PanDown({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) });
             return 0;
         case WM_MBUTTONUP:
-            if (wp & MK_LBUTTON) return 0;
             if (viewer->PanUp()) return 0;
             break;
         case WM_RBUTTONDOWN:
             if (!IsRealMouse()) break;
-            if (viewer->Panning() || (wp & MK_LBUTTON)) return 0;
+            if (touchSelection || viewer->Panning() || (wp & MK_LBUTTON)) return 0;
             TakeFocus(window);
             mouse->Press({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) }, false, MouseSelect::Mode::Lasso);
             return 0;

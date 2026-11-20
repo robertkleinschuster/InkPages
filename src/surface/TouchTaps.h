@@ -9,6 +9,7 @@
 #include <interactioncontext.h>
 
 #include <functional>
+#include <optional>
 
 #include "inkpages/model/TapGesture.h"
 

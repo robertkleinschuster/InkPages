@@ -49,6 +49,7 @@ namespace inkpages::detail
     void ViewerInput::PanDown(POINT client, bool middleButton)
     {
         panning = true;
+        middlePan = middleButton;
         panMoved = false;
         panFrom = client;
         panView = c.viewport->Current();
@@ -73,7 +74,7 @@ namespace inkpages::detail
 
     bool ViewerInput::PanUp()
     {
-        if (!panning) return false;
+        if (!panning || !middlePan) return false;
         panning = false;
         if (GetCapture() == c.window) ReleaseCapture();
         Log("viewer: pan ended");

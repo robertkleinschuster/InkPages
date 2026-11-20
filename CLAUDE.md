@@ -237,7 +237,9 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
 - **Touch keyboard:** [doc] it comes up when the user taps into the focused element with an editable text pattern (not
   on programmatic focus); a hardware keyboard keeps it away unless "Show the touch keyboard" is "Always". [measured,
   sandbox] It did not show, also with `TabletTip\1.7\TouchKeyboardTapInvoke = 2` (TextInputHost stayed cloaked): the
-  sandbox has a keyboard and only virtual pen/touch – a device check (README "Device checks"). Documented explicit route
+  sandbox has a keyboard and only virtual pen/touch – a device check (README "Device checks"). During editing
+  `IFrameworkInputPane::AdviseWithHWND` watches the desktop pane's occupied screen rectangle. The surface shortens
+  its DirectManipulation viewport and reveals the edited box. Documented explicit route
   if auto-invoke fails: `IInputPaneInterop::GetForWindow` -> `InputPane.TryShow()` (the probe saw true with Visible =
   false while a keyboard was attached) – not built.
 
@@ -286,6 +288,10 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   `PictureHost::PictureAt` picture or the edited text box) at a left press in viewer mode; ink is transparent to it.
   A claimed drag or double/triple click goes to the app. `ClickCount` uses Windows' double-click time and DPI-aware
   rectangle. Single clicks stay the library's (pictures, Text tool, `tapped`). The hover cursor is a separate hook.
+- **Touch in Auswählen:** `InkStrokeContainer::SelectWithLine` picks ink at the tap; the picture host handles
+  pictures and texts. The selection's frame can take the primary touch without assigning it to DirectManipulation.
+  A second touch cancels the selection preview and assigns both contacts. `TouchTaps` watches the native
+  Interaction Context secondary tap while DirectManipulation has not claimed the contact, and reports it to the app.
 - **Text tool** (`TextTest`): mode None; a pen press without a drag (farthest movement under the tap distance, however
   long it rests – real pens hold deliberate taps longer than 300 ms) goes to `TextEditor::Tap`; while a box is edited the
   pen over it is taken from the presenter (`ToolInput::SetTextBox`) and its presses reach RichEdit as mouse messages; a

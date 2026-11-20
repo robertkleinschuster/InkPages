@@ -30,11 +30,22 @@ namespace inkpages::detail
         {
             if (!context)
             {
-                winrt::check_hresult(CreateInteractionContext(&context));
+                HINTERACTIONCONTEXT created = nullptr;
+                winrt::check_hresult(CreateInteractionContext(&created));
                 INTERACTION_CONTEXT_CONFIGURATION config{ INTERACTION_ID_SECONDARY_TAP, INTERACTION_CONFIGURATION_FLAG_SECONDARY_TAP };
-                winrt::check_hresult(SetInteractionConfigurationInteractionContext(context, 1, &config));
-                winrt::check_hresult(SetPropertyInteractionContext(context, INTERACTION_CONTEXT_PROPERTY_FILTER_POINTERS, FALSE));
-                winrt::check_hresult(RegisterOutputCallbackInteractionContext(context, OnInteraction, this));
+                try
+                {
+                    winrt::check_hresult(SetInteractionConfigurationInteractionContext(created, 1, &config));
+                    winrt::check_hresult(SetPropertyInteractionContext(created, INTERACTION_CONTEXT_PROPERTY_FILTER_POINTERS, FALSE));
+                    winrt::check_hresult(RegisterOutputCallbackInteractionContext(created, OnInteraction, this));
+                }
+                catch (...)
+                {
+                    HRESULT hr = DestroyInteractionContext(created);
+                    if (FAILED(hr)) LogHr("touch: DestroyInteractionContext after configuration error", hr);
+                    throw;
+                }
+                context = created;
             }
             POINTER_INFO info{};
             winrt::check_bool(GetPointerInfo(pointer, &info));

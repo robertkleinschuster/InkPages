@@ -46,6 +46,7 @@ namespace inkpages::detail
         bool HasSelection() const { return !strokes.Empty() || !pictures.empty(); }
         /// A press at this document point would move or scale the selection (it is on the frame).
         bool Grabs(PointF document) const { return frame && frame->At(document) != Handle::None; }
+        LPCWSTR CursorAt(PointF document) const;
         /// The view zoomed: the frame and its handles keep their size on the screen.
         void Zoomed();
 

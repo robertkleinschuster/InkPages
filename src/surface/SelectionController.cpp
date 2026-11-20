@@ -117,6 +117,20 @@ namespace inkpages::detail
         Publish(false);
     }
 
+    LPCWSTR SelectionController::CursorAt(PointF document) const
+    {
+        if (!frame) return nullptr;
+        switch (frame->At(document))
+        {
+        case Handle::Move: return IDC_SIZEALL;
+        case Handle::TopLeft:
+        case Handle::BottomRight: return IDC_SIZENWSE;
+        case Handle::TopRight:
+        case Handle::BottomLeft: return IDC_SIZENESW;
+        default: return nullptr;
+        }
+    }
+
     void SelectionController::Publish(bool log)
     {
         auto f = frame;

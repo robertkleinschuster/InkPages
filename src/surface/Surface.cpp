@@ -116,7 +116,16 @@ namespace inkpages::detail
         viewer = std::make_unique<ViewerInput>(ViewerInputContext{ window, viewport.get(), [this] { return ClientSize(); },
             [this] { return scale; }, [this]() -> PageLayout const& { return layout; },
             [this](RectF content) { ZoomToRect(content); }, toDocument,
-            [this](int page, PointF point) -> LPCWSTR { return cursorAt ? cursorAt(page, point) : nullptr; },
+            [this](int page, PointF point) -> LPCWSTR {
+                if (page < 0) return cursorAt ? cursorAt(page, point) : nullptr;
+                RectF paper = layout.Page(page);
+                LPCWSTR toolCursor = selection->CursorAt({ paper.left + point.x, paper.top + point.y });
+                if (!toolCursor && currentTool == Tool::Select) toolCursor = IDC_CROSS;
+                if (!toolCursor && currentTool == Tool::Text) toolCursor = IDC_IBEAM;
+                if (!toolCursor) return cursorAt ? cursorAt(page, point) : nullptr;
+                if (cursorAt) cursorAt(-1, {}); // close the app's link tooltip while the tool owns the cursor
+                return toolCursor;
+            },
             [this] {
                 if (currentTool != Tool::Select && currentTool != Tool::Text && mousePannedWithWriteTool)
                     mousePannedWithWriteTool();
