@@ -56,6 +56,19 @@ namespace inkpages::detail
         return selection;
     }
 
+    StrokeSelection InkSelection::SelectAt(PointF point, float radius)
+    {
+        Clear();
+        ink.container.SelectWithLine({ point.x - radius, point.y }, { point.x + radius, point.y });
+        for (InkStroke const& stroke : ink.container.GetStrokes())
+        {
+            if (stroke.Selected()) selection.ids.insert(stroke.Id());
+            stroke.Selected(false);
+        }
+        Measure();
+        return selection;
+    }
+
     void InkSelection::Clear()
     {
         Preview({});

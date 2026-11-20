@@ -100,11 +100,27 @@ namespace inkpages::detail
                     viewer->PanDown(press, false);
                     viewer->PanMove(at);
                 } });
-        touchTaps = std::make_unique<TouchTaps>(toDocument, zoom, [this](PointF at) { Tapped(at, PointerKind::Touch); });
+        touchTaps = std::make_unique<TouchTaps>(toDocument, zoom, [this](PointF at) { TouchTapped(at); }, [this](POINT screen) {
+            if (!touchHeld || currentTool == Tool::Select || currentTool == Tool::Text) return;
+            POINT client = screen;
+            winrt::check_bool(ScreenToClient(window, &client));
+            PointF doc = ToDocument(client);
+            auto page = layout.PageAt(doc);
+            if (!page) return;
+            RectF paper = layout.Page(*page);
+            ui->Post([this, page = *page, at = PointF{ doc.x - paper.left, doc.y - paper.top }, screen,
+                generation = pagesGeneration.load()] {
+                if (generation == pagesGeneration && touchHeld) touchHeld(page, at, screen);
+            });
+        });
         viewer = std::make_unique<ViewerInput>(ViewerInputContext{ window, viewport.get(), [this] { return ClientSize(); },
             [this] { return scale; }, [this]() -> PageLayout const& { return layout; },
             [this](RectF content) { ZoomToRect(content); }, toDocument,
-            [this](int page, PointF point) -> LPCWSTR { return cursorAt ? cursorAt(page, point) : nullptr; } });
+            [this](int page, PointF point) -> LPCWSTR { return cursorAt ? cursorAt(page, point) : nullptr; },
+            [this] {
+                if (currentTool != Tool::Select && currentTool != Tool::Text && mousePannedWithWriteTool)
+                    mousePannedWithWriteTool();
+            } });
 
         automation = std::make_unique<SurfaceAutomation>(window);
         pageMark = std::make_unique<PageMark>(composition->Devices(), composition->MarkLayer());
@@ -113,7 +129,7 @@ namespace inkpages::detail
             [this] { return textHost; }, [this] { return CurrentView(); }, [this] { return scale; },
             [this] { return sheetScale; }, [this]() -> PageLayout const& { return layout; },
             [this] { composition->Commit(); }, automation.get() });
-        textEditor->editingChanged = [this](bool editing) { if (textEditingChanged) textEditingChanged(editing); };
+        textEditor->editingChanged = [this](bool editing) { EditChanged(editing); };
 
         ink = std::make_unique<InkLayer>(host, composition->Ink(),
             [this] { OnPresenterReady(); }, [this] { ui->Post([this] { composition->Commit(); }); });
@@ -126,6 +142,8 @@ namespace inkpages::detail
     {
         try
         {
+            inputPane.reset();
+            inputPaneScreen.reset();
             textEditor.reset(); // ends editing first: the result still reaches the app and the history
             if (uiSettings) uiSettings.ColorValuesChanged(accentChanged);
             host.Run("tools shutdown", [this] {
@@ -177,6 +195,37 @@ namespace inkpages::detail
         if (!page) return false;
         RectF r = layout.Page(*page);
         return mouseClaims(*page, { document.x - r.left, document.y - r.top });
+    }
+
+    void Surface::TouchTapped(PointF document)
+    {
+        if (currentTool == Tool::Text)
+        {
+            if (textEditor->Contains(document)) textEditor->PlaceCaret(document);
+            else if (layout.PageAt(document)) textEditor->Tap(document, textStyle);
+            return;
+        }
+        if (currentTool != Tool::Select)
+        {
+            Tapped(document, PointerKind::Touch);
+            return;
+        }
+        if (selection->Grabs(document)) return;
+        if (!layout.PageAt(document))
+        {
+            selection->Clear();
+            return;
+        }
+        float radius = Tap::MaxDistance(viewport->Current().zoom);
+        host.Post("touch select", [this, document, radius, generation = pagesGeneration.load()] {
+            if (!tools) return;
+            auto made = tools->Selection().SelectAt(document, radius);
+            ui->Post([this, made, document, generation] {
+                if (generation != pagesGeneration) return;
+                selection->Selected(made, { document });
+                if (!selection->HasSelection()) Tapped(document, PointerKind::Touch);
+            });
+        });
     }
 
     void Surface::AppGesture(MousePhase phase, PointF press, PointF document, int clicks)
@@ -234,6 +283,11 @@ namespace inkpages::detail
         };
         ink->collected = [this, previous = ink->collected](std::vector<Placed> const& placed) {
             if (previous) previous(placed);
+            if (!placed.empty() && !reportedPenStroke)
+            {
+                reportedPenStroke = true;
+                ui->Post([this] { if (firstPenStroke) firstPenStroke(); });
+            }
             View view;
             {
                 std::scoped_lock guard(viewLock);
@@ -263,8 +317,7 @@ namespace inkpages::detail
 
     SizeF Surface::ClientSize() const
     {
-        RECT rc;
-        GetClientRect(window, &rc);
+        RECT rc = EffectiveClient();
         return { static_cast<float>(rc.right), static_cast<float>(rc.bottom) };
     }
 
@@ -286,11 +339,63 @@ namespace inkpages::detail
 
     void Surface::Resized()
     {
-        RECT rc;
-        GetClientRect(window, &rc);
+        RECT rc = EffectiveClient();
         if (viewport) viewport->SetViewportRect(rc);
         composition->SetClip({ rc.right, rc.bottom });
         Changed(true);
+    }
+
+    RECT Surface::EffectiveClient() const
+    {
+        RECT client{};
+        winrt::check_bool(GetClientRect(window, &client));
+        if (!inputPaneScreen) return client;
+        POINT topLeft{ inputPaneScreen->left, inputPaneScreen->top };
+        POINT bottomRight{ inputPaneScreen->right, inputPaneScreen->bottom };
+        winrt::check_bool(ScreenToClient(window, &topLeft));
+        winrt::check_bool(ScreenToClient(window, &bottomRight));
+        if (topLeft.y > 0 && topLeft.y < client.bottom && bottomRight.x > 0 && topLeft.x < client.right)
+            client.bottom = topLeft.y;
+        return client;
+    }
+
+    void Surface::EditChanged(bool editing)
+    {
+        try
+        {
+            if (editing)
+            {
+                if (!inputPane)
+                {
+                    HWND root = GetAncestor(window, GA_ROOT);
+                    winrt::check_pointer(root);
+                    inputPane = std::make_unique<InputPane>(root, [this](std::optional<RECT> screen) { InputPaneChanged(screen); });
+                }
+                InputPaneChanged(inputPane->Location());
+            }
+            else if (inputPaneScreen) InputPaneChanged(std::nullopt);
+        }
+        catch (...)
+        {
+            LogException("text: tracking the input pane");
+        }
+        if (textEditingChanged) textEditingChanged(editing);
+    }
+
+    void Surface::InputPaneChanged(std::optional<RECT> screen)
+    {
+        bool editing = textEditor && textEditor->Editing();
+        if (!editing) screen.reset();
+        if (!screen && !inputPaneScreen) return;
+        inputPaneScreen = screen;
+        Resized();
+        if (!screen) return;
+        RectF box = textEditor->DocumentBounds();
+        if (auto page = layout.PageAt({ box.left, box.top }))
+        {
+            RectF paper = layout.Page(*page);
+            RevealRect(*page, { box.left - paper.left, box.top - paper.top, box.right - paper.left, box.bottom - paper.top });
+        }
     }
 
     void Surface::BuildLayout(std::vector<PageSpec> specs, std::vector<Paper>& papers)

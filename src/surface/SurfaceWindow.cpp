@@ -28,8 +28,6 @@ namespace inkpages::detail
             return type;
         }
 
-        bool IsPen(WPARAM wp) { return TypeOf(wp) == PT_PEN; }
-
         // [doc] Mouse messages Windows makes from pen or touch input carry this signature in GetMessageExtraInfo
         // ("Distinguishing Pen Input from Mouse and Touch"): only the real mouse (and touchpad clicks) is the mouse here.
         bool IsRealMouse()
@@ -87,15 +85,56 @@ namespace inkpages::detail
         switch (message)
         {
         case WM_POINTERDOWN:
+        {
+            UINT32 id = GET_POINTERID_WPARAM(wp);
+            POINTER_INPUT_TYPE type = TypeOf(wp);
+            if (type == PT_TOUCH)
+            {
+                if (touchSelection)
+                {
+                    // The second finger takes over as a pinch. Undo the preview and give both contacts to Windows.
+                    UINT32 first = touchSelection;
+                    touchSelection = 0;
+                    selection->EndTouchDrag(true);
+                    viewport->OnPointer(first);
+                    touchTaps->Cancel("the second contact takes the selection drag");
+                }
+                else if (IS_POINTER_PRIMARY_WPARAM(wp) && currentTool == Tool::Select && !viewport->Moving())
+                {
+                    POINT client = ClientOf(window, lp);
+                    if (selection->Grabs(ToDocument(client)))
+                    {
+                        touchSelection = id;
+                        selection->BeginTouchDrag(client);
+                        return 0;
+                    }
+                }
+            }
             if (viewport && viewport->OnPointer(wp)) // touch and touchpad pan and zoom
             {
                 // A finger that stops the pages' inertia (or joins a running pan) is no tap.
-                if (TypeOf(wp) == PT_TOUCH && !viewport->Moving()) touchTaps->Down(GET_POINTERID_WPARAM(wp), ClientOf(window, lp));
+                if (type == PT_TOUCH && !viewport->Moving() && (IS_POINTER_PRIMARY_WPARAM(wp) || touchTaps->Active()))
+                    touchTaps->Down(id, ClientOf(window, lp));
                 return 0;
             }
-            if (IsPen(wp) && selection->OnPointer(message, wp, lp)) return 0;
+            if (type == PT_PEN && !touchSelection && selection->OnPointer(message, wp, lp)) return 0;
             break;
+        }
         case DM_POINTERHITTEST:
+            if (touchSelection == GET_POINTERID_WPARAM(wp)) return 0;
+            if (currentTool == Tool::Select && selection->HasSelection() && !viewport->Moving())
+            {
+                POINTER_INFO info{};
+                if (!GetPointerInfo(GET_POINTERID_WPARAM(wp), &info))
+                    LogHr("GetPointerInfo (selection hit test)", HRESULT_FROM_WIN32(GetLastError()));
+                else if (info.pointerType == PT_TOUCH && (info.pointerFlags & POINTER_FLAG_PRIMARY))
+                {
+                    POINT client = info.ptPixelLocation;
+                    if (!ScreenToClient(window, &client))
+                        LogHr("ScreenToClient (selection hit test)", HRESULT_FROM_WIN32(GetLastError()));
+                    else if (selection->Grabs(ToDocument(client))) return 0;
+                }
+            }
             if (viewport && viewport->OnPointer(wp)) return 0;
             break;
         case WM_POINTERUPDATE:
@@ -104,20 +143,35 @@ namespace inkpages::detail
             POINTER_INPUT_TYPE type = TypeOf(wp);
             if (type == PT_TOUCH)
             {
+                if (touchSelection == GET_POINTERID_WPARAM(wp))
+                {
+                    if (message == WM_POINTERUP)
+                    {
+                        touchSelection = 0;
+                        selection->EndTouchDrag(false);
+                    }
+                    else selection->UpdateTouchDrag(ClientOf(window, lp));
+                    return 0;
+                }
                 if (message == WM_POINTERUP) touchTaps->Up(GET_POINTERID_WPARAM(wp), ClientOf(window, lp));
                 else touchTaps->Update(GET_POINTERID_WPARAM(wp), ClientOf(window, lp));
             }
-            if (type == PT_PEN && selection->OnPointer(message, wp, lp)) return 0;
+            if (type == PT_PEN && !touchSelection && selection->OnPointer(message, wp, lp)) return 0;
             break;
         }
         case WM_POINTERCAPTURECHANGED:
+            if (touchSelection == GET_POINTERID_WPARAM(wp))
+            {
+                touchSelection = 0;
+                selection->EndTouchDrag(true);
+            }
             touchTaps->Cancel("DirectManipulation took the contact");
             break;
         case WM_LBUTTONDOWN:
         case WM_LBUTTONDBLCLK: // (the class has CS_DBLCLKS for the text box: outside it a press is a press)
         {
             if (!IsRealMouse()) break;
-            if (viewer->Panning() || mouse->UsesRightButton()) return 0;
+            if (touchSelection || viewer->Panning() || mouse->UsesRightButton()) return 0;
             TakeFocus(window);
             // A press that cleared the selection or ended a text's edit is no click of its own.
             bool had = selection->HasSelection() || (wasEditing && !textEditor->Editing());
@@ -134,6 +188,7 @@ namespace inkpages::detail
                 break;
             }
             POINT at{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
+            if (touchSelection) return 0;
             if (viewer->PanMove(at)) return 0;
             if (selection->OnPointer(message, wp, lp)) return 0;
             if (wp & (mouse->UsesRightButton() ? MK_RBUTTON : MK_LBUTTON)) mouse->Move(at);
@@ -164,6 +219,8 @@ namespace inkpages::detail
             mouse->Press({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) }, false, MouseSelect::Mode::Lasso);
             return 0;
         case WM_RBUTTONUP:
+            // The interaction context takes touch secondary taps, including touch promoted to mouse input.
+            if ((GetMessageExtraInfo() & 0xFFFFFF80) == 0xFF515780) return 0;
             if (IsRealMouse() && mouse->UsesRightButton()
                 && mouse->Release({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) })) return 0;
             break;
@@ -172,7 +229,7 @@ namespace inkpages::detail
             break;
         case WM_LBUTTONUP:
             if (!IsRealMouse()) break;
-            if (mouse->UsesRightButton()) return 0;
+            if (touchSelection || mouse->UsesRightButton()) return 0;
             if (selection->OnPointer(message, wp, lp)) return 0;
             mouse->Release({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) });
             return 0;

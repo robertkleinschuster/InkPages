@@ -25,6 +25,7 @@ namespace inkpages
         std::wstring pen = L"Pen";
         std::wstring highlighter = L"Highlighter";
         std::wstring presetTip = L"tap again for color and size";
+        std::wstring writeToolTip = L"Only the pen writes. The mouse and touch navigate.";
         std::wstring eraser = L"Eraser";
         std::wstring eraserTip = L"Eraser – the pen's eraser button erases too, with any tool";
         std::wstring wholeStrokeErase = L"Erase whole strokes";

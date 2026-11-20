@@ -53,6 +53,7 @@ namespace inkpages::detail
         TextEditor& operator=(TextEditor const&) = delete;
 
         bool Editing() const { return box != nullptr; }
+        RectF DocumentBounds() const { return docBox; }
         /// The Text tool's pen tap (document point): ends editing when a text is edited; otherwise edits the text
         /// there, or starts a new one in `style`.
         void Tap(PointF at, TextStyle const& style);

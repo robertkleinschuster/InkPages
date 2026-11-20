@@ -28,6 +28,7 @@ namespace inkpages::detail
         explicit InkSelection(InkState& ink) : ink(ink) {}
 
         StrokeSelection Select(std::vector<PointF> const& polygon);
+        StrokeSelection SelectAt(PointF point, float radius);
         StrokeSelection SelectAll(int page);
         StrokeSelection Current() const { return selection; }
         void Clear();

@@ -29,6 +29,7 @@ namespace inkpages::detail
         std::function<void(RectF content)> zoomToRect;           // kept on the content
         std::function<PointF(POINT client)> toDocument;
         std::function<LPCWSTR(int page, PointF point)> cursorAt; // the app's (may be empty)
+        std::function<void()> panned;
     };
 
     class ViewerInput
@@ -60,6 +61,7 @@ namespace inkpages::detail
 
         ViewerInputContext c;
         bool panning = false;
+        bool panMoved = false;
         POINT panFrom{};
         View panView;
         LPCWSTR hoverCursor = nullptr; // a system cursor id; nullptr: the default

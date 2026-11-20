@@ -57,6 +57,9 @@ namespace inkpages::detail
 
         /// Window pointer input (pen given to the window, mouse); true when it was the selection's.
         bool OnPointer(UINT message, WPARAM wp, LPARAM lp);
+        void BeginTouchDrag(POINT client);
+        void UpdateTouchDrag(POINT client);
+        void EndTouchDrag(bool cancelled);
         /// The auto-scroll timer of a drag near the view's edge.
         void OnScrollTimer();
 
@@ -82,7 +85,8 @@ namespace inkpages::detail
         PointF ToDocument(POINT client) const;
         void Press(POINT client);
         void MoveTo(POINT client);
-        void Release();
+        void Release(bool keepOnTap = false);
+        void ResetPreview();
         void Set(StrokeSelection const& made, std::vector<PictureId> picked);
         void Publish(bool log = true);
         std::optional<SelectionFrame> FrameAround(RectF bounds) const;

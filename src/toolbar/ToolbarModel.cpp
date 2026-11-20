@@ -37,8 +37,8 @@ namespace inkpages::detail
         }
         b.push_back({ ButtonId::Eraser, Glyph::Eraser, std::nullopt, Check, true });
         b.push_back({ ButtonId::WholeStrokes, Glyph::WholeStrokes, std::nullopt, CheckWithMenu });
-        b.push_back({ ButtonId::Select, Glyph::Lasso, std::nullopt, CheckWithMenu, true });
         b.push_back({ ButtonId::Shape, Glyph::Shapes, std::nullopt, CheckWithMenu });
+        b.push_back({ ButtonId::Select, Glyph::Lasso, std::nullopt, CheckWithMenu, true });
         b.push_back({ ButtonId::Text, Glyph::Text, Palette::Pens[std::clamp(choices.textColor, 0, 9)], CheckWithMenu });
         b.push_back({ ButtonId::Ruler, Glyph::Ruler, std::nullopt, CheckWithMenu });
         b.push_back({ ButtonId::Cut, Glyph::Cut, std::nullopt, Command, true });
@@ -126,7 +126,10 @@ namespace inkpages::detail
 
     std::wstring TipOf(int id, ToolChoices const& c, ToolbarTexts const& t, std::vector<ToolbarButton> const& extensions)
     {
-        auto preset = [&](std::wstring const& kind, std::wstring const& color) { return std::format(L"{} – {} ({})", kind, color, t.presetTip); };
+        auto writeTip = [&](std::wstring const& tip) { return tip + L"\n" + t.writeToolTip; };
+        auto preset = [&](std::wstring const& kind, std::wstring const& color) {
+            return writeTip(std::format(L"{} – {} ({})", kind, color, t.presetTip));
+        };
         if (IsPreset(id, ButtonId::Pen))
         {
             auto pens = c.PensOrDefault();
@@ -142,10 +145,10 @@ namespace inkpages::detail
         {
         case ButtonId::Undo: return t.undo;
         case ButtonId::Redo: return t.redo;
-        case ButtonId::Eraser: return t.eraserTip;
+        case ButtonId::Eraser: return writeTip(t.eraserTip);
         case ButtonId::WholeStrokes: return t.wholeStrokeEraseTip;
         case ButtonId::Select: return t.selectTip;
-        case ButtonId::Shape: return t.shapesTip;
+        case ButtonId::Shape: return writeTip(t.shapesTip);
         case ButtonId::Text: return t.textTip;
         case ButtonId::Ruler: return t.rulerTip;
         case ButtonId::Cut: return t.cut;

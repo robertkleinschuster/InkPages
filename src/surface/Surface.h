@@ -18,6 +18,7 @@
 #include "render/Overlay.h"
 #include "render/PageMark.h"
 #include "surface/Composition.h"
+#include "surface/InputPane.h"
 #include "surface/MouseSelect.h"
 #include "surface/SelectionController.h"
 #include "surface/SurfaceAutomation.h"
@@ -108,6 +109,10 @@ namespace inkpages::detail
         void Tapped(PointF document, PointerKind kind);
         // The app's mouse gestures (mouseClaims/mouseGesture): its claim where nothing of the library's lies, ink at
         // a press (ink thread, waited for), a gesture to the app in the press page's coordinates.
+        void TouchTapped(PointF document);
+        void EditChanged(bool editing);
+        void InputPaneChanged(std::optional<RECT> screen);
+        RECT EffectiveClient() const;
         bool AppClaims(PointF document) const;
         void AppGesture(MousePhase phase, PointF press, PointF document, int clicks);
 
@@ -134,9 +139,13 @@ namespace inkpages::detail
         winrt::Windows::UI::ViewManagement::UISettings uiSettings{ nullptr };
         winrt::event_token accentChanged{};
         std::unique_ptr<TextEditor> textEditor;
+        std::unique_ptr<InputPane> inputPane;
+        std::optional<RECT> inputPaneScreen;
         TextHost* textHost = nullptr;
         TextStyle textStyle; // the Text tool's
         Tool currentTool = Tool::Pen;
+        UINT32 touchSelection = 0;
+        bool reportedPenStroke = false; // ink thread only
         // Page operations issued (UI thread) and applied on the ink thread: a tool's result made before the ink thread
         // applied every issued one refers to the old pages and is dropped.
         std::atomic<unsigned> pagesGeneration = 0, inkPagesGeneration = 0;

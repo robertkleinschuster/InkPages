@@ -49,6 +49,7 @@ namespace inkpages::detail
     void ViewerInput::PanDown(POINT client, bool middleButton)
     {
         panning = true;
+        panMoved = false;
         panFrom = client;
         panView = c.viewport->Current();
         SetCapture(c.window);
@@ -62,6 +63,11 @@ namespace inkpages::detail
         // From the press: the view moves opposite to the mouse, so the content follows it.
         c.zoomToRect(PanRect(c.clientSize(), panView, static_cast<float>(panFrom.x - client.x),
             static_cast<float>(panFrom.y - client.y)));
+        if (!panMoved && (panFrom.x != client.x || panFrom.y != client.y))
+        {
+            panMoved = true;
+            if (c.panned) c.panned();
+        }
         return true;
     }
 

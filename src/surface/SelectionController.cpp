@@ -241,20 +241,55 @@ namespace inkpages::detail
         MoveTo(drag->client);
     }
 
-    void SelectionController::Release()
+    void SelectionController::BeginTouchDrag(POINT client)
+    {
+        Log("selection: touch drag begins");
+        Press(client);
+    }
+
+    void SelectionController::UpdateTouchDrag(POINT client)
+    {
+        if (drag) MoveTo(client);
+    }
+
+    void SelectionController::EndTouchDrag(bool cancelled)
+    {
+        Log(cancelled ? "selection: touch drag cancelled" : "selection: touch drag ends");
+        if (!drag) return;
+        if (!cancelled)
+        {
+            Release(true);
+            return;
+        }
+        KillTimer(c.window, ScrollTimer);
+        drag.reset();
+        ResetPreview();
+    }
+
+    void SelectionController::ResetPreview()
+    {
+        c.host->Post("selection preview end", [tools = c.tools] {
+            if (ToolInput* t = tools()) t->PreviewSelection({});
+        });
+        if (PictureHost* host = c.pictures(); host && !pictures.empty()) host->Preview(pictures, {});
+    }
+
+    void SelectionController::Release(bool keepOnTap)
     {
         KillTimer(c.window, ScrollTimer);
         Drag d = *drag;
         drag.reset();
         unsigned ms = static_cast<unsigned>(GetTickCount64() - d.began);
-        if (Tap::IsTap(d.farthest, ms, c.viewport->Current().zoom))
+        bool tap = keepOnTap ? d.farthest < Tap::MaxDistance(c.viewport->Current().zoom)
+            : Tap::IsTap(d.farthest, ms, c.viewport->Current().zoom);
+        if (tap)
         {
-            c.host->Post("selection preview end", [tools = c.tools] {
-                if (ToolInput* t = tools()) t->PreviewSelection({});
-            });
-            if (PictureHost* host = c.pictures(); host && !pictures.empty()) host->Preview(pictures, {});
-            Log("selection: a tap on the selection clears it");
-            Clear();
+            ResetPreview();
+            if (!keepOnTap)
+            {
+                Log("selection: a tap on the selection clears it");
+                Clear();
+            }
             return;
         }
         if (PictureHost* host = c.pictures(); host && !pictures.empty())

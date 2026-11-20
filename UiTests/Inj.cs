@@ -283,6 +283,19 @@ public static class Inj
         Touch(new[] { Contact(0, P(x, y), F | UP) });
     }
 
+    public static void TouchHold(double x, double y, int milliseconds)
+    {
+        const uint F = PRIMARY | CONFIDENCE;
+        var at = P(x, y);
+        Touch(new[] { Contact(0, at, F | INRANGE | INCONTACT | DOWN) });
+        for (int elapsed = 0; elapsed < milliseconds; elapsed += 25)
+        {
+            Thread.Sleep(25);
+            Touch(new[] { Contact(0, at, F | INRANGE | INCONTACT | UPDATE) });
+        }
+        Touch(new[] { Contact(0, at, F | UP) });
+    }
+
     public static void Click(double x, double y)
     {
         var p = P(x, y);

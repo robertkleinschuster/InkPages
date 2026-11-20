@@ -23,7 +23,7 @@ add_library(InkPages STATIC ${INKPAGES_SOURCES})
 target_include_directories(InkPages PUBLIC include PRIVATE src)
 target_compile_options(InkPages PRIVATE ${INKPAGES_COMPILE_OPTIONS})
 target_compile_definitions(InkPages PUBLIC ${INKPAGES_DEFINITIONS})
-target_link_libraries(InkPages PUBLIC windowsapp d3d11 dxgi d2d1 dcomp comctl32 imm32 uiautomationcore)
+target_link_libraries(InkPages PUBLIC windowsapp d3d11 dxgi d2d1 dcomp comctl32 imm32 uiautomationcore ninput)
 
 # The demo and development app (UI tests in Windows Sandbox run against it).
 add_executable(InkPagesDemo WIN32 demo/main.cpp demo/DemoPictures.cpp demo/app.rc)
