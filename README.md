@@ -8,17 +8,17 @@ them, plus their toolbar – native, lean, modern Win32.
   (`CoreInkIndependentInputSource.PointerCursor`).
 - The sheet moves like paper: finger and precision touchpad pan (with inertia) and zoom with DirectManipulation; the
   pen writes, also while a finger holds the sheet.
-- Tools (being ported): pen and highlighter presets, eraser (whole strokes or exact), lasso/rectangle selection with
-  exact moves and scaling, shapes and shape recognition (`InkAnalyzer`), the Windows ruler, undo/redo.
+- Tools: pen and highlighter presets, eraser (whole strokes or exact), lasso/rectangle selection with exact moves and
+  scaling, shapes and shape recognition (`InkAnalyzer`), the Windows ruler and protractor, a text tool, undo/redo.
 - Controls: comctl32 v6 with visual styles, PerMonitorV2. No UI framework, few dependencies, static CRT – an app is a
   single small exe.
 
 There is no file format inside: the app supplies its document's pages and adds its own commands.
 
-**Status (2026-11-19): the C++/Win32 library has the writing surface (pages, paper, the app's underlay, ink,
-pan/zoom, pen cursor, lazy pages with stroke keys) and the tools (toolbar, pen and highlighter presets, eraser
-whole/exact, the pen's eraser end, selection with the app's pictures, shapes and recognition, Windows' ruler and
-protractor, undo/redo).** The WinUI 3 version
+**Status (2026-11-20): the C++/Win32 library has the writing surface (pages, paper, the app's underlay, ink,
+pan/zoom, pen cursor, lazy pages with stroke keys, page operations) and the tools (toolbar, pen and highlighter
+presets, eraser whole/exact, the pen's eraser end, selection with the app's pictures, shapes and recognition, Windows'
+ruler and protractor, the text tool, undo/redo).** The WinUI 3 version
 (C#, `InkCanvas`/`InkToolbar`, with its WinUI fork runtime) is tagged
 [`winui-final`](https://github.com/robertkleinschuster/InkPages/tree/winui-final).
 
@@ -84,7 +84,7 @@ toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize(
 - **Toolbar:** comctl32, Segoe Fluent icons, menus at the presets (color, width), at the eraser toggle (size), at
   select (lasso/rectangle), shapes (kind, recognition), text (font, size, color) and the ruler; `ToolbarTexts` in your language; app buttons
   (`ToolbarButton`: a Segoe Fluent glyph or a vector `path` in XAML path syntax, `pathSize` = its box; `name` = the
-  accessible name; `groupStart` = a separator before it). Every button has an accessible name (MSAA, so native UI Automation and Narrator find it).
+  accessible name; `groupStart` = a separator before it; `atStart` = at the toolbar's start, before undo/redo). Every button has an accessible name (MSAA, so native UI Automation and Narrator find it).
 
 ## Layout
 
