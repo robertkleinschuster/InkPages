@@ -38,7 +38,7 @@ namespace inkpages::detail
 
         /// Ink thread: a selection was made with the lasso or rectangle (strokes and the polygon, for the app's
         /// pictures); the selection was cleared by writing or tapping beside it; the pen goes to the window / comes back.
-        std::function<void(StrokeSelection const&, std::vector<PointF> const& polygon)> selected;
+        std::function<void(StrokeSelection const&, std::vector<PointF> const& polygon, bool rectangle)> selected;
         std::function<void()> cleared;
         std::function<void(bool taken)> penTaken;
         /// Ink thread: a pen tap with the Text tool (document point: edit the text there or start one).

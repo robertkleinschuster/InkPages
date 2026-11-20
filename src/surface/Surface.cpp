@@ -194,11 +194,24 @@ namespace inkpages::detail
         pageStore->load = [this](int page) { return load ? load(page) : std::vector<KeyedStroke>{}; };
         pageStore->store = [this](int page, std::vector<KeyedStroke> strokes) { if (store) store(page, std::move(strokes)); };
         tools = std::make_unique<ToolInput>(*ink, overlay);
-        tools->selected = [this](StrokeSelection const& made, std::vector<PointF> const& polygon) {
-            ui->Post([this, made, polygon, generation = inkPagesGeneration.load()] {
+        tools->selected = [this](StrokeSelection const& made, std::vector<PointF> const& polygon, bool rectangle) {
+            ui->Post([this, made, polygon, rectangle, generation = inkPagesGeneration.load()] {
                 if (generation != pagesGeneration) return; // made on pages that changed since
                 textEditor->End(); // one thing at a time: a selection ends editing
                 selection->Selected(made, polygon);
+                if (!emptyRectangle || !rectangle || selection->HasSelection()) return;
+                auto page = layout.PageAt(polygon.front());
+                if (!page) return;
+                RectF paper = layout.Page(*page);
+                PointF a = polygon.front(), b = polygon[2];
+                RectF area{
+                    std::max(paper.left, std::min(a.x, b.x)) - paper.left,
+                    std::max(paper.top, std::min(a.y, b.y)) - paper.top,
+                    std::min(paper.right, std::max(a.x, b.x)) - paper.left,
+                    std::min(paper.bottom, std::max(a.y, b.y)) - paper.top,
+                };
+                float minimum = Tap::MaxDistance(viewport->Current().zoom);
+                if (area.Width() >= minimum && area.Height() >= minimum) emptyRectangle(*page, area);
             });
         };
         tools->cleared = [this] { ui->Post([this] { selection->Cleared(); }); };

@@ -165,6 +165,8 @@ namespace inkpages
         /// double click too.
         std::function<bool(int page, PointF point)> mouseClaims;
         std::function<void(MouseGesture const& gesture)> mouseGesture;
+        /// A rectangle selected no objects. Gives the clipped rectangle in the press page's coordinates.
+        std::function<void(int page, RectF area)> emptyRectangle;
 
         // ---- the app's content below the ink
         /// The underlay of a page: what lies under the ink (background and ruling, a rendered PDF page, the app's

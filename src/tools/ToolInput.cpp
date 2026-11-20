@@ -335,7 +335,7 @@ namespace inkpages::detail
             lasso.clear();
             StrokeSelection made = selection.Select(polygon);
             Log(std::format("tools: {} selected {} strokes", rectangle ? "rectangle" : "lasso", made.ids.size()));
-            if (selected) selected(made, polygon);
+            if (selected) selected(made, polygon, rectangle);
             break;
         }
         default: break;
