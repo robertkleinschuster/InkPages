@@ -20,10 +20,16 @@ set(INKPAGES_DEFINITIONS UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 file(GLOB INKPAGES_SOURCES CONFIGURE_DEPENDS
     src/base/*.cpp src/model/*.cpp src/render/*.cpp src/ink/*.cpp src/tools/*.cpp src/surface/*.cpp src/toolbar/*.cpp src/text/*.cpp)
 add_library(InkPages STATIC ${INKPAGES_SOURCES})
+set(INKPAGES_TOOLBAR_ATLAS "${CMAKE_CURRENT_SOURCE_DIR}/assets/toolbar-icons.png")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${INKPAGES_TOOLBAR_ATLAS}")
+file(READ "${INKPAGES_TOOLBAR_ATLAS}" INKPAGES_TOOLBAR_ATLAS_HEX HEX)
+string(REGEX REPLACE "(..)" "0x\\1,\n" INKPAGES_TOOLBAR_ATLAS_BYTES "${INKPAGES_TOOLBAR_ATLAS_HEX}")
+file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/toolbar-atlas.inc" CONTENT "${INKPAGES_TOOLBAR_ATLAS_BYTES}")
+set_property(SOURCE src/toolbar/Icons.cpp APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_include_directories(InkPages PUBLIC include PRIVATE src)
 target_compile_options(InkPages PRIVATE ${INKPAGES_COMPILE_OPTIONS})
 target_compile_definitions(InkPages PUBLIC ${INKPAGES_DEFINITIONS})
-target_link_libraries(InkPages PUBLIC windowsapp d3d11 dxgi d2d1 dcomp comctl32 imm32 uiautomationcore ninput)
+target_link_libraries(InkPages PUBLIC windowsapp d3d11 dxgi d2d1 dcomp comctl32 imm32 uiautomationcore ninput windowscodecs coremessaging)
 
 # The demo and development app (UI tests in Windows Sandbox run against it).
 add_executable(InkPagesDemo WIN32 demo/main.cpp demo/DemoPictures.cpp demo/app.rc)

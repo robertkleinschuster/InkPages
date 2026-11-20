@@ -97,15 +97,15 @@ namespace inkpages::detail
         }
     }
 
-    void InkHost::Post(char const* name, std::function<void()> work)
+    HRESULT InkHost::Post(char const* name, std::function<void()> work)
     {
         if (OnThread())
         {
-            WorkItem(name, std::move(work)).Invoke();
-            return;
+            return WorkItem(name, std::move(work)).Invoke();
         }
         HRESULT hr = host->QueueWorkItem(winrt::make<WorkItem>(name, std::move(work)).get());
         if (FAILED(hr)) LogHr(std::format("QueueWorkItem({})", name), hr);
+        return hr;
     }
 
     void InkHost::Run(char const* name, std::function<void()> work, DWORD timeoutMs)

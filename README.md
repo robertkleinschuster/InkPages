@@ -87,6 +87,8 @@ toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize(
 - **Selection:** `Cut`, `Copy`, `Paste`, `Duplicate`, `DeleteSelection`, `SelectAll`, `ClearSelection`,
   `selectionChanged`; Windows ink's clipboard, or your own format with `copyToClipboard`/`pasteFromClipboard` (`Clip`).
 - **History:** `Undo`, `Redo`, `historyChanged`, `MarkSaved`/`AtSavePoint` – one history across pages.
+- **UI dispatch:** InkPages uses the current thread's Windows `DispatcherQueue`. The demo keeps a
+  `UiDispatcherScope` around its message loop so the dispatcher shuts down after the window and writing surface.
 - **Toolbar:** comctl32, Segoe Fluent icons, menus at the presets (color, width), at the eraser toggle (size), at
   select (lasso/rectangle), shapes (kind, recognition), text (font, size, color) and the ruler; `ToolbarTexts` in your language; app buttons
   (`ToolbarButton`: a Segoe Fluent glyph or a vector `path` in XAML path syntax, `pathSize` = its box; `name` = the

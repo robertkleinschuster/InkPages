@@ -18,7 +18,7 @@ namespace inkpages::detail
         constexpr int Pen = 200, Highlighter = 300; // + preset index
         constexpr int Eraser = 400, WholeStrokes = 401;
         constexpr int Select = 500, Shape = 501, Ruler = 502, Text = 503;
-        constexpr int Cut = 600, Copy = 601, Paste = 602, Duplicate = 603, Delete = 604, SelectAll = 605;
+        constexpr int Cut = 600, Copy = 601, Paste = 602, Duplicate = 603, Delete = 604;
         constexpr int Extension = 1000; // + index of the app's button
         constexpr int PresetRange = 20;
     }
@@ -28,7 +28,7 @@ namespace inkpages::detail
     struct ButtonSpec
     {
         int id = 0;
-        wchar_t glyph = 0;        // 0: a drawn icon (the shapes tool)
+        ToolbarSymbol symbol = ToolbarSymbol::Undo; // only used for built-in buttons
         std::optional<Color> bar; // a preset's color
         ButtonKind kind = ButtonKind::Command;
         bool groupStart = false;  // a separator before it

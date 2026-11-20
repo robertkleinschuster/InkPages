@@ -170,6 +170,8 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
 - Presenter state lives on the host thread: input events (Windows' input thread) and UI calls queue work items
   (`OnInkThread`, inline when already there). `InkHost::Run` carries the work's exception to the caller and throws on
   its timeout; shutdown waits without a timeout (the work refers to the surface).
+  `Surface` stores its `InkLayer` before calling `Start`, because the ready callback runs on the ink thread and
+  uses that member.
 - [measured, 2026-11-20] Dropping the last ink host reference shuts its thread down asynchronously. Ending the
   creating apartment immediately afterward can unload Windows.UI.Input.Inking.dll while the thread is still running
   (0xC0000005, reproduced by the InkHost regression test). The host keeps a synchronizable thread handle and waits
@@ -203,12 +205,17 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
 
 ## comctl32 toolbar, RichEdit, UI Automation
 
-- Toolbar: comctl32 (flat, tooltips via TBN_GETINFOTIP, BTNS_CHECK + BTNS_DROPDOWN, Segoe Fluent Icons images at
-  16 px × DPI) in its own container window (its notifications stay in the library); preset menus are user32 popup menus
+- Toolbar: comctl32 (flat, tooltips via TBN_GETINFOTIP, BTNS_CHECK + BTNS_DROPDOWN, 16 DIP images)
+  in its own container window (its notifications stay in the library); preset menus are user32 popup menus
   (a swatch bitmap replaces the check mark, so the current color is bold) – windowed popups, pen taps reach them. A
   second tap on the active preset opens its menu (WinUI behavior). Numbers use `ToolbarTexts::decimalSeparator`
-  ("0,85 pt"). App buttons: a glyph or XAML/SVG path data (`F0`/`F1`, M L H V C A Z, absolute/relative;
-  `model/PathData`, unit-tested) drawn with D2D in the glyphs' color and size; the shapes icon is drawn (no glyph).
+  ("0,85 pt"). InkPages owns the shared icon set. The embedded `assets/toolbar-icons.png` atlas has five columns
+  and four rows of 64 px tiles in `ToolbarSymbol` order. WIC scales the selected tile to the toolbar's current DPI.
+- [measured 2026-11-20] After setting a hidden toolbar's bitmap size to 16 or 24 pixels, `TB_LOADIMAGES` with
+  the matching standard set returned zero on its first call. `TB_GETIMAGELIST` returned the requested dimensions and
+  all 15 images. Verify the list and its count to check that the load succeeded.
+  Destroy the image list after destroying the temporary toolbar. In a 400-toolbar probe, destroying only the toolbar
+  leaked five GDI objects per instance; destroying the list as well kept GDI and USER object counts constant.
 - [measured 2026-11-19] comctl32 exposes a button's text as its MSAA name; with `TBSTYLE_EX_MIXEDBUTTONS` the text is not
   drawn without `BTNS_SHOWTEXT`, so every button gets its name as text and the tooltip stays the long tip. Native UIA
   (as Narrator) shows a ToolBar with Button/CheckBox children and names; no automation ids (MSAA has none). UI tests
@@ -238,7 +245,9 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   on programmatic focus); a hardware keyboard keeps it away unless "Show the touch keyboard" is "Always". [measured,
   sandbox] It did not show, also with `TabletTip\1.7\TouchKeyboardTapInvoke = 2` (TextInputHost stayed cloaked): the
   sandbox has a keyboard and only virtual pen/touch – a device check (README "Device checks"). During editing
-  `IFrameworkInputPane::AdviseWithHWND` watches the desktop pane's occupied screen rectangle. The surface shortens
+  `IFrameworkInputPane::AdviseWithHWND` watches the desktop pane's occupied screen rectangle. [measured] Unregister
+  on edit end while the root window is still alive. Unregistering at window teardown returned `E_INVALIDARG`.
+  The surface shortens
   its DirectManipulation viewport and reveals the edited box. Documented explicit route
   if auto-invoke fails: `IInputPaneInterop::GetForWindow` -> `InputPane.TryShow()` (the probe saw true with Visible =
   false while a keyboard was attached) – not built.

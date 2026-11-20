@@ -4,6 +4,7 @@
 // middle-button pan and hover cursor to ViewerInput - and the UI thread's handed-over work.
 
 #include "surface/Surface.h"
+#include "WindowData.h"
 
 #include <windowsx.h>
 
@@ -15,7 +16,6 @@ namespace inkpages::detail
 {
     namespace
     {
-        constexpr UINT UiMessage = WM_APP + 0x101;
         constexpr UINT_PTR MotionTimer = 2, ScrollTimer = 3;
 
         POINTER_INPUT_TYPE TypeOf(WPARAM wp)
@@ -54,8 +54,7 @@ namespace inkpages::detail
     {
         if (message == WM_NCCREATE)
         {
-            SetWindowLongPtrW(window, GWLP_USERDATA,
-                reinterpret_cast<LONG_PTR>(reinterpret_cast<CREATESTRUCTW*>(lp)->lpCreateParams));
+            if (!SetWindowData(window, reinterpret_cast<CREATESTRUCTW*>(lp)->lpCreateParams)) return FALSE;
         }
         auto self = reinterpret_cast<Surface*>(GetWindowLongPtrW(window, GWLP_USERDATA));
         if (self && self->composition)
@@ -264,9 +263,6 @@ namespace inkpages::detail
         case WM_DPICHANGED_AFTERPARENT:
             SetScale();
             Resized();
-            return 0;
-        case UiMessage:
-            ui->Drain();
             return 0;
         case WM_TIMER:
             if (wp == MotionTimer) Changed(false);

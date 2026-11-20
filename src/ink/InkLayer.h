@@ -36,11 +36,14 @@ namespace inkpages::detail
     {
     public:
         /// `ready` and `commit` run on the ink thread (the owner hands them to the UI thread).
-        InkLayer(InkHost& host, IDCompositionVisual* root, std::function<void()> ready,
+        InkLayer(InkHost& host, std::function<void()> ready,
             std::function<void()> commit);
         ~InkLayer();
         InkLayer(InkLayer const&) = delete;
         InkLayer& operator=(InkLayer const&) = delete;
+
+        // Call after the owner has stored this layer, before posting other presenter work.
+        void Start(IDCompositionVisual* root);
 
         InkPresenter const& Presenter() const { return presenter; }
         CoreInkIndependentInputSource const& Input() const { return input; }

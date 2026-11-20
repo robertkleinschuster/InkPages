@@ -182,6 +182,10 @@ namespace inkpages
         std::function<void(int page, ID2D1DeviceContext* dc, RectF area)> drawUnderlay;
         /// The page's underlay changed (a PDF render arrived, a picture moved): drawn anew.
         virtual void InvalidatePage(int page) = 0;
+        virtual void InvalidatePages(std::set<int> const& pages)
+        {
+            for (int page : pages) InvalidatePage(page);
+        }
         /// A visual for the app's content of a page (PDF page, pictures): page units, origin at the page's top left,
         /// above the paper, below the ink. Draw with the surface's device; sharpness: `RenderScale`.
         virtual IDCompositionVisual* PageLayer(int page) = 0;

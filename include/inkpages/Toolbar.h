@@ -12,7 +12,9 @@
 #include <array>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "inkpages/model/Pens.h"
@@ -20,6 +22,9 @@
 
 namespace inkpages
 {
+    /// A 32-bit Segoe Fluent Icons glyph for a native image list. The caller owns the bitmap.
+    HBITMAP CreateFluentGlyphBitmap(wchar_t glyph, COLORREF color, int size);
+
     struct ToolbarTexts
     {
         std::wstring pen = L"Pen";
@@ -52,7 +57,6 @@ namespace inkpages
         std::wstring paste = L"Paste";
         std::wstring duplicate = L"Duplicate selection";
         std::wstring deleteSelection = L"Delete selection";
-        std::wstring selectAll = L"Select all on the page";
         std::wstring undo = L"Undo";
         std::wstring redo = L"Redo";
         std::wstring color = L"Color";
@@ -68,6 +72,13 @@ namespace inkpages
     /// An app's own button at the end of the toolbar (or, with `atStart`, before undo/redo): a Segoe Fluent Icons glyph, or a vector path where the font has no
     /// fitting glyph (XAML/SVG path data with M L H V C A Z, absolute or relative, F0 even-odd / F1 nonzero fill, in a
     /// square of `pathSize` units).
+    // Ordered as the cells of the shared toolbar atlas, left to right and top to bottom.
+    enum class ToolbarSymbol
+    {
+        Save, ExportPdf, Undo, Redo, Pen, Highlighter, Eraser, WholeStrokes, Shapes, Select, Text, Ruler, Cut, Copy,
+        Paste, Duplicate, Delete, InsertPage, DeletePage
+    };
+
     struct ToolbarButton
     {
         int id = 0;            // the app's id (any number)
@@ -80,6 +91,7 @@ namespace inkpages
         bool groupStart = false; // a separator before it (the first app button at the end always has one)
         bool atStart = false;    // placed at the toolbar's start, before undo/redo, as apps put Save and Export there;
                                  // a separator follows the last of them
+        std::optional<ToolbarSymbol> symbol; // a shared InkPages bitmap, if set
     };
 
     class Toolbar

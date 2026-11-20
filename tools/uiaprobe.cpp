@@ -2,6 +2,8 @@
 //   uiaprobe.exe <window class>            every element, depth first: control type id, name, automation id
 //   uiaprobe.exe <window class> <text>     the first element whose name contains <text>: "x y" = its center in screen
 //                                          pixels (exit code 1 when there is none) - UI tests click it there
+//   uiaprobe.exe <window class> <text> --tree-item   match tree items only
+//   uiaprobe.exe <window class> <text> --exact       match the full name
 //   uiaprobe.exe --focus                   the focused element: control type, class, keyboard focus, text pattern and
 //                                          its text, bounds (exit code 1 when it has no text pattern)
 //   uiaprobe.exe --keyboard                the touch keyboard's windows (TextInputHost): class, title, visible, cloaked,
@@ -18,6 +20,7 @@
 
 #include <cstdio>
 #include <string>
+#include <string_view>
 
 #include <winrt/base.h>
 
@@ -27,6 +30,8 @@ namespace
     {
         IUIAutomationTreeWalker* walker;
         std::wstring find;
+        bool treeItemsOnly = false;
+        bool exactName = false;
         bool found = false;
 
         void Visit(IUIAutomationElement* element, int depth)
@@ -46,7 +51,8 @@ namespace
                 {
                     wprintf(L"%*s%d '%s' id '%s'\n", depth * 2, L"", type, text.c_str(), id ? id : L"");
                 }
-                else if (text.find(find) != std::wstring::npos)
+                else if ((!treeItemsOnly || type == UIA_TreeItemControlTypeId) &&
+                    (exactName ? text == find : text.find(find) != std::wstring::npos))
                 {
                     RECT r{};
                     child->get_CurrentBoundingRectangle(&r);
@@ -163,7 +169,8 @@ int wmain(int argc, wchar_t** argv)
         winrt::check_hresult(uia->ElementFromHandle(window, root.put()));
         winrt::com_ptr<IUIAutomationTreeWalker> walker;
         winrt::check_hresult(uia->get_RawViewWalker(walker.put()));
-        Probe probe{ walker.get(), argc > 2 ? argv[2] : L"" };
+        std::wstring_view option = argc > 3 ? argv[3] : L"";
+        Probe probe{ walker.get(), argc > 2 ? argv[2] : L"", option == L"--tree-item", option == L"--exact" };
         probe.Visit(root.get(), 0);
         return probe.find.empty() || probe.found ? 0 : 1;
     }

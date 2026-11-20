@@ -25,7 +25,7 @@ namespace inkpages::detail
         InkHost& operator=(InkHost const&) = delete;
 
         IInkDesktopHost* Get() const { return host.get(); }
-        void Post(char const* name, std::function<void()> work);
+        HRESULT Post(char const* name, std::function<void()> work);
         /// Runs `work` on the ink thread and waits for it (snapshots; INFINITE at shutdown: the work refers to objects
         /// that are about to go). The work's exception comes to the caller; a timeout throws hresult_error
         /// (HRESULT_FROM_WIN32(ERROR_TIMEOUT)) - the work may still run later, so it must hold what it touches.

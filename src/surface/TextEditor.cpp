@@ -172,8 +172,7 @@ namespace inkpages::detail
     void TextEditor::ScheduleDraw()
     {
         if (drawPending || !box) return;
-        drawPending = true;
-        c.ui->Post([this] {
+        drawPending = c.ui->Post([this] {
             drawPending = false;
             try
             {

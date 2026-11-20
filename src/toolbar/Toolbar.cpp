@@ -1,9 +1,11 @@
 #include "inkpages/Toolbar.h"
+#include "WindowData.h"
 
 #include <commctrl.h>
 
 #include <algorithm>
 #include <format>
+#include <type_traits>
 
 #include "inkpages/Log.h"
 #include "toolbar/Icons.h"
@@ -17,7 +19,7 @@ namespace inkpages
         using namespace detail;
 
         constexpr wchar_t ClassName[] = L"InkPagesToolbar";
-        constexpr Color Dark{ 0xFF, 0x20, 0x20, 0x20 };
+        constexpr Color NotebookBlue{ 0xFF, 0x21, 0x57, 0x8F };
 
         // The comctl32 toolbar in a container window of the library's own (its notifications stay in the library).
         class Bar final : public Toolbar
@@ -38,6 +40,7 @@ namespace inkpages
         private:
             LRESULT Handle(UINT message, WPARAM wp, LPARAM lp);
             void Build();
+            void DestroyControls();
             void Click(int id);
             void Menu(int id);
             void Apply(bool changed);
@@ -55,6 +58,7 @@ namespace inkpages
             std::vector<std::wstring> names; // the buttons' texts (accessible names), alive as long as the buttons
             HWND container = nullptr, bar = nullptr;
             HIMAGELIST images = nullptr;
+            std::shared_ptr<bool> alive = std::make_shared<bool>(true);
         };
 
         Bar::Bar(HWND parent, WritingSurface& surface, ToolChoices choices, ToolbarTexts texts,
@@ -75,48 +79,62 @@ namespace inkpages
             (void)registered;
             container = CreateWindowExW(0, ClassName, L"", WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN, 0, 0, 100, 40, parent,
                 nullptr, GetModuleHandleW(nullptr), this);
-            winrt::check_pointer(container);
-            bar = CreateWindowExW(0, TOOLBARCLASSNAMEW, L"", WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_LIST | TBSTYLE_TOOLTIPS |
-                CCS_NODIVIDER | CCS_NORESIZE | CCS_NOPARENTALIGN, 0, 0, 100, 40, container, nullptr,
-                GetModuleHandleW(nullptr), nullptr);
-            winrt::check_pointer(bar);
-            SendMessageW(bar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
-            // Mixed buttons: a button's text is its accessible name (MSAA/UI Automation) but is not drawn without
-            // BTNS_SHOWTEXT (TBSTYLE_EX_MIXEDBUTTONS needs TBSTYLE_LIST).
-            SendMessageW(bar, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_DRAWDDARROWS | TBSTYLE_EX_MIXEDBUTTONS);
-            Build();
-            // Undo/redo and the selection's commands follow the surface (after the app's own handlers).
-            for (auto* handler : { &surface.historyChanged, &surface.selectionChanged })
+            if (!container) winrt::throw_last_error();
+            try
             {
-                *handler = [this, previous = std::move(*handler)] {
-                    UpdateStates();
-                    if (previous) previous();
+                bar = CreateWindowExW(0, TOOLBARCLASSNAMEW, L"", WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_LIST | TBSTYLE_TOOLTIPS |
+                    CCS_NODIVIDER | CCS_NORESIZE | CCS_NOPARENTALIGN, 0, 0, 100, 40, container, nullptr,
+                    GetModuleHandleW(nullptr), nullptr);
+                if (!bar) winrt::throw_last_error();
+                SendMessageW(bar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
+                // Mixed buttons keep accessible names while rendering the icons alone.
+                SendMessageW(bar, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_DRAWDDARROWS | TBSTYLE_EX_MIXEDBUTTONS);
+                Build();
+                Apply(false);
+                auto followSurface = [this](std::function<void()> const& previous) -> std::function<void()> {
+                    return [this, lifetime = std::weak_ptr<bool>(alive), previous] {
+                        if (!lifetime.expired()) UpdateStates();
+                        if (previous) previous();
+                    };
                 };
+                auto history = followSurface(surface.historyChanged);
+                auto selection = followSurface(surface.selectionChanged);
+                surface.historyChanged = std::move(history);
+                surface.selectionChanged = std::move(selection);
             }
-            Apply(false);
+            catch (...)
+            {
+                DestroyControls();
+                throw;
+            }
         }
 
         Bar::~Bar()
         {
-            if (container)
+            alive.reset();
+            DestroyControls();
+        }
+
+        void Bar::DestroyControls()
+        {
+            if (IsWindow(container))
             {
-                SetWindowLongPtrW(container, GWLP_USERDATA, 0);
-                DestroyWindow(container);
+                SetWindowData(container, nullptr);
+                if (!DestroyWindow(container)) LogHr("DestroyWindow (toolbar)", HRESULT_FROM_WIN32(GetLastError()));
             }
-            if (images) ImageList_Destroy(images);
+            if (images && !ImageList_Destroy(images)) LogError("ImageList_Destroy (toolbar) failed");
         }
 
         void Bar::Build()
         {
             int size = MulDiv(16, GetDpiForWindow(container), 96); // normal mouse size (the pen operates it)
-            if (images) ImageList_Destroy(images);
-            images = ImageList_Create(size, size, ILC_COLOR32, 24, 4);
-            while (SendMessageW(bar, TB_BUTTONCOUNT, 0, 0) > 0) SendMessageW(bar, TB_DELETEBUTTON, 0, 0);
-            SendMessageW(bar, TB_SETIMAGELIST, 0, reinterpret_cast<LPARAM>(images));
+            std::unique_ptr<std::remove_pointer_t<HIMAGELIST>, decltype(&ImageList_Destroy)> nextImages(
+                ImageList_Create(size, size, ILC_COLOR32, 24, 4), ImageList_Destroy);
+            if (!nextImages) throw winrt::hresult_error(E_FAIL, L"ImageList_Create (toolbar)");
             std::vector<TBBUTTON> buttons;
             auto specs = ToolbarButtons(choices, extensions);
-            names.clear();
-            names.reserve(specs.size()); // the toolbar keeps pointers into these
+            std::vector<std::wstring> nextNames;
+            nextNames.reserve(specs.size()); // the toolbar keeps pointers into these
             for (ButtonSpec const& spec : specs)
             {
                 if (spec.groupStart)
@@ -125,32 +143,46 @@ namespace inkpages
                     separator.fsStyle = BTNS_SEP;
                     buttons.push_back(separator);
                 }
-                HBITMAP icon = IconOf(spec, size);
                 TBBUTTON b{};
-                b.iBitmap = ImageList_Add(images, icon, nullptr);
-                DeleteObject(icon);
+                HBITMAP icon = IconOf(spec, size);
+                if (!icon) throw winrt::hresult_error(E_FAIL, L"Render toolbar icon");
+                b.iBitmap = ImageList_Add(nextImages.get(), icon, nullptr);
+                if (!DeleteObject(icon)) LogError("DeleteObject (toolbar bitmap) failed");
+                if (b.iBitmap < 0) throw winrt::hresult_error(E_FAIL, L"ImageList_Add (toolbar)");
                 b.idCommand = spec.id;
                 b.fsState = TBSTATE_ENABLED;
-                names.push_back(NameOf(spec.id, choices, texts, extensions));
-                b.iString = reinterpret_cast<INT_PTR>(names.back().c_str());
+                nextNames.push_back(NameOf(spec.id, choices, texts, extensions));
+                b.iString = reinterpret_cast<INT_PTR>(nextNames.back().c_str());
                 b.fsStyle = static_cast<BYTE>(spec.kind == ButtonKind::Command ? BTNS_BUTTON
                     : spec.kind == ButtonKind::Check ? BTNS_CHECK : BTNS_CHECK | BTNS_DROPDOWN);
                 buttons.push_back(b);
             }
-            SendMessageW(bar, TB_ADDBUTTONSW, buttons.size(), reinterpret_cast<LPARAM>(buttons.data()));
+            while (SendMessageW(bar, TB_BUTTONCOUNT, 0, 0) > 0)
+            {
+                if (!SendMessageW(bar, TB_DELETEBUTTON, 0, 0))
+                    throw winrt::hresult_error(E_FAIL, L"TB_DELETEBUTTON (toolbar)");
+            }
+            HIMAGELIST old = images;
+            images = nextImages.release();
+            SendMessageW(bar, TB_SETIMAGELIST, 0, reinterpret_cast<LPARAM>(images));
+            if (old && !ImageList_Destroy(old)) LogError("ImageList_Destroy (previous toolbar images) failed");
+            names.swap(nextNames);
+            if (!SendMessageW(bar, TB_ADDBUTTONSW, buttons.size(), reinterpret_cast<LPARAM>(buttons.data())))
+                throw winrt::hresult_error(E_FAIL, L"TB_ADDBUTTONS (toolbar)");
             SendMessageW(bar, TB_AUTOSIZE, 0, 0);
             UpdateStates();
         }
 
         HBITMAP Bar::IconOf(ButtonSpec const& spec, int size) const
         {
-            if (spec.glyph) return GlyphIcon(spec.glyph, Dark, spec.bar, size);
             if (spec.id >= ButtonId::Extension)
             {
                 ToolbarButton const& b = extensions[spec.id - ButtonId::Extension];
-                return PathIcon(b.path, b.pathSize, Dark, size);
+                if (b.symbol) return ArtworkIcon(*b.symbol, {}, size);
+                if (b.glyph) return GlyphIcon(b.glyph, NotebookBlue, {}, size);
+                return PathIcon(b.path, b.pathSize, NotebookBlue, size);
             }
-            return ShapesIcon(Dark, size);
+            return ArtworkIcon(spec.symbol, spec.bar, size);
         }
 
         int Bar::Height() const
@@ -262,7 +294,6 @@ namespace inkpages
             case ButtonId::Paste: surface.Paste(); break;
             case ButtonId::Duplicate: surface.Duplicate(); break;
             case ButtonId::Delete: surface.DeleteSelection(); break;
-            case ButtonId::SelectAll: surface.SelectAll(); break;
             default: break;
             }
             UpdateStates();
@@ -304,8 +335,7 @@ namespace inkpages
         {
             if (message == WM_NCCREATE)
             {
-                SetWindowLongPtrW(window, GWLP_USERDATA,
-                    reinterpret_cast<LONG_PTR>(reinterpret_cast<CREATESTRUCTW*>(lp)->lpCreateParams));
+                if (!SetWindowData(window, reinterpret_cast<CREATESTRUCTW*>(lp)->lpCreateParams)) return FALSE;
             }
             auto self = reinterpret_cast<Bar*>(GetWindowLongPtrW(window, GWLP_USERDATA));
             if (self && self->bar)

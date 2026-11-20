@@ -44,6 +44,29 @@ namespace inkpages::tests
         EXPECT_FLOAT_EQ(82, CaretScroll(Viewport, { 700, 400, 702, 420 }, floating, 12).y);
     }
 
+    TEST(Viewer, RevealCaretChoosesAvailableDirectionAtDocumentEnd)
+    {
+        auto target = RevealCaretRect(Viewport, { 1, 0, -800 }, { 1000, 1600 },
+            { 500, 400, 502, 420 }, { 0, 350, 1000, 600 }, 12, 6);
+        ASSERT_TRUE(target);
+        EXPECT_FLOAT_EQ(1000, target->Width());
+        EXPECT_FLOAT_EQ(588, target->top);
+    }
+
+    TEST(Viewer, RevealCaretCanMakeRoomOnAPageThatFillsTheViewport)
+    {
+        RectF caret{ 700, 400, 702, 420 }, pane{ 600, 350, 950, 600 };
+        auto target = RevealCaretRect(Viewport, {}, Viewport, caret, pane, 12, 6);
+        ASSERT_TRUE(target);
+        float zoom = Viewport.width / target->Width();
+        EXPECT_GT(zoom, 1);
+        RectF shifted{ (caret.left - target->left) * zoom, (caret.top - target->top) * zoom,
+            (caret.right - target->left) * zoom, (caret.bottom - target->top) * zoom };
+        EXPECT_FALSE(shifted.Intersects(pane));
+        EXPECT_GE(shifted.top, 0);
+        EXPECT_LE(shifted.bottom, Viewport.height);
+    }
+
     TEST(Viewer, ScrollKeysStepLinesPagesAndGoToTheEnds)
     {
         View view{ 1, 0, -1000 };

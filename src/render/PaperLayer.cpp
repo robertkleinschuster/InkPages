@@ -91,11 +91,12 @@ namespace inkpages::detail
             dc->SetTransform(D2D1::Matrix3x2F::Scale(scale, scale) *
                 D2D1::Matrix3x2F::Translation(static_cast<float>(offset.x - px.left), static_cast<float>(offset.y - px.top)));
             D2D1_RECT_F clip{ px.left / scale, px.top / scale, px.right / scale, px.bottom / scale };
-            dc->PushAxisAlignedClip(clip, D2D1_ANTIALIAS_MODE_ALIASED);
-            dc->Clear(ToD2D(paper.sheetColor));
             winrt::com_ptr<ID2D1SolidColorBrush> brush;
             winrt::check_hresult(dc->CreateSolidColorBrush(ToD2D(paper.lineColor), brush.put()));
-            for (Line const& line : paper.Lines(page.Width(), page.Height()))
+            auto lines = paper.Lines(page.Width(), page.Height());
+            dc->PushAxisAlignedClip(clip, D2D1_ANTIALIAS_MODE_ALIASED);
+            dc->Clear(ToD2D(paper.sheetColor));
+            for (Line const& line : lines)
             {
                 bool vertical = line.from.x == line.to.x;
                 if (vertical ? (line.from.x < clip.left - 2 || line.from.x > clip.right + 2)

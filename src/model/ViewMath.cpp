@@ -111,6 +111,63 @@ namespace inkpages
         return scroll;
     }
 
+    std::optional<RectF> RevealCaretRect(SizeF viewport, View view, SizeF content, RectF caret, RectF pane,
+        float margin, float maxZoom)
+    {
+        RectF current = PanRect(viewport, view, 0, 0);
+        RectF padded = caret.Inflated(margin, margin);
+        if (padded.left >= 0 && padded.top >= 0 && padded.right <= viewport.width &&
+            padded.bottom <= viewport.height && !padded.Intersects(pane)) return std::nullopt;
+        PointF anchor{ caret.left, caret.top };
+        for (float zoom = view.zoom;; zoom = std::min(maxZoom, zoom * 1.25f))
+        {
+            RectF anchored = ZoomRect(viewport, view, zoom, anchor);
+            View candidateView{ zoom, -anchored.left * zoom, -anchored.top * zoom };
+            RectF target{ caret.left, caret.top, caret.left + caret.Width() * zoom / view.zoom,
+                caret.top + caret.Height() * zoom / view.zoom };
+            PointF primary = CaretScroll(viewport, target, pane, margin);
+            std::optional<RectF> best;
+            float bestDistance = 0;
+            for (float padding : { margin, 0.f })
+            {
+                RectF wanted = target.Inflated(padding, padding);
+                PointF offsets[] = { primary, {},
+                    { primary.x, wanted.bottom - pane.top }, { primary.x, wanted.top - pane.bottom },
+                    { wanted.right - pane.left, primary.y }, { wanted.left - pane.right, primary.y } };
+                for (PointF offset : offsets)
+                {
+                    RectF rect = KeepOnContent(PanRect(viewport, candidateView, offset.x, offset.y), content);
+                    float dx = (rect.left - anchored.left) * zoom, dy = (rect.top - anchored.top) * zoom;
+                    RectF visible{ wanted.left - dx, wanted.top - dy, wanted.right - dx, wanted.bottom - dy };
+                    constexpr float Tolerance = 0.01f;
+                    if (visible.left < -Tolerance || visible.top < -Tolerance || visible.right > viewport.width + Tolerance ||
+                        visible.bottom > viewport.height + Tolerance || visible.Intersects(pane.Inflated(-Tolerance, -Tolerance)))
+                        continue;
+                    float distance = dx * dx + dy * dy;
+                    if (!best || distance < bestDistance)
+                    {
+                        best = rect;
+                        bestDistance = distance;
+                    }
+                }
+                if (best) break;
+            }
+            if (best)
+            {
+                if (zoom == view.zoom && std::abs(best->left - current.left) < 0.01f &&
+                    std::abs(best->top - current.top) < 0.01f) return std::nullopt;
+                return best;
+            }
+            if (zoom >= maxZoom || !caret.Intersects(pane)) break;
+        }
+        PointF shift = CaretScroll(viewport, caret, pane, margin);
+        if (shift.x == 0 && shift.y == 0) return std::nullopt;
+        RectF bounded = KeepOnContent(PanRect(viewport, view, shift.x, shift.y), content);
+        if (std::abs(bounded.left - current.left) < 0.01f && std::abs(bounded.top - current.top) < 0.01f)
+            return std::nullopt;
+        return bounded;
+    }
+
     RectF KeyScrollRect(ScrollKey key, SizeF viewportPx, View view, float scale, float documentHeight, float linePx,
         float overlapPx)
     {

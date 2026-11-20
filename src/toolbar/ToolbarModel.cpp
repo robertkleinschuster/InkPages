@@ -5,48 +5,40 @@
 
 namespace inkpages::detail
 {
-    namespace Glyph // Segoe Fluent Icons
-    {
-        constexpr wchar_t Undo = 0xE7A7, Redo = 0xE7A6, Pen = 0xE76D, Highlighter = 0xE7E6, Eraser = 0xE75C,
-            WholeStrokes = 0xED62, Lasso = 0xF1BE, Shapes = 0, Text = 0xE8D2, Ruler = 0xED5E, Cut = 0xE8C6, Copy = 0xE8C8,
-            Paste = 0xE77F, Duplicate = 0xF413, Delete = 0xE74D, SelectAll = 0xE8B3;
-    }
-
     std::vector<ButtonSpec> ToolbarButtons(ToolChoices const& choices, std::vector<ToolbarButton> const& extensions)
     {
         using enum ButtonKind;
         std::vector<ButtonSpec> b;
         auto appButton = [&](size_t i, bool groupStart) { // glyph 0: its path
-            b.push_back({ ButtonId::Extension + static_cast<int>(i), extensions[i].glyph, std::nullopt, Command, groupStart });
+            b.push_back({ ButtonId::Extension + static_cast<int>(i), ToolbarSymbol{}, std::nullopt, Command, groupStart });
         };
         for (size_t i = 0; i < extensions.size(); ++i)
         {
             if (extensions[i].atStart) appButton(i, !b.empty() && extensions[i].groupStart);
         }
-        b.push_back({ ButtonId::Undo, Glyph::Undo, std::nullopt, Command, !b.empty() });
-        b.push_back({ ButtonId::Redo, Glyph::Redo });
+        b.push_back({ ButtonId::Undo, ToolbarSymbol::Undo, std::nullopt, Command, !b.empty() });
+        b.push_back({ ButtonId::Redo, ToolbarSymbol::Redo });
         auto pens = choices.PensOrDefault();
         for (int i = 0; i < static_cast<int>(pens.size()); ++i)
         {
-            b.push_back({ ButtonId::Pen + i, Glyph::Pen, Palette::Pens[pens[i].color], CheckWithMenu, i == 0 });
+            b.push_back({ ButtonId::Pen + i, ToolbarSymbol::Pen, Palette::Pens[pens[i].color], CheckWithMenu, i == 0 });
         }
         auto highlighters = choices.HighlightersOrDefault();
         for (int i = 0; i < static_cast<int>(highlighters.size()); ++i)
         {
-            b.push_back({ ButtonId::Highlighter + i, Glyph::Highlighter, Palette::Highlighters[highlighters[i].color], CheckWithMenu, i == 0 });
+            b.push_back({ ButtonId::Highlighter + i, ToolbarSymbol::Highlighter, Palette::Highlighters[highlighters[i].color], CheckWithMenu, i == 0 });
         }
-        b.push_back({ ButtonId::Eraser, Glyph::Eraser, std::nullopt, Check, true });
-        b.push_back({ ButtonId::WholeStrokes, Glyph::WholeStrokes, std::nullopt, CheckWithMenu });
-        b.push_back({ ButtonId::Shape, Glyph::Shapes, std::nullopt, CheckWithMenu });
-        b.push_back({ ButtonId::Select, Glyph::Lasso, std::nullopt, CheckWithMenu, true });
-        b.push_back({ ButtonId::Text, Glyph::Text, Palette::Pens[std::clamp(choices.textColor, 0, 9)], CheckWithMenu });
-        b.push_back({ ButtonId::Ruler, Glyph::Ruler, std::nullopt, CheckWithMenu });
-        b.push_back({ ButtonId::Cut, Glyph::Cut, std::nullopt, Command, true });
-        b.push_back({ ButtonId::Copy, Glyph::Copy });
-        b.push_back({ ButtonId::Paste, Glyph::Paste });
-        b.push_back({ ButtonId::Duplicate, Glyph::Duplicate });
-        b.push_back({ ButtonId::Delete, Glyph::Delete });
-        b.push_back({ ButtonId::SelectAll, Glyph::SelectAll });
+        b.push_back({ ButtonId::Eraser, ToolbarSymbol::Eraser, std::nullopt, Check, true });
+        b.push_back({ ButtonId::WholeStrokes, ToolbarSymbol::WholeStrokes, std::nullopt, CheckWithMenu, false });
+        b.push_back({ ButtonId::Shape, ToolbarSymbol::Shapes, std::nullopt, CheckWithMenu, false });
+        b.push_back({ ButtonId::Select, ToolbarSymbol::Select, std::nullopt, CheckWithMenu, true });
+        b.push_back({ ButtonId::Text, ToolbarSymbol::Text, Palette::Pens[std::clamp(choices.textColor, 0, 9)], CheckWithMenu, false });
+        b.push_back({ ButtonId::Ruler, ToolbarSymbol::Ruler, std::nullopt, CheckWithMenu, false });
+        b.push_back({ ButtonId::Cut, ToolbarSymbol::Cut, std::nullopt, Command, true });
+        b.push_back({ ButtonId::Copy, ToolbarSymbol::Copy });
+        b.push_back({ ButtonId::Paste, ToolbarSymbol::Paste });
+        b.push_back({ ButtonId::Duplicate, ToolbarSymbol::Duplicate });
+        b.push_back({ ButtonId::Delete, ToolbarSymbol::Delete });
         bool first = true;
         for (size_t i = 0; i < extensions.size(); ++i)
         {
@@ -156,7 +148,6 @@ namespace inkpages::detail
         case ButtonId::Paste: return t.paste;
         case ButtonId::Duplicate: return t.duplicate;
         case ButtonId::Delete: return t.deleteSelection;
-        case ButtonId::SelectAll: return t.selectAll;
         default: return {};
         }
     }

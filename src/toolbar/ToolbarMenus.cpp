@@ -37,29 +37,48 @@ namespace inkpages::detail
                 return -1;
             }
             std::vector<std::unique_ptr<std::remove_pointer_t<HBITMAP>, BitmapDeleter>> swatches;
+            struct OwnedMenu
+            {
+                HMENU handle;
+                ~OwnedMenu() { if (!DestroyMenu(handle)) LogError("DestroyMenu (toolbar) failed"); }
+            } owned{ menu };
+            swatches.reserve(items.size());
             int swatchSize = GetSystemMetricsForDpi(SM_CYMENUCHECK, GetDpiForWindow(owner));
             for (size_t i = 0; i < items.size(); ++i)
             {
                 Item const& item = items[i];
                 if (item.separator)
                 {
-                    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+                    if (!AppendMenuW(menu, MF_SEPARATOR, 0, nullptr))
+                    {
+                        LogHr("AppendMenuW (toolbar separator)", HRESULT_FROM_WIN32(GetLastError()));
+                        return -1;
+                    }
                     continue;
                 }
-                AppendMenuW(menu, MF_STRING | (item.checked ? MF_CHECKED : 0), i + 1, item.text.c_str());
+                if (!AppendMenuW(menu, MF_STRING | (item.checked ? MF_CHECKED : 0), i + 1, item.text.c_str()))
+                {
+                    LogHr("AppendMenuW (toolbar item)", HRESULT_FROM_WIN32(GetLastError()));
+                    return -1;
+                }
                 if (item.swatch)
                 {
                     swatches.emplace_back(Swatch(*item.swatch, swatchSize));
+                    if (!swatches.back())
+                    {
+                        LogError("CreateDIBSection (toolbar swatch) failed");
+                        continue;
+                    }
                     MENUITEMINFOW info{ sizeof(info) };
                     info.fMask = MIIM_BITMAP | MIIM_STATE;
                     info.hbmpItem = swatches.back().get();
                     // The swatch takes the check mark's place: the current color is shown in bold.
                     info.fState = item.checked ? MFS_CHECKED | MFS_DEFAULT : 0;
-                    SetMenuItemInfoW(menu, static_cast<UINT>(i + 1), FALSE, &info);
+                    if (!SetMenuItemInfoW(menu, static_cast<UINT>(i + 1), FALSE, &info))
+                        LogHr("SetMenuItemInfoW (toolbar swatch)", HRESULT_FROM_WIN32(GetLastError()));
                 }
             }
             UINT chosen = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN, anchor.left, anchor.bottom, owner, nullptr);
-            DestroyMenu(menu);
             return static_cast<int>(chosen) - 1;
         }
 

@@ -69,6 +69,9 @@ namespace inkpages
 
     SizeF ViewportWithInputPane(SizeF client, RectF pane);
     PointF CaretScroll(SizeF viewport, RectF caret, RectF pane, float margin);
+    // Keeps the caret out of the pane after clamping to the document. Zooms only if panning cannot clear an overlap.
+    std::optional<RectF> RevealCaretRect(SizeF viewport, View view, SizeF content, RectF caret, RectF pane,
+        float margin, float maxZoom);
 
     /// The content rectangle for a scroll key at the current zoom: a line = `linePx` viewport pixels, a page = the view's
     /// height less `overlapPx` (what stays in view), Start/End = the document's top/bottom (`documentHeight` in DIPs).

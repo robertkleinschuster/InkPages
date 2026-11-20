@@ -16,13 +16,16 @@ namespace inkpages::detail
     using winrt::Windows::UI::Core::CoreInputDeviceTypes;
     using winrt::Windows::UI::Core::PointerEventArgs;
 
-    InkLayer::InkLayer(InkHost& host, IDCompositionVisual* root, std::function<void()> ready,
+    InkLayer::InkLayer(InkHost& host, std::function<void()> ready,
         std::function<void()> commit)
         : host(host), ready(std::move(ready)), commit(std::move(commit))
+    {}
+
+    void InkLayer::Start(IDCompositionVisual* root)
     {
         winrt::com_ptr<IDCompositionVisual> visual;
         visual.copy_from(root);
-        host.Post("create presenter", [this, visual] { Create(visual.get()); });
+        winrt::check_hresult(host.Post("create presenter", [this, visual] { Create(visual.get()); }));
     }
 
     InkLayer::~InkLayer()

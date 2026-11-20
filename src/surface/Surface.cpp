@@ -1,4 +1,5 @@
 #include "surface/Surface.h"
+#include "WindowData.h"
 
 #include <cmath>
 #include <format>
@@ -22,7 +23,6 @@ namespace inkpages::detail
     namespace
     {
         constexpr wchar_t ClassName[] = L"InkPagesWritingSurface";
-        constexpr UINT UiMessage = WM_APP + 0x101;   // UiThread's work
         constexpr UINT_PTR MotionTimer = 2;
         constexpr UINT MotionIntervalMs = 120;       // lazy pages and sheets while the view moves
         constexpr float RevealMarginDip = 16;
@@ -30,6 +30,20 @@ namespace inkpages::detail
     }
 
     Surface::Surface(HWND parent, SurfaceOptions options) : options(options)
+    {
+        try
+        {
+            Initialize(parent);
+        }
+        catch (...)
+        {
+            if (window) SetWindowData(window, nullptr);
+            Close();
+            throw;
+        }
+    }
+
+    void Surface::Initialize(HWND parent)
     {
         static bool registered = [] {
             WNDCLASSEXW wc{ sizeof(wc) };
@@ -44,8 +58,8 @@ namespace inkpages::detail
         (void)registered;
         window = CreateWindowExW(0, ClassName, L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS, 0, 0, 100, 100, parent,
             nullptr, GetModuleHandleW(nullptr), this);
-        winrt::check_pointer(window);
-        ui = std::make_unique<UiThread>(window, UiMessage);
+        if (!window) winrt::throw_last_error();
+        ui = std::make_unique<UiThread>();
         composition = std::make_unique<Composition>(window);
         SetScale();
 
@@ -77,7 +91,17 @@ namespace inkpages::detail
         };
 
         overlay.changed = [this] {
-            if (!overlayPending.exchange(true)) ui->Post([this] { DrawOverlay(); }); // one drawing per batch of changes
+            if (overlayPending.exchange(true)) return; // one drawing per batch of changes
+            try
+            {
+                if (ui->Post([this] { DrawOverlay(); })) return;
+            }
+            catch (...)
+            {
+                overlayPending = false;
+                throw;
+            }
+            overlayPending = false;
         };
 
         selection = std::make_unique<SelectionController>(SelectionContext{ window, viewport.get(), &host, ui.get(),
@@ -142,25 +166,32 @@ namespace inkpages::detail
         textEditor->editingChanged = [this](bool editing) { EditChanged(editing); };
         textEditor->caretMoved = [this] { RevealTextCaret(); };
 
-        ink = std::make_unique<InkLayer>(host, composition->Ink(),
+        ink = std::make_unique<InkLayer>(host,
             [this] { OnPresenterReady(); }, [this] { ui->Post([this] { composition->Commit(); }); });
+        ink->Start(composition->Ink());
         Resized();
         composition->Commit();
         Log(std::format("surface: created (DPI scale {:.2f})", scale));
     }
 
-    Surface::~Surface()
+    Surface::~Surface() { Close(); }
+
+    void Surface::Close()
     {
+        if (ui) ui->Close();
         try
         {
+            if (uiSettings) uiSettings.ColorValuesChanged(accentChanged);
             inputPane.reset();
             inputPaneScreen.reset();
             textEditor.reset(); // ends editing first: the result still reaches the app and the history
-            if (uiSettings) uiSettings.ColorValuesChanged(accentChanged);
-            host.Run("tools shutdown", [this] {
-                tools.reset();
-                pageStore.reset();
-            }, INFINITE); // the work refers to this surface: it must have run before the members go
+            if (ink)
+            {
+                host.Run("tools shutdown", [this] {
+                    tools.reset();
+                    pageStore.reset();
+                }, INFINITE); // the work refers to this surface: it must have run before the members go
+            }
             ink.reset();
             mouse.reset();
             touchTaps.reset();
@@ -175,8 +206,11 @@ namespace inkpages::detail
         {
             LogException("surface shutdown");
         }
-        SetWindowLongPtrW(window, GWLP_USERDATA, 0);
-        DestroyWindow(window);
+        if (IsWindow(window))
+        {
+            SetWindowData(window, nullptr);
+            if (!DestroyWindow(window)) LogHr("DestroyWindow (writing surface)", HRESULT_FROM_WIN32(GetLastError()));
+        }
     }
 
     PointF Surface::ToDocument(POINT client) const
@@ -391,7 +425,11 @@ namespace inkpages::detail
                 }
                 InputPaneChanged(inputPane->Location());
             }
-            else if (inputPaneScreen) InputPaneChanged(std::nullopt);
+            else
+            {
+                inputPane.reset(); // unregister while the root window is still alive
+                if (inputPaneScreen) InputPaneChanged(std::nullopt);
+            }
         }
         catch (...)
         {
@@ -421,9 +459,10 @@ namespace inkpages::detail
         }
         auto caret = textEditor->CaretInClient();
         if (!caret) return;
-        SizeF client = ClientSize();
-        PointF scroll = CaretScroll(client, *caret, *pane, RevealMarginDip * scale);
-        if (scroll.x != 0 || scroll.y != 0) ZoomToRect(PanRect(client, CurrentView(), scroll.x, scroll.y));
+        SizeF doc = layout.DocumentSize();
+        if (auto target = RevealCaretRect(ClientSize(), CurrentView(), { doc.width * scale, doc.height * scale },
+            *caret, *pane, RevealMarginDip * scale, options.maxZoom))
+            viewport->ZoomToRect(*target, false);
     }
 
     void Surface::BuildLayout(std::vector<PageSpec> specs, std::vector<Paper>& papers)
@@ -569,14 +608,16 @@ namespace inkpages::detail
         {
             // The accent as Windows' settings have it, and again when the user changes it (the event comes on a worker
             // thread: the UI thread reads and draws).
-            uiSettings = winrt::Windows::UI::ViewManagement::UISettings();
-            accentChanged = uiSettings.ColorValuesChanged([this](auto&&, auto&&) {
-                ui->Post([this] {
-                    ReadAccent();
-                    ShowPageMark();
-                    composition->Commit();
-                });
+            winrt::Windows::UI::ViewManagement::UISettings settings;
+            accentChanged = settings.ColorValuesChanged([dispatch = ui->Dispatcher(), this](auto&&, auto&&) {
+                if (auto queue = dispatch.lock())
+                    queue->Post([this] {
+                        ReadAccent();
+                        ShowPageMark();
+                        composition->Commit();
+                    });
             });
+            uiSettings = std::move(settings);
             ReadAccent();
         }
         markCurrentPage = mark;
@@ -775,6 +816,14 @@ namespace inkpages::detail
     void Surface::InvalidatePage(int page)
     {
         composition->Invalidate(page);
+        composition->UpdateSheets(Visible(), sheetScale);
+        composition->Commit();
+    }
+
+    void Surface::InvalidatePages(std::set<int> const& changedPages)
+    {
+        if (changedPages.empty()) return;
+        for (int page : changedPages) composition->Invalidate(page);
         composition->UpdateSheets(Visible(), sheetScale);
         composition->Commit();
     }

@@ -64,6 +64,7 @@ namespace inkpages::detail
         bool EditingText() const override { return textEditor && textEditor->Editing(); }
         void EndTextEditing() override;
         void InvalidatePage(int page) override;
+        void InvalidatePages(std::set<int> const& changedPages) override;
 
         void SetTool(ToolState tool) override;
         void SetRuler(bool shown) override;
@@ -93,6 +94,8 @@ namespace inkpages::detail
 
     private:
         LRESULT Handle(UINT message, WPARAM wp, LPARAM lp);   // SurfaceWindow.cpp
+        void Initialize(HWND parent);
+        void Close();
         void OnPresenterReady();                               // ink thread
         SizeF ClientSize() const;
         RectF Visible() const override;

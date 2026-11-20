@@ -41,14 +41,14 @@ namespace inkpages::detail
         : pane(winrt::create_instance<IFrameworkInputPane>(__uuidof(FrameworkInputPane))),
           handler(winrt::make_self<Handler>(std::move(changed)))
     {
-        winrt::check_hresult(pane->AdviseWithHWND(window, handler.as<IFrameworkInputPaneHandler>().get(), &cookie));
+        winrt::check_hresult(LogHr("input pane: AdviseWithHWND",
+            pane->AdviseWithHWND(window, handler.as<IFrameworkInputPaneHandler>().get(), &cookie)));
     }
 
     InputPane::~InputPane()
     {
         handler->changed = nullptr;
-        HRESULT hr = pane->Unadvise(cookie);
-        if (FAILED(hr)) LogHr("input pane: Unadvise", hr);
+        LogHr("input pane: Unadvise", pane->Unadvise(cookie));
     }
 
     std::optional<RECT> InputPane::Location() const
