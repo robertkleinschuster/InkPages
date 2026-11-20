@@ -48,8 +48,16 @@ namespace inkpages::detail
 
         struct Event
         {
-            Event() : handle(CreateEventW(nullptr, TRUE, FALSE, nullptr)) { winrt::check_pointer(handle); }
-            ~Event() { CloseHandle(handle); }
+            Event() : handle(CreateEventW(nullptr, TRUE, FALSE, nullptr))
+            {
+                if (!handle)
+                    winrt::throw_hresult(LogHr("ink: CreateEventW", HRESULT_FROM_WIN32(GetLastError())));
+            }
+            ~Event()
+            {
+                if (!CloseHandle(handle))
+                    LogHr("ink: CloseHandle (completion event)", HRESULT_FROM_WIN32(GetLastError()));
+            }
             HANDLE handle;
         };
     }
@@ -125,7 +133,11 @@ namespace inkpages::detail
             struct Signal
             {
                 HANDLE handle;
-                ~Signal() { SetEvent(handle); }
+                ~Signal()
+                {
+                    if (!SetEvent(handle))
+                        LogHr("ink: SetEvent (work completed)", HRESULT_FROM_WIN32(GetLastError()));
+                }
             } signal{ done->handle };
             try
             {
@@ -137,7 +149,10 @@ namespace inkpages::detail
             }
         }).get());
         if (FAILED(hr)) winrt::throw_hresult(LogHr(std::format("QueueWorkItem({})", name), hr));
-        if (WaitForSingleObject(done->handle, timeoutMs) != WAIT_OBJECT_0)
+        const DWORD wait = WaitForSingleObject(done->handle, timeoutMs);
+        if (wait == WAIT_FAILED)
+            winrt::throw_hresult(LogHr("ink: WaitForSingleObject (work completion)", HRESULT_FROM_WIN32(GetLastError())));
+        if (wait == WAIT_TIMEOUT)
         {
             LogError(std::format("ink: {} did not finish within {} ms", name, timeoutMs));
             throw winrt::hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT), winrt::to_hstring(std::format("ink thread: {} timed out", name)));
