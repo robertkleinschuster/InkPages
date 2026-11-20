@@ -3,7 +3,10 @@
 // The writing surface: a child window the app places, showing the document's pages stacked vertically on their paper,
 // with Windows ink on them and the tools that work on it.
 //   - Finger and precision touchpad: pan with inertia, pinch zoom; mouse wheel scrolls, Ctrl+wheel zooms
-//     (DirectManipulation). Touch never draws; pen and mouse buttons never pan.
+//     (DirectManipulation). Touch never draws; the pen and the left/right mouse buttons never pan.
+//   - A viewer's mouse and keys: the middle mouse button dragged pans; with the keyboard focus (the surface takes it on
+//     a mouse press) DirectManipulation's keys, else arrows scroll a line, Bild auf/ab and (Umschalt+)Leertaste a
+//     screen, Pos1/Ende go to the start/end; the app's cursor over its places (`cursorAt`: links).
 //   - Mouse (and touchpad clicks): never writes. A drag selects (lasso or rectangle by the select mode, with any tool),
 //     moves the selection or scales it at a corner; a click beside the selection clears it, on a picture selects it.
 //   - Text tool: a pen tap or mouse click writes a text there (or edits the text there), the keyboard types (TextHost,
@@ -126,6 +129,13 @@ namespace inkpages
         virtual PageLayout const& Layout() const = 0;
         virtual void ZoomTo(float zoom) = 0;    // around the view's center
         virtual void FitWidth() = 0;
+        /// The page in view whole (half a gap around it), centered.
+        virtual void FitPage() = 0;
+        /// Where the view is: the page and point at its top left, and the zoom (none without pages).
+        virtual std::optional<ViewPlace> CurrentPlace() const = 0;
+        /// Shows `place` (as CurrentPlace gave it): its zoom (clamped), its point at the view's top left, kept on the
+        /// content - Back/Forward, a document's last position.
+        virtual void GoTo(ViewPlace place) = 0;
         virtual void ScrollToPage(int page) = 0;
         /// Scrolls so that `point` (page units on `page`) is at the view's top left, 16 DIPs in; the zoom stays, the
         /// view stays on the content (outline entries, links).
@@ -144,6 +154,10 @@ namespace inkpages
         /// selection gesture took (a click beside the selection clears it, a click on a picture selects it). `point`:
         /// page coordinates of the press. For the app's links; the pen never taps here.
         std::function<void(int page, PointF point, PointerKind kind)> tapped;
+        /// The real mouse moves over the surface without a button pressed: `point` in page coordinates of `page` (page -1:
+        /// beside the pages, the pen or touch moved, or the mouse left the window). Returns the system cursor to show there
+        /// (e.g. IDC_HAND over a link) or nullptr for the default. Called for every move: keep it fast.
+        std::function<LPCWSTR(int page, PointF point)> cursorAt;
         /// The app's own mouse gestures on its content (e.g. selecting a PDF's text): asked when a mouse press becomes a
         /// drag or a double/triple click, only where nothing of the library's lies - not on the selection's frame, not on
         /// a picture of the PictureHost, not in the edited text box, not on ink (a drag starting on ink selects it).

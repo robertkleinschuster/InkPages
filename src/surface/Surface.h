@@ -23,6 +23,7 @@
 #include "surface/SurfaceAutomation.h"
 #include "surface/TextEditor.h"
 #include "surface/TouchTaps.h"
+#include "surface/ViewerInput.h"
 #include "surface/Viewport.h"
 #include "tools/ToolInput.h"
 
@@ -42,6 +43,9 @@ namespace inkpages::detail
         PageLayout const& Layout() const override { return layout; }
         void ZoomTo(float zoom) override;
         void FitWidth() override;
+        void FitPage() override;
+        std::optional<ViewPlace> CurrentPlace() const override;
+        void GoTo(ViewPlace place) override;
         void ScrollToPage(int page) override;
         void ScrollTo(int page, PointF point) override;
         void RevealRect(int page, RectF area) override;
@@ -123,6 +127,7 @@ namespace inkpages::detail
         std::unique_ptr<SelectionController> selection;
         std::unique_ptr<MouseSelect> mouse;
         std::unique_ptr<TouchTaps> touchTaps;
+        std::unique_ptr<ViewerInput> viewer;
         std::unique_ptr<SurfaceAutomation> automation;
         std::unique_ptr<PageMark> pageMark;
         bool markCurrentPage = false;

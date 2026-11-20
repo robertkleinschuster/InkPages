@@ -159,6 +159,23 @@ namespace inkpages::detail
         return SUCCEEDED(hr) && handled;
     }
 
+    bool Viewport::OnKey(MSG const& message)
+    {
+        HRESULT contact = viewport->SetContact(DIRECTMANIPULATION_KEYBOARDFOCUS);
+        if (FAILED(contact))
+        {
+            LogHr("SetContact(keyboard focus)", contact);
+            return false;
+        }
+        BOOL handled = FALSE;
+        HRESULT hr = manager->ProcessInput(&message, &handled);
+        if (FAILED(hr)) LogHr("ProcessInput(key)", hr);
+        HRESULT release = viewport->ReleaseContact(DIRECTMANIPULATION_KEYBOARDFOCUS);
+        if (FAILED(release)) LogHr("ReleaseContact(keyboard focus)", release);
+        Log(std::format("viewport: key 0x{:02X} {}", message.wParam, SUCCEEDED(hr) && handled ? "taken by DirectManipulation" : "not taken"));
+        return SUCCEEDED(hr) && handled;
+    }
+
     void Viewport::ZoomToRect(RectF r, bool animate)
     {
         HRESULT hr = viewport->ZoomToRect(r.left, r.top, r.right, r.bottom, animate);

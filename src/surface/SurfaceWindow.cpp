@@ -1,6 +1,7 @@
 // The writing surface's window procedure: input to the module it belongs to - touch and touchpad to DirectManipulation
 // (finger taps watched by TouchTaps), the pen given to the window to the selection, the mouse to the selection and
-// then to MouseSelect, a text being edited first to the TextEditor, the wheel to DirectManipulation - and the UI thread's handed-over work.
+// then to MouseSelect, a text being edited first to the TextEditor, the wheel to DirectManipulation, the viewer's keys,
+// middle-button pan and hover cursor to ViewerInput - and the UI thread's handed-over work.
 
 #include "surface/Surface.h"
 
@@ -35,6 +36,12 @@ namespace inkpages::detail
         {
             constexpr LPARAM Mask = static_cast<LPARAM>(0xFFFFFF00), Signature = 0xFF515700;
             return (GetMessageExtraInfo() & Mask) != Signature;
+        }
+
+        // A mouse press puts the keyboard on the pages (scroll keys), as a viewer's page area takes the focus when clicked.
+        void TakeFocus(HWND window)
+        {
+            if (GetFocus() != window) SetFocus(window);
         }
 
         POINT ClientOf(HWND window, LPARAM lp)
@@ -110,6 +117,7 @@ namespace inkpages::detail
         case WM_LBUTTONDBLCLK: // (the class has CS_DBLCLKS for the text box: outside it a press is a press)
         {
             if (!IsRealMouse()) break;
+            TakeFocus(window);
             // A press that cleared the selection or ended a text's edit is no click of its own.
             bool had = selection->HasSelection() || (wasEditing && !textEditor->Editing());
             if (selection->OnPointer(message, wp, lp)) return 0; // on the selection: move or scale
@@ -117,17 +125,51 @@ namespace inkpages::detail
             return 0;
         }
         case WM_MOUSEMOVE:
-            if (!IsRealMouse()) break;
+        {
+            if (!IsRealMouse())
+            {
+                viewer->NotHovering();
+                break;
+            }
+            POINT at{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
+            if (viewer->PanMove(at)) return 0;
             if (selection->OnPointer(message, wp, lp)) return 0;
-            if (wp & MK_LBUTTON) mouse->Move({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) });
+            if (wp & MK_LBUTTON) mouse->Move(at);
+            if (wp & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON | MK_XBUTTON1 | MK_XBUTTON2)) viewer->NotHovering();
+            else viewer->Hover(at);
             return 0;
+        }
+        case WM_MOUSELEAVE:
+            viewer->Left();
+            return 0;
+        case WM_SETCURSOR:
+            if (LOWORD(lp) == HTCLIENT && viewer->OnSetCursor()) return TRUE;
+            break;
+        case WM_MBUTTONDOWN:
+            if (!IsRealMouse()) break;
+            TakeFocus(window);
+            viewer->PanDown({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) });
+            return 0;
+        case WM_MBUTTONUP:
+            if (viewer->PanUp()) return 0;
+            break;
+        case WM_RBUTTONDOWN:
+            if (IsRealMouse()) TakeFocus(window); // and the default: WM_CONTEXTMENU goes to the app (the parent)
+            break;
+        case WM_KEYDOWN:
+            if (viewer->OnKey(wp, lp)) return 0;
+            break;
         case WM_LBUTTONUP:
             if (!IsRealMouse()) break;
             if (selection->OnPointer(message, wp, lp)) return 0;
             mouse->Release({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) });
             return 0;
         case WM_CAPTURECHANGED:
-            if (reinterpret_cast<HWND>(lp) != window) mouse->CaptureLost();
+            if (reinterpret_cast<HWND>(lp) != window)
+            {
+                mouse->CaptureLost();
+                viewer->CaptureLost();
+            }
             break;
         case WM_MOUSEWHEEL:
         case WM_MOUSEHWHEEL:

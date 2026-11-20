@@ -79,6 +79,66 @@ namespace inkpages
         return RectF{ shown.left + dx, shown.top + dy, shown.right + dx, shown.bottom + dy };
     }
 
+    RectF PanRect(SizeF viewportPx, View view, float dxPx, float dyPx)
+    {
+        float left = (dxPx - view.dx) / view.zoom, top = (dyPx - view.dy) / view.zoom;
+        return { left, top, left + viewportPx.width / view.zoom, top + viewportPx.height / view.zoom };
+    }
+
+    RectF KeyScrollRect(ScrollKey key, SizeF viewportPx, View view, float scale, float documentHeight, float linePx,
+        float overlapPx)
+    {
+        float page = std::max(linePx, viewportPx.height - overlapPx);
+        switch (key)
+        {
+        case ScrollKey::LineUp: return PanRect(viewportPx, view, 0, -linePx);
+        case ScrollKey::LineDown: return PanRect(viewportPx, view, 0, linePx);
+        case ScrollKey::LineLeft: return PanRect(viewportPx, view, -linePx, 0);
+        case ScrollKey::LineRight: return PanRect(viewportPx, view, linePx, 0);
+        case ScrollKey::PageUp: return PanRect(viewportPx, view, 0, -page);
+        case ScrollKey::PageDown: return PanRect(viewportPx, view, 0, page);
+        case ScrollKey::Start: return ScrollRect(viewportPx, view, scale, 0);
+        case ScrollKey::End:
+        {
+            RectF r = ScrollRect(viewportPx, view, scale, 0);
+            float bottom = documentHeight * scale;
+            return { r.left, bottom - r.Height(), r.right, bottom };
+        }
+        }
+        return PanRect(viewportPx, view, 0, 0);
+    }
+
+    RectF FitPageRect(RectF page, SizeF viewportPx, float scale, float marginDip, float minZoom, float maxZoom)
+    {
+        float w = (page.Width() + 2 * marginDip) * scale, h = (page.Height() + 2 * marginDip) * scale;
+        float zoom = w > 0 && h > 0 ? std::min(viewportPx.width / w, viewportPx.height / h) : 1;
+        zoom = ClampZoom(zoom, minZoom, maxZoom);
+        float cx = (page.left + page.right) / 2 * scale, cy = (page.top + page.bottom) / 2 * scale;
+        float rw = viewportPx.width / zoom, rh = viewportPx.height / zoom;
+        return { cx - rw / 2, cy - rh / 2, cx + rw / 2, cy + rh / 2 };
+    }
+
+    std::optional<ViewPlace> PlaceOf(PageLayout const& layout, RectF visible, float zoom)
+    {
+        auto page = layout.NearestPage({ (visible.left + visible.right) / 2, visible.top });
+        if (!page) return std::nullopt;
+        RectF r = layout.Page(*page);
+        return ViewPlace{ *page, { visible.left - r.left, visible.top - r.top }, zoom };
+    }
+
+    RectF PlaceRect(PageLayout const& layout, ViewPlace place, SizeF viewportPx, float scale, float minZoom, float maxZoom)
+    {
+        float zoom = ClampZoom(place.zoom, minZoom, maxZoom);
+        PointF origin;
+        if (layout.Count() > 0)
+        {
+            RectF r = layout.Page(std::clamp(place.page, 0, layout.Count() - 1));
+            origin = { r.left, r.top };
+        }
+        float left = (origin.x + place.point.x) * scale, top = (origin.y + place.point.y) * scale;
+        return { left, top, left + viewportPx.width / zoom, top + viewportPx.height / zoom };
+    }
+
     std::set<int> LivePages(PageLayout const& layout, RectF visible, std::set<int> const& live, std::set<int> const& held)
     {
         float h = visible.Height();

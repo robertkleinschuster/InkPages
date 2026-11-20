@@ -35,6 +35,10 @@ namespace inkpages::detail
         /// WM_MOUSEWHEEL / WM_MOUSEHWHEEL / WM_POINTERWHEEL: handed to DirectManipulation (ProcessInput).
         bool OnWheel(MSG const& message);
 
+        /// WM_KEYDOWN: handed to DirectManipulation (ProcessInput with the keyboard focus contact); false when it did not
+        /// take the key.
+        bool OnKey(MSG const& message);
+
         /// Moves the view so that the content rectangle (content pixels) fills it.
         void ZoomToRect(RectF content, bool animate);
 

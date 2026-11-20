@@ -18,6 +18,19 @@ namespace inkpages
         friend bool operator==(View, View) = default;
     };
 
+    /// A place in the document as the view shows it: the page and the point of it (page units, may lie beside the page)
+    /// at the view's top left, and the zoom. Page-relative, so it stays right when the layout changes (Back/Forward, the
+    /// last position of a document).
+    struct ViewPlace
+    {
+        int page = 0;
+        PointF point;
+        float zoom = 1;
+    };
+
+    /// What a scroll key does (the surface maps the keyboard to it).
+    enum class ScrollKey { LineUp, LineDown, LineLeft, LineRight, PageUp, PageDown, Start, End };
+
     float ClampZoom(float zoom, float minZoom, float maxZoom);
 
     /// The zoom at which the document's width fills the viewport's width.
@@ -49,6 +62,26 @@ namespace inkpages
     /// The content rectangle that brings `area` (document) into view with `marginPx` around it, moving as little as
     /// needed at the current zoom; none when it is in view already. An area larger than the view shows its top left.
     std::optional<RectF> RevealRect(SizeF viewportPx, View view, float scale, RectF area, float marginPx);
+
+    /// The content rectangle moved by (dxPx, dyPx) viewport pixels at the current zoom (positive: the view moves right/down
+    /// over the document, the content up/left) - panning.
+    RectF PanRect(SizeF viewportPx, View view, float dxPx, float dyPx);
+
+    /// The content rectangle for a scroll key at the current zoom: a line = `linePx` viewport pixels, a page = the view's
+    /// height less `overlapPx` (what stays in view), Start/End = the document's top/bottom (`documentHeight` in DIPs).
+    RectF KeyScrollRect(ScrollKey key, SizeF viewportPx, View view, float scale, float documentHeight, float linePx,
+        float overlapPx);
+
+    /// The content rectangle that shows `page` (document) whole with `marginDip` around it, centered, zoom clamped.
+    RectF FitPageRect(RectF page, SizeF viewportPx, float scale, float marginDip, float minZoom, float maxZoom);
+
+    /// The place the view shows: `visible` = VisibleDocument; the page is the one nearest to the view's top (at its
+    /// horizontal center). None without pages.
+    std::optional<ViewPlace> PlaceOf(PageLayout const& layout, RectF visible, float zoom);
+
+    /// The content rectangle that shows `place` (its point at the view's top left at its zoom, clamped); the page index is
+    /// clamped to the document. Call KeepOnContent on it.
+    RectF PlaceRect(PageLayout const& layout, ViewPlace place, SizeF viewportPx, float scale, float minZoom, float maxZoom);
 
     /// Lazy pages: which pages keep (or get) their ink. Pages within one viewport height of the visible area come in;
     /// pages already live stay until they are more than two viewport heights away; held pages always stay.

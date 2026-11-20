@@ -97,6 +97,10 @@ namespace inkpages::detail
             MouseClaims{ [this](PointF at) { return AppClaims(at); }, [this](PointF at) { return InkAt(at); },
                 [this](MousePhase phase, PointF press, PointF at, int clicks) { AppGesture(phase, press, at, clicks); } });
         touchTaps = std::make_unique<TouchTaps>(toDocument, zoom, [this](PointF at) { Tapped(at, PointerKind::Touch); });
+        viewer = std::make_unique<ViewerInput>(ViewerInputContext{ window, viewport.get(), [this] { return ClientSize(); },
+            [this] { return scale; }, [this]() -> PageLayout const& { return layout; },
+            [this](RectF content) { ZoomToRect(content); }, toDocument,
+            [this](int page, PointF point) -> LPCWSTR { return cursorAt ? cursorAt(page, point) : nullptr; } });
 
         automation = std::make_unique<SurfaceAutomation>(window);
         pageMark = std::make_unique<PageMark>(composition->Devices(), composition->MarkLayer());
@@ -127,6 +131,7 @@ namespace inkpages::detail
             ink.reset();
             mouse.reset();
             touchTaps.reset();
+            viewer.reset();
             selection.reset();
             viewport.reset();
             pageMark.reset();
@@ -495,6 +500,29 @@ namespace inkpages::detail
             float z = ClampZoom(FitWidthZoom(layout.DocumentSize().width, size.width, scale), options.minZoom, options.maxZoom);
             float top = -view.dy / view.zoom;
             ZoomToRect({ 0, top, size.width / z, top + size.height / z });
+        });
+    }
+
+    void Surface::FitPage()
+    {
+        if (layout.Count() == 0) return;
+        WhenReady([this] {
+            RectF page = layout.Page(PageInView().value_or(0));
+            ZoomToRect(FitPageRect(page, ClientSize(), scale, options.gap / 2, options.minZoom, options.maxZoom));
+        });
+    }
+
+    std::optional<ViewPlace> Surface::CurrentPlace() const
+    {
+        return PlaceOf(layout, Visible(), CurrentView().zoom);
+    }
+
+    void Surface::GoTo(ViewPlace place)
+    {
+        if (layout.Count() == 0) return;
+        WhenReady([this, place] {
+            Log(std::format("surface: to page {} at {:.0f},{:.0f}, zoom {:.2f}", place.page + 1, place.point.x, place.point.y, place.zoom));
+            ZoomToRect(PlaceRect(layout, place, ClientSize(), scale, options.minZoom, options.maxZoom));
         });
     }
 
