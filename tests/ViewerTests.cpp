@@ -73,6 +73,12 @@ namespace inkpages::tests
         EXPECT_FLOAT_EQ(visible.top * Scale, r.top);
         EXPECT_FLOAT_EQ(Viewport.width / 1.25f, r.Width());
 
+        RectF gap{ second.left, second.top - 12, second.left + 500, second.top + 588 }; // the top in the gap above page 2
+        auto inGap = PlaceOf(layout, gap, 1);
+        ASSERT_TRUE(inGap);
+        EXPECT_EQ(1, inGap->page) << "the page in view, not the page above the gap";
+        EXPECT_FLOAT_EQ(-12, inGap->point.y);
+
         PageLayout four({ { 600, 800 }, { 600, 800 }, { 600, 800 }, { 400, 300 } }, 24, 24); // one more above
         RectF moved = PlaceRect(four, { 2, place->point, place->zoom }, Viewport, Scale, 0.2f, 6);
         EXPECT_FLOAT_EQ((four.Page(2).top + 100) * Scale, moved.top);

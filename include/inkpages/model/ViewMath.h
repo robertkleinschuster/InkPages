@@ -75,8 +75,8 @@ namespace inkpages
     /// The content rectangle that shows `page` (document) whole with `marginDip` around it, centered, zoom clamped.
     RectF FitPageRect(RectF page, SizeF viewportPx, float scale, float marginDip, float minZoom, float maxZoom);
 
-    /// The place the view shows: `visible` = VisibleDocument; the page is the one nearest to the view's top (at its
-    /// horizontal center). None without pages.
+    /// The place the view shows: `visible` = VisibleDocument; the page is the page in view (PageLayout::PageInView: a
+    /// view whose top lies in a gap names the page below, not the one above). None without pages.
     std::optional<ViewPlace> PlaceOf(PageLayout const& layout, RectF visible, float zoom);
 
     /// The content rectangle that shows `place` (its point at the view's top left at its zoom, clamped); the page index is

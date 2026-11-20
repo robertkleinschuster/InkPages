@@ -120,7 +120,7 @@ namespace inkpages
 
     std::optional<ViewPlace> PlaceOf(PageLayout const& layout, RectF visible, float zoom)
     {
-        auto page = layout.NearestPage({ (visible.left + visible.right) / 2, visible.top });
+        auto page = layout.PageInView(visible); // the page shown most, as the app's "Seite n" counts it
         if (!page) return std::nullopt;
         RectF r = layout.Page(*page);
         return ViewPlace{ *page, { visible.left - r.left, visible.top - r.top }, zoom };
