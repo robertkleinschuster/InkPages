@@ -281,7 +281,7 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   strokes replace the originals (width unchanged), cut at page edges, one undo step with the pictures
   (`CompositeEdit`). An inside tap keeps the selection, an outside tap clears it (the pen dot is dropped). Near the
   view's edge the drag scrolls (16 ms timer = one frame). Handles keep their screen size when the zoom changes. The
-  frame has inline rotation, delete and duplicate handles. A barrel tap inside the selection also duplicates it.
+  frame has inline rotation, delete and duplicate handles. Inside it, a barrel tap duplicates and a barrel drag moves.
 - **Shapes** on unprocessed input (preview in the overlay), one stroke of even width. **Recognition:**
   `InkAnalyzer.AnalyzeAsync` (Completed handler, result posted to the ink thread); the freehand stroke is replaced by
   the outline as its own undo step.

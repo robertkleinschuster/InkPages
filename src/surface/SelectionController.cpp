@@ -189,7 +189,6 @@ namespace inkpages::detail
                         LogHr("GetPointerPenInfo (selection)", HRESULT_FROM_WIN32(GetLastError()));
                     else if (info.penFlags & PEN_FLAG_BARREL)
                     {
-                        drag->handle = Handle::Duplicate;
                         drag->barrel = true;
                     }
                 }
@@ -208,7 +207,12 @@ namespace inkpages::detail
             }
             if (up)
             {
-                Release(client);
+                try { Release(client); }
+                catch (...)
+                {
+                    if (!pointer) ReleaseCapture();
+                    throw;
+                }
                 if (!pointer) ReleaseCapture();
             }
             else if (contact) MoveTo(client);
@@ -238,7 +242,8 @@ namespace inkpages::detail
         PointF at = ToDocument(client);
         drag->client = client;
         drag->farthest = std::max(drag->farthest, std::abs(at.x - drag->start.x) + std::abs(at.y - drag->start.y));
-        if (IsSelectionCommand(drag->handle)) return;
+        if (IsSelectionCommand(drag->handle) ||
+            (drag->barrel && drag->farthest < Tap::MaxDistance(c.viewport->Current().zoom))) return;
         drag->m = frame->Drag(drag->handle, drag->start, at);
         Affine m = drag->m;
         c.host->Post("selection preview", [tools = c.tools, m] {
@@ -323,19 +328,20 @@ namespace inkpages::detail
         KillTimer(c.window, ScrollTimer);
         Drag d = *drag;
         drag.reset();
-        if (IsSelectionCommand(d.handle))
+        PointF at = ToDocument(client);
+        float distance = std::max(d.farthest, std::abs(at.x - d.start.x) + std::abs(at.y - d.start.y));
+        bool tap = distance < Tap::MaxDistance(c.viewport->Current().zoom);
+        if (IsSelectionCommand(d.handle) || (d.barrel && tap))
         {
-            Handle released = frame->At(ToDocument(client));
-            if (released == (d.barrel ? Handle::Move : d.handle) &&
-                d.farthest < Tap::MaxDistance(c.viewport->Current().zoom))
+            if (tap && frame->At(at) == d.handle)
             {
                 if (d.handle == Handle::Delete) Delete();
                 else Duplicate();
             }
             return;
         }
-        if (client.x != d.client.x || client.y != d.client.y)
-            d.m = frame->Drag(d.handle, d.start, ToDocument(client));
+        if (d.barrel || client.x != d.client.x || client.y != d.client.y)
+            d.m = frame->Drag(d.handle, d.start, at);
         if (d.m.IsIdentity())
         {
             ResetPreview();
@@ -343,7 +349,7 @@ namespace inkpages::detail
         }
         if (PictureHost* host = c.pictures(); host && !pictures.empty())
         {
-            host->Preview(pictures, {});
+            ResetPreview();
             host->Transform(pictures, d.m);
         }
         auto pictureEdit = PictureStep(static_cast<int>(PictureEdit::Kind::Transformed), pictures, d.m, 0, {});

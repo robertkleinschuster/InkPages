@@ -54,9 +54,10 @@ Invoke-Test {
     Drag 'barrel lasso' $lasso $BARREL
     ZShot '01-selected' 290 240
 
-    # 2. the pen over the selection moves it (window input) - exact, with the card
+    # 2. a barrel drag over the selection moves it (window input) together with the card
     Hover 290 240 0; Hover 291 241 0
-    Drag 'move' @(291, 241, 391, 241)
+    Drag 'barrel move' @(291, 241, 391, 241) $BARREL
+    if ((Get-Content "$out\demo.log" -Raw) -notmatch 'selection: 2 strokes moved') { throw 'Barrel drag did not move the selection' }
     ZShot '02-moved' 390 240
     Ctrl 0x5A; ZShot '03-move-undone' 290 240
     Ctrl 0x59; ZShot '04-move-redone' 390 240
