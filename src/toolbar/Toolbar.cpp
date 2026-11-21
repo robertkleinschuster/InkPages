@@ -37,6 +37,7 @@ namespace inkpages
             void Choose(ToolChoices next) override;
             void EnableButton(int id, bool enabled) override;
             void SetColors(std::optional<ToolbarColors> palette) override;
+            void SetLargeIcons(bool large) override;
             void SetDarkPaperPreview(bool dark) override;
 
             static LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wp, LPARAM lp);
@@ -53,6 +54,7 @@ namespace inkpages
             RECT ButtonRect(int id) const;
             void DrawDropdownArrow(NMCUSTOMDRAW const& draw) const;
             HBITMAP IconOf(ButtonSpec const& spec, int size) const;
+            int IconSize() const { return MulDiv(largeIcons ? 32 : 16, GetDpiForWindow(container), 96); }
 
             WritingSurface& surface;
             ToolChoices choices;
@@ -66,6 +68,7 @@ namespace inkpages
             HIMAGELIST images = nullptr;
             std::optional<ToolbarColors> colors;
             bool darkPaperPreview = false;
+            bool largeIcons = false;
             std::shared_ptr<bool> alive = std::make_shared<bool>(true);
         };
 
@@ -136,7 +139,7 @@ namespace inkpages
 
         void Bar::Build()
         {
-            int size = MulDiv(16, GetDpiForWindow(container), 96); // normal mouse size (the pen operates it)
+            int size = IconSize();
             std::unique_ptr<std::remove_pointer_t<HIMAGELIST>, decltype(&ImageList_Destroy)> nextImages(
                 ImageList_Create(size, size, ILC_COLOR32, 24, 4), ImageList_Destroy);
             if (!nextImages) throw winrt::hresult_error(E_FAIL, L"ImageList_Create (toolbar)");
@@ -160,6 +163,11 @@ namespace inkpages
                 if (b.iBitmap < 0) throw winrt::hresult_error(E_FAIL, L"ImageList_Add (toolbar)");
                 b.idCommand = spec.id;
                 b.fsState = TBSTATE_ENABLED;
+                if (spec.id >= ButtonId::Extension)
+                {
+                    LRESULT state = SendMessageW(bar, TB_GETSTATE, spec.id, 0);
+                    if (state >= 0 && !(state & TBSTATE_ENABLED)) b.fsState = 0;
+                }
                 nextNames.push_back(NameOf(spec.id, choices, texts, extensions));
                 b.iString = reinterpret_cast<INT_PTR>(nextNames.back().c_str());
                 b.fsStyle = static_cast<BYTE>(spec.kind == ButtonKind::Command ? BTNS_BUTTON
@@ -171,6 +179,8 @@ namespace inkpages
                 if (!SendMessageW(bar, TB_DELETEBUTTON, 0, 0))
                     throw winrt::hresult_error(E_FAIL, L"TB_DELETEBUTTON (toolbar)");
             }
+            if (!SendMessageW(bar, TB_SETBITMAPSIZE, 0, MAKELPARAM(size, size)))
+                throw winrt::hresult_error(E_FAIL, L"TB_SETBITMAPSIZE (toolbar)");
             HIMAGELIST old = images;
             images = nextImages.release();
             SendMessageW(bar, TB_SETIMAGELIST, 0, reinterpret_cast<LPARAM>(images));
@@ -401,11 +411,19 @@ namespace inkpages
             winrt::check_bool(RedrawWindow(container, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN));
         }
 
+        void Bar::SetLargeIcons(bool large)
+        {
+            if (largeIcons == large) return;
+            largeIcons = large;
+            Build();
+            if (sizeChanged) sizeChanged();
+        }
+
         void Bar::SetDarkPaperPreview(bool dark)
         {
             if (darkPaperPreview == dark) return;
             darkPaperPreview = dark;
-            int size = MulDiv(16, GetDpiForWindow(container), 96);
+            int size = IconSize();
             for (auto const& spec : ToolbarButtons(choices, extensions))
             {
                 if (!spec.bar) continue;
@@ -509,6 +527,7 @@ namespace inkpages
                 return 0;
             case WM_DPICHANGED_AFTERPARENT:
                 Build();
+                if (sizeChanged) sizeChanged();
                 return 0;
             }
             return DefWindowProcW(container, message, wp, lp);

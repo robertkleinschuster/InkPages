@@ -122,10 +122,14 @@ namespace inkpages
         virtual void Choose(ToolChoices choices) = 0;
         virtual void EnableButton(int id, bool enabled) = 0;
         virtual void SetColors(std::optional<ToolbarColors> colors) = 0;
+        /// Use 32-DIP icons instead of the default 16-DIP icons.
+        virtual void SetLargeIcons(bool large) = 0;
         /// The page in view uses the dark paper palette, so preset bars and swatches show its ink colors.
         virtual void SetDarkPaperPreview(bool dark) = 0;
 
         /// The user changed a choice (UI thread): save it.
         std::function<void(ToolChoices const&)> choicesChanged;
+        /// The toolbar changed height after changing icon size or monitor DPI.
+        std::function<void()> sizeChanged;
     };
 }
