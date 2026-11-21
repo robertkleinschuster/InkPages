@@ -1,8 +1,8 @@
 #pragma once
 
 // The selection on the UI thread: the selected strokes (the ink thread keeps them) and the app's pictures, its frame,
-// moving and scaling it with window pointer input (the pen over the selection is given to the window; the mouse always
-// is), taps (a short still press on it clears it), auto-scroll near the view's edge, and its commands. Every change of
+// moving, scaling and rotating it with window pointer input (the pen over the selection is given to the window; the
+// mouse always is), auto-scroll near the view's edge, and its commands. Every change of
 // content is one undo step (strokes and pictures together). Moving and scaling are exact - only a tap is not a move.
 
 #include <windows.h>
@@ -63,6 +63,7 @@ namespace inkpages::detail
         void EndTouchDrag(bool cancelled);
         /// The auto-scroll timer of a drag near the view's edge.
         void OnScrollTimer();
+        void CancelDrag();
 
         void Clear();
         void Cut();
@@ -77,17 +78,17 @@ namespace inkpages::detail
         struct Drag
         {
             Handle handle = Handle::None;
-            PointF start, last;     // document
+            PointF start;     // document
             POINT client{};         // the pointer, window pixels (auto-scroll keeps the document point under it)
             float farthest = 0;
-            ULONGLONG began = 0;
+            bool barrel = false;
             Affine m;
         };
 
         PointF ToDocument(POINT client) const;
         void Press(POINT client);
         void MoveTo(POINT client);
-        void Release(bool keepOnTap = false);
+        void Release(POINT client);
         void ResetPreview();
         void Set(StrokeSelection const& made, std::vector<PictureId> picked);
         void Publish(bool log = true);

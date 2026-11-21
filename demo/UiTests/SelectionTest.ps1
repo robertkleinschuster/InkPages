@@ -1,5 +1,5 @@
 # Phase 2b/2c: selection (barrel lasso with the pen tool, rectangle), the pen over the selection moves it (window input,
-# the demo's card with the strokes), undo/redo of the move, a tap on it and a tap beside it clear it (no dot), duplicate,
+# the demo's card with the strokes), undo/redo of the move, a tap inside keeps it and a tap outside clears it (no dot), duplicate,
 # delete, copy/paste (Windows ink's clipboard), a drag to the view's edge auto-scrolls onto the next page, strokes cut
 # at the page edge, shapes, shape recognition, Windows' ruler.
 #   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\SelectionTest.ps1
@@ -66,9 +66,9 @@ Invoke-Test {
     Tap 'beside' 500 120
     ZShot '05-tap-beside' 500 120
 
-    # 4. duplicate, copy, delete, undo; paste
+    # 4. duplicate with the pen button, copy, delete, undo; paste
     Drag 'barrel lasso 3' @(330, 190, 450, 190, 450, 300, 330, 300, 330, 190) $BARREL
-    Ctrl 0x44
+    Drag 'barrel duplicate' @(391, 241) $BARREL
     ZShot '06-duplicated' 400 260
     Ctrl 0x43
     Key 0x2E
@@ -77,13 +77,26 @@ Invoke-Test {
     Ctrl 0x56
     ZShot '08-pasted' 370 200
 
-    # 5. rectangle selection of a new stroke, then a tap on the selection clears it
+    # 5. an inside tap keeps the selection, an outside tap clears it
     Key 0x31
     Drag 'stroke 3' @(250, 120, 320, 125)
     Key 0x39
     Drag 'rectangle' @(240, 110, 330, 135)
     Hover 285 122 0; Hover 286 123 0
     Tap 'on the selection' 286 123
+    ZShot '08b-inside-keeps-selection' 286 123
+    Tap 'outside the selection' 350 140
+    Drag 'reselect for frame actions' @(240, 110, 330, 135)
+    Drag 'rotate with the right handle' @(344, 123, 285, 182)
+    ZShot '08c-rotated' 285 123
+    Ctrl 0x5A
+    Drag 'reselect after undo' @(240, 110, 330, 135)
+    Tap 'duplicate with the frame button' 226 141
+    Tap 'delete the duplicate with the frame button' 234 124
+    $selectionLog = Get-Content "$out\demo.log" -Raw
+    foreach ($handle in 6, 7, 8) {
+        if ($selectionLog -notmatch "selection: drag begins \($handle\)") { throw "Selection handle $handle was not reached" }
+    }
 
     # 6. shapes: a line; recognition: a drawn circle becomes an ellipse
     Key 0x37

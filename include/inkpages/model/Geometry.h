@@ -41,7 +41,9 @@ namespace inkpages
         static bool IsTap(float farthest, unsigned durationMs, float zoom) { return farthest < MaxDistance(zoom) && durationMs < MaxDurationMs; }
     };
 
-    enum class Handle { None, Move, TopLeft, TopRight, BottomRight, BottomLeft };
+    enum class Handle { None, Move, TopLeft, TopRight, BottomRight, BottomLeft, Rotate, Delete, Duplicate };
+
+    constexpr bool IsSelectionCommand(Handle h) { return h == Handle::Delete || h == Handle::Duplicate; }
 
     /// The selection's frame: its bounds with a margin, and the corner handles (scaling) - sizes in page units.
     struct SelectionFrame
@@ -49,6 +51,7 @@ namespace inkpages
         RectF bounds;            // what is selected
         float margin = 4;        // the frame around it
         float handle = 8;        // a corner handle's side
+        Affine orientation{};   // drawing transform during rotation preview
 
         RectF Frame() const { return bounds.Inflated(margin, margin); }
         RectF HandleRect(Handle h) const;

@@ -56,6 +56,23 @@ namespace inkpages::tests
         EXPECT_GT(tiny.m11, 0) << "never mirrored or collapsed";
     }
 
+    TEST(SelectionFrame, ActionsAreReachableAndRotationKeepsTheCenter)
+    {
+        SelectionFrame frame{ { 100, 100, 200, 150 }, 4, 8 };
+        for (Handle h : { Handle::Rotate, Handle::Delete, Handle::Duplicate })
+        {
+            RectF r = frame.HandleRect(h);
+            EXPECT_EQ(h, frame.At({ (r.left + r.right) / 2, (r.top + r.bottom) / 2 }));
+        }
+        Affine rotation = frame.Drag(Handle::Rotate, { 220, 125 }, { 150, 195 });
+        PointF pivot = rotation.Apply(PointF{ 150, 125 });
+        EXPECT_NEAR(150, pivot.x, 1e-4);
+        EXPECT_NEAR(125, pivot.y, 1e-4);
+        PointF edge = rotation.Apply(PointF{ 200, 125 });
+        EXPECT_NEAR(150, edge.x, 1e-4);
+        EXPECT_NEAR(175, edge.y, 1e-4);
+    }
+
     TEST(ClipToRect, CutsAtTheEdgeAndDropsWhatIsOutside)
     {
         std::vector<InkSample> line{ { { -10, 5 }, 0.2f }, { { 30, 5 }, 0.6f } };

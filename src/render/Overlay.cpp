@@ -86,10 +86,16 @@ namespace inkpages::detail
         for (PointF p : c.lasso) Grow(bounds, any, p, 1);
         if (c.frame)
         {
-            RectF f = c.frame->Frame();
+            RectF f = c.frame->orientation.Bounds(c.frame->Frame());
             float pad = c.frame->handle;
             Grow(bounds, any, { f.left, f.top }, pad);
             Grow(bounds, any, { f.right, f.bottom }, pad);
+            for (Handle h : { Handle::Rotate, Handle::Delete, Handle::Duplicate })
+            {
+                RectF r = c.frame->orientation.Bounds(c.frame->HandleRect(h));
+                Grow(bounds, any, { r.left, r.top }, pad);
+                Grow(bounds, any, { r.right, r.bottom }, pad);
+            }
         }
         for (PointF p : c.shape) Grow(bounds, any, p, c.shapeWidth + 2);
         if (!any)
@@ -131,15 +137,39 @@ namespace inkpages::detail
             }
             if (c.frame)
             {
+                auto const& m = c.frame->orientation;
+                D2D1::Matrix3x2F drawn;
+                dc->GetTransform(&drawn);
+                dc->SetTransform(D2D1::Matrix3x2F(m.m11, m.m12, m.m21, m.m22, m.dx, m.dy) * drawn);
                 RectF f = c.frame->Frame();
                 dc->DrawRectangle({ f.left, f.top, f.right, f.bottom }, accent.get(), hair);
-                for (Handle handle : { Handle::TopLeft, Handle::TopRight, Handle::BottomRight, Handle::BottomLeft })
+                for (Handle handle : { Handle::TopLeft, Handle::TopRight, Handle::BottomRight, Handle::BottomLeft,
+                    Handle::Rotate, Handle::Delete, Handle::Duplicate })
                 {
                     RectF r = c.frame->HandleRect(handle);
                     D2D1_RECT_F rect{ r.left, r.top, r.right, r.bottom };
                     dc->FillRectangle(rect, white.get());
                     dc->DrawRectangle(rect, accent.get(), hair);
+                    float x = (r.left + r.right) / 2, y = (r.top + r.bottom) / 2, a = r.Width() / 4;
+                    if (handle == Handle::Delete)
+                    {
+                        dc->DrawLine({ x - a, y - a }, { x + a, y + a }, accent.get(), hair);
+                        dc->DrawLine({ x + a, y - a }, { x - a, y + a }, accent.get(), hair);
+                    }
+                    else if (handle == Handle::Duplicate)
+                    {
+                        dc->DrawRectangle({ x - a / 3, y - a, x + a, y + a / 3 }, accent.get(), hair);
+                        dc->FillRectangle({ x - a, y - a / 3, x + a / 3, y + a }, white.get());
+                        dc->DrawRectangle({ x - a, y - a / 3, x + a / 3, y + a }, accent.get(), hair);
+                    }
+                    else if (handle == Handle::Rotate)
+                    {
+                        dc->DrawLine({ f.right, y }, { r.left, y }, accent.get(), hair);
+                        dc->DrawEllipse(D2D1::Ellipse({ x, y }, a, a), accent.get(), hair);
+                        dc->DrawLine({ x + a, y }, { x + a / 3, y - a / 2 }, accent.get(), hair);
+                    }
                 }
+                dc->SetTransform(drawn);
             }
             if (!c.shape.empty())
             {

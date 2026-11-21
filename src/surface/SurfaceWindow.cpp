@@ -170,6 +170,7 @@ namespace inkpages::detail
                 touchSelection = 0;
                 selection->EndTouchDrag(true);
             }
+            if (TypeOf(wp) == PT_PEN) selection->CancelDrag();
             touchTaps->Cancel("DirectManipulation took the contact");
             break;
         case WM_LBUTTONDOWN:
@@ -240,6 +241,7 @@ namespace inkpages::detail
         case WM_CAPTURECHANGED:
             if (reinterpret_cast<HWND>(lp) != window)
             {
+                selection->CancelDrag();
                 mouse->CaptureLost();
                 viewer->CaptureLost();
             }

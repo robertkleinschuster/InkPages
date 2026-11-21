@@ -123,6 +123,9 @@ namespace inkpages::detail
         switch (frame->At(document))
         {
         case Handle::Move: return IDC_SIZEALL;
+        case Handle::Rotate:
+        case Handle::Delete:
+        case Handle::Duplicate: return IDC_HAND;
         case Handle::TopLeft:
         case Handle::BottomRight: return IDC_SIZENWSE;
         case Handle::TopRight:
@@ -145,6 +148,7 @@ namespace inkpages::detail
 
     void SelectionController::Cleared()
     {
+        CancelDrag();
         strokes = {};
         pictures.clear();
         frame.reset();
@@ -165,15 +169,30 @@ namespace inkpages::detail
     {
         POINT client{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
         bool pointer = message == WM_POINTERDOWN || message == WM_POINTERUPDATE || message == WM_POINTERUP;
-        if (pointer) ScreenToClient(c.window, &client); // pointer messages carry screen coordinates
+        if (pointer && !ScreenToClient(c.window, &client))
+        {
+            LogHr("ScreenToClient (selection)", HRESULT_FROM_WIN32(GetLastError()));
+            return false;
+        }
         bool down = message == WM_POINTERDOWN || message == WM_LBUTTONDOWN || message == WM_LBUTTONDBLCLK;
         bool up = message == WM_POINTERUP || message == WM_LBUTTONUP;
         bool contact = pointer ? IS_POINTER_INCONTACT_WPARAM(wp) : (wp & MK_LBUTTON) != 0;
         if (down)
         {
-            if (frame && frame->At(ToDocument(client)) != Handle::None)
+            if (Grabs(ToDocument(client)))
             {
                 Press(client);
+                if (pointer && drag->handle == Handle::Move)
+                {
+                    POINTER_PEN_INFO info{};
+                    if (!GetPointerPenInfo(GET_POINTERID_WPARAM(wp), &info))
+                        LogHr("GetPointerPenInfo (selection)", HRESULT_FROM_WIN32(GetLastError()));
+                    else if (info.penFlags & PEN_FLAG_BARREL)
+                    {
+                        drag->handle = Handle::Duplicate;
+                        drag->barrel = true;
+                    }
+                }
                 if (!pointer) SetCapture(c.window);
                 return true;
             }
@@ -182,9 +201,14 @@ namespace inkpages::detail
         }
         if (drag)
         {
+            if (pointer && IS_POINTER_CANCELED_WPARAM(wp))
+            {
+                CancelDrag();
+                return true;
+            }
             if (up)
             {
-                Release();
+                Release(client);
                 if (!pointer) ReleaseCapture();
             }
             else if (contact) MoveTo(client);
@@ -205,7 +229,7 @@ namespace inkpages::detail
     void SelectionController::Press(POINT client)
     {
         PointF at = ToDocument(client);
-        drag = Drag{ frame->At(at), at, at, client, 0, GetTickCount64(), {} };
+        drag = Drag{ frame->At(at), at, client };
         Log(std::format("selection: drag begins ({})", static_cast<int>(drag->handle)));
     }
 
@@ -213,8 +237,8 @@ namespace inkpages::detail
     {
         PointF at = ToDocument(client);
         drag->client = client;
-        drag->last = at;
         drag->farthest = std::max(drag->farthest, std::abs(at.x - drag->start.x) + std::abs(at.y - drag->start.y));
+        if (IsSelectionCommand(drag->handle)) return;
         drag->m = frame->Drag(drag->handle, drag->start, at);
         Affine m = drag->m;
         c.host->Post("selection preview", [tools = c.tools, m] {
@@ -272,9 +296,15 @@ namespace inkpages::detail
         if (!drag) return;
         if (!cancelled)
         {
-            Release(true);
+            Release(drag->client);
             return;
         }
+        CancelDrag();
+    }
+
+    void SelectionController::CancelDrag()
+    {
+        if (!drag) return;
         KillTimer(c.window, ScrollTimer);
         drag.reset();
         ResetPreview();
@@ -288,22 +318,27 @@ namespace inkpages::detail
         if (PictureHost* host = c.pictures(); host && !pictures.empty()) host->Preview(pictures, {});
     }
 
-    void SelectionController::Release(bool keepOnTap)
+    void SelectionController::Release(POINT client)
     {
         KillTimer(c.window, ScrollTimer);
         Drag d = *drag;
         drag.reset();
-        unsigned ms = static_cast<unsigned>(GetTickCount64() - d.began);
-        bool tap = keepOnTap ? d.farthest < Tap::MaxDistance(c.viewport->Current().zoom)
-            : Tap::IsTap(d.farthest, ms, c.viewport->Current().zoom);
-        if (tap)
+        if (IsSelectionCommand(d.handle))
+        {
+            Handle released = frame->At(ToDocument(client));
+            if (released == (d.barrel ? Handle::Move : d.handle) &&
+                d.farthest < Tap::MaxDistance(c.viewport->Current().zoom))
+            {
+                if (d.handle == Handle::Delete) Delete();
+                else Duplicate();
+            }
+            return;
+        }
+        if (client.x != d.client.x || client.y != d.client.y)
+            d.m = frame->Drag(d.handle, d.start, ToDocument(client));
+        if (d.m.IsIdentity())
         {
             ResetPreview();
-            if (!keepOnTap)
-            {
-                Log("selection: a tap on the selection clears it");
-                Clear();
-            }
             return;
         }
         if (PictureHost* host = c.pictures(); host && !pictures.empty())

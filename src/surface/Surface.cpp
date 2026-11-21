@@ -245,6 +245,11 @@ namespace inkpages::detail
 
     void Surface::TouchTapped(PointF document)
     {
+        if (selection->HasSelection() && !selection->Grabs(document))
+        {
+            selection->Clear();
+            return;
+        }
         if (currentTool == Tool::Text)
         {
             if (textEditor->Contains(document)) textEditor->PlaceCaret(document);

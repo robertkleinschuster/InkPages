@@ -44,6 +44,9 @@ namespace inkpages
         case Handle::TopRight: c = { f.right, f.top }; break;
         case Handle::BottomRight: c = { f.right, f.bottom }; break;
         case Handle::BottomLeft: c = { f.left, f.bottom }; break;
+        case Handle::Rotate: c = { f.right + 2 * handle, (f.top + f.bottom) / 2 }; s = handle; break;
+        case Handle::Delete: c = { f.left - 2 * handle, f.top }; s = handle; break;
+        case Handle::Duplicate: c = { f.left - 2 * handle, f.top + 2.5f * handle }; s = handle; break;
         default: return {};
         }
         return { c.x - s, c.y - s, c.x + s, c.y + s };
@@ -51,7 +54,7 @@ namespace inkpages
 
     Handle SelectionFrame::At(PointF p) const
     {
-        for (Handle h : { Handle::TopLeft, Handle::TopRight, Handle::BottomRight, Handle::BottomLeft })
+        for (Handle h : { Handle::TopLeft, Handle::TopRight, Handle::BottomRight, Handle::BottomLeft, Handle::Rotate, Handle::Delete, Handle::Duplicate })
         {
             RectF r = HandleRect(h).Inflated(handle / 4, handle / 4); // a little more than drawn: easy to hit with a pen
             if (p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom) return h;
@@ -63,7 +66,15 @@ namespace inkpages
     Affine SelectionFrame::Drag(Handle grabbed, PointF from, PointF to) const
     {
         if (grabbed == Handle::Move) return Affine::Translation(to.x - from.x, to.y - from.y);
-        if (grabbed == Handle::None) return {};
+        if (grabbed == Handle::None || IsSelectionCommand(grabbed)) return {};
+        if (grabbed == Handle::Rotate)
+        {
+            PointF pivot{ (bounds.left + bounds.right) / 2, (bounds.top + bounds.bottom) / 2 };
+            float angle = std::atan2(to.y - pivot.y, to.x - pivot.x) - std::atan2(from.y - pivot.y, from.x - pivot.x);
+            float c = std::cos(angle), s = std::sin(angle);
+            return Affine::Translation(-pivot.x, -pivot.y).Then({ c, s, -s, c, 0, 0 })
+                .Then(Affine::Translation(pivot.x, pivot.y));
+        }
         RectF f = Frame();
         // The opposite corner stays; the grabbed one follows the pointer, keeping the proportions.
         PointF anchor, corner;

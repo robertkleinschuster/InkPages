@@ -272,17 +272,16 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
 - **Undo:** one `UndoHistory` on the ink thread; edits are removed/added strokes; undo re-adds `Clone()`s and the edit
   holds the copies from then on; earlier edits name the original, so `InkState::Current` follows `Replaced` copies
   (`tests/StrokeEditTests`, real Windows ink objects). Undo/redo clear the selection.
-- **Selection:** lasso/rectangle on unprocessed input (the barrel always lassos, any tool); strokes via the container's
+- **Selection:** lasso/rectangle on unprocessed input (the barrel lassos with any tool outside an existing selection); strokes via the container's
   `SelectWithPolyLine` (its `Selected` flags are reset at once – the library keeps the selection and uses `Selected`
   only as the removal mark), the app's pictures by `PictureHost::PicturesIn`; a tap on no stroke selects the picture
-  under the pen (`PictureAt`). Moving/scaling on window pointer input (the pen hovering over the frame is taken from the
+  under the pen (`PictureAt`). Moving, scaling and rotating use window pointer input (the pen hovering over the frame is taken from the
   presenter). Preview: `PointTransform` + `PictureHost::Preview`, frame and ink changed in one ink-thread work item
   (`ToolInput::PreviewSelection`; hit-testing uses the committed frame until the drag ends); commit: transformed
   strokes replace the originals (width unchanged), cut at page edges, one undo step with the pictures
-  (`CompositeEdit`). A short still press on the selection or a tap beside clears it (the dot dropped); writing beside
-  clears it. Near the view's edge the drag scrolls (16 ms timer = one frame). Handles keep their screen size when the
-  zoom changes. Commands are toolbar buttons – nothing pops up at the selection (windowed popups swallowed barrel
-  releases in WinUI); tests move the mouse off the toolbar after each click.
+  (`CompositeEdit`). An inside tap keeps the selection, an outside tap clears it (the pen dot is dropped). Near the
+  view's edge the drag scrolls (16 ms timer = one frame). Handles keep their screen size when the zoom changes. The
+  frame has inline rotation, delete and duplicate handles. A barrel tap inside the selection also duplicates it.
 - **Shapes** on unprocessed input (preview in the overlay), one stroke of even width. **Recognition:**
   `InkAnalyzer.AnalyzeAsync` (Completed handler, result posted to the ink thread); the freehand stroke is replaced by
   the outline as its own undo step.

@@ -222,7 +222,8 @@ namespace inkpages::detail
         selection.Preview(m);
         if (!frame) return;
         SelectionFrame shown = *frame;
-        shown.bounds = m.Bounds(frame->bounds); // the handles keep their size, as the frame on the screen
+        if (m.m12 != 0 || m.m21 != 0 || m.m11 < 0 || m.m22 < 0) shown.orientation = m;
+        else shown.bounds = m.Bounds(frame->bounds); // scaling keeps the handles' size on screen
         overlay.SetFrame(shown);
     }
 
