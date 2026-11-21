@@ -105,7 +105,7 @@ namespace inkpages::detail
         for (InkStroke const& s : strokes)
         {
             edit->Removed(s, ink.PageOf(s));
-            moved.push_back(Transformed(s, m));
+            moved.push_back(ink.TransformForDocument(s, m));
             ink.keys.Moved(s.Id(), moved.back().Id(), m); // the app's stroke, moved (cut at a page edge: new ink)
         }
         ink.Remove(strokes);
@@ -130,7 +130,7 @@ namespace inkpages::detail
     {
         auto edit = std::make_shared<StrokeEdit>(ink);
         std::vector<InkStroke> copies;
-        for (InkStroke const& s : Strokes()) copies.push_back(Transformed(s, m));
+        for (InkStroke const& s : Strokes()) copies.push_back(ink.TransformForDocument(s, m));
         Place(copies, *edit);
         return edit;
     }
@@ -138,7 +138,7 @@ namespace inkpages::detail
     std::vector<InkStroke> InkSelection::Copies(PointF origin) const
     {
         std::vector<InkStroke> copies;
-        for (InkStroke const& s : Strokes()) copies.push_back(Transformed(s, Affine::Translation(-origin.x, -origin.y)));
+        for (InkStroke const& s : Strokes()) copies.push_back(ink.TransformForDocument(s, Affine::Translation(-origin.x, -origin.y)));
         return copies;
     }
 
@@ -155,10 +155,14 @@ namespace inkpages::detail
     {
         auto strokes = Strokes();
         if (strokes.empty()) return false;
-        std::set<uint32_t> ids = selection.ids;
-        for (InkStroke const& s : ink.container.GetStrokes()) s.Selected(ids.contains(s.Id()));
-        ink.container.CopySelectedToClipboard();
-        for (InkStroke const& s : strokes) s.Selected(false);
+        InkStrokeContainer copy;
+        for (InkStroke const& stroke : strokes)
+        {
+            auto clone = ink.TransformForDocument(stroke, {});
+            copy.AddStroke(clone);
+            clone.Selected(true);
+        }
+        copy.CopySelectedToClipboard();
         Log(std::format("selection: {} strokes copied to the clipboard (Windows ink)", strokes.size()));
         return true;
     }

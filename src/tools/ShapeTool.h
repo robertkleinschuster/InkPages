@@ -35,6 +35,7 @@ namespace inkpages::detail
         InkState& ink;
         OverlayModel& overlay;
         ShapeLook look;
+        Color previewColor;
         PointF start;
         bool running = false;
     };

@@ -15,8 +15,8 @@ namespace inkpages::detail
     public:
         explicit StrokeEdit(InkState& ink) : ink(ink) {}
 
-        void Removed(InkStroke const& stroke, int page) { removed.push_back({ stroke, page }); }
-        void Added(InkStroke const& stroke, int page) { added.push_back({ stroke, page }); }
+        void Removed(InkStroke const& stroke, int page) { removed.push_back({ stroke, page, ink.OriginalColor(stroke) }); }
+        void Added(InkStroke const& stroke, int page) { added.push_back({ stroke, page, ink.OriginalColor(stroke) }); }
         /// A stroke this edit added is gone again (the exact eraser cut it within the same drag).
         bool Forget(InkStroke const& stroke);
 
@@ -32,6 +32,7 @@ namespace inkpages::detail
         {
             InkStroke stroke;
             int page;
+            winrt::Windows::UI::Color color;
         };
         static void Swap(InkState& ink, std::vector<Entry>& gone, std::vector<Entry>& back);
 

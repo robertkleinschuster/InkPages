@@ -3,6 +3,7 @@
 #include <winrt/Windows.Foundation.Collections.h>
 
 #include "inkpages/model/Pens.h"
+#include "inkpages/model/PaperAppearance.h"
 
 namespace inkpages::detail
 {
@@ -25,7 +26,87 @@ namespace inkpages::detail
     void InkState::Add(InkStroke const& stroke, int page)
     {
         container.AddStroke(stroke);
+        Adopt(stroke, page);
+    }
+
+    void InkState::Adopt(InkStroke const& stroke, int page)
+    {
         owner[stroke.Id()] = page;
+        ApplyDisplayColor(stroke, page);
+    }
+
+    void InkState::Forget(InkStroke const& stroke)
+    {
+        owner.erase(stroke.Id());
+        originalColors.erase(stroke.Id());
+    }
+
+    void InkState::SetDarkPages(std::vector<bool> pages)
+    {
+        if (darkPages == pages) return;
+        darkPages = std::move(pages);
+        if (container)
+            for (InkStroke const& stroke : container.GetStrokes()) ApplyDisplayColor(stroke, PageOf(stroke));
+    }
+
+    winrt::Windows::UI::Color InkState::OriginalColor(InkStroke const& stroke) const
+    {
+        if (auto it = originalColors.find(stroke.Id()); it != originalColors.end()) return it->second;
+        return stroke.DrawingAttributes().Color();
+    }
+
+    bool InkState::DarkPage(std::optional<int> page) const
+    {
+        return page && *page >= 0 && *page < static_cast<int>(darkPages.size()) && darkPages[*page];
+    }
+
+    void InkState::RememberOriginalColor(InkStroke const& stroke, winrt::Windows::UI::Color color)
+    {
+        originalColors.insert_or_assign(stroke.Id(), color);
+    }
+
+    InkDrawingAttributes InkState::OriginalAttributes(InkStroke const& stroke) const
+    {
+        auto attributes = stroke.DrawingAttributes();
+        if (auto it = originalColors.find(stroke.Id()); it != originalColors.end()) attributes.Color(it->second);
+        return attributes;
+    }
+
+    InkStroke InkState::TransformForDocument(InkStroke const& stroke, Affine const& transform) const
+    {
+        return Transformed(stroke, transform, OriginalAttributes(stroke));
+    }
+
+    void InkState::ApplyDisplayColor(InkStroke const& stroke, int page)
+    {
+        bool dark = DarkPage(page);
+        auto previous = originalColors.find(stroke.Id());
+        if (!dark && previous == originalColors.end()) return;
+        auto attributes = stroke.DrawingAttributes();
+        auto current = attributes.Color();
+        auto original = previous == originalColors.end() ? current : previous->second;
+        auto shown = original;
+        if (dark)
+        {
+            auto adapted = PaperAppearance::DarkToolInk({ original.A, original.R, original.G, original.B },
+                attributes.DrawAsHighlighter());
+            shown = { original.A, adapted.r, adapted.g, adapted.b };
+        }
+        if (shown == original)
+        {
+            if (current != original)
+            {
+                attributes.Color(original);
+                stroke.DrawingAttributes(attributes);
+            }
+            originalColors.erase(stroke.Id());
+        }
+        else if (shown != current)
+        {
+            originalColors.try_emplace(stroke.Id(), original);
+            attributes.Color(shown);
+            stroke.DrawingAttributes(attributes);
+        }
     }
 
     void InkState::Remove(std::vector<InkStroke> const& strokes)
@@ -36,7 +117,7 @@ namespace inkpages::detail
         // DeleteSelected is the container's only removal: exactly these strokes are marked, no other stays marked.
         for (InkStroke const& s : container.GetStrokes()) s.Selected(ids.contains(s.Id()));
         container.DeleteSelected();
-        for (uint32_t id : ids) owner.erase(id);
+        for (InkStroke const& stroke : strokes) Forget(stroke);
     }
 
     std::vector<InkStroke> InkState::StrokesOn(int page) const
@@ -119,7 +200,7 @@ namespace inkpages::detail
         PointF d = relocation->shift[oldPage];
         if (d.x == 0 && d.y == 0) return stroke;
         Affine m = Affine::Translation(d.x, d.y);
-        InkStroke copy = Transformed(stroke, m);
+        InkStroke copy = TransformForDocument(stroke, m);
         keys.Moved(stroke.Id(), copy.Id(), m); // the app's key follows (its page coordinates stay the same)
         relocation->copies.emplace(stroke.Id(), copy);
         relocation->made.insert(copy.Id());
@@ -140,11 +221,12 @@ namespace inkpages::detail
             if (inside) return { { stroke, pages[0] } };
         }
         std::vector<Placed> placed;
+        auto attributes = OriginalAttributes(stroke);
         for (int page : pages)
         {
             for (Piece const& piece : ClipToRect(samples, layout.Page(page)))
             {
-                placed.push_back({ MakeStroke(piece, stroke.DrawingAttributes()), page });
+                placed.push_back({ MakeStroke(piece, attributes), page });
             }
         }
         return placed;

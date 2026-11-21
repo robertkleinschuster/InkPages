@@ -31,7 +31,7 @@ namespace inkpages::detail
         std::vector<KeyedStroke> strokes;
         for (InkStroke const& s : state.StrokesOn(page))
         {
-            KeyedStroke keyed{ Transformed(s, Affine::Translation(-origin.x, -origin.y)) };
+            KeyedStroke keyed{ state.TransformForDocument(s, Affine::Translation(-origin.x, -origin.y)) };
             if (auto key = state.keys.Find(s.Id(), origin))
             {
                 keyed.key = key->key;

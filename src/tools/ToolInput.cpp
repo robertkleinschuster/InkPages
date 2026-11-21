@@ -249,6 +249,7 @@ namespace inkpages::detail
         bool showEraser = !h.leaving && (settings.tool == Tool::Eraser || h.inverted);
         overlay.SetEraser(showEraser ? std::optional(h.at) : std::nullopt, settings.eraserRadius, settings.squareEraser);
         if (!h.pen) return;
+        ink.SetPenPage(h.leaving ? std::nullopt : ink.State().layout.PageAt(h.at));
         bool inverted = h.inverted && !h.leaving;
         if (inverted != eraserEndHover)
         {
@@ -430,7 +431,7 @@ namespace inkpages::detail
     {
         if (!settings.recognizeShapes || settings.tool != Tool::Pen || placed.size() != 1) return;
         InkStroke drawn = placed.front().stroke;
-        auto attributes = drawn.DrawingAttributes();
+        auto attributes = ink.State().OriginalAttributes(drawn);
         auto c = attributes.Color();
         Color color{ c.A, c.R, c.G, c.B };
         float width = attributes.Size().Width * InkWidth::FullPressureFactor; // shapes draw the pen's full width

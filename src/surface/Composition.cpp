@@ -43,6 +43,11 @@ namespace inkpages::detail
         if (page >= 0 && page < static_cast<int>(papers.size())) papers[page]->Invalidate();
     }
 
+    void Composition::SetPaper(int page, Paper paper)
+    {
+        papers.at(page)->SetPaper(paper);
+    }
+
     void Composition::SetPages(PageLayout const& newLayout, std::vector<Paper> const& paper,
         std::function<void(int, ID2D1DeviceContext*, RectF)> underlay)
     {

@@ -6,6 +6,7 @@
 #include <winrt/Windows.UI.Core.h>
 
 #include "ink/StrokeEdit.h"
+#include "inkpages/model/PaperAppearance.h"
 #include "inkpages/Log.h"
 
 namespace inkpages::detail
@@ -15,6 +16,14 @@ namespace inkpages::detail
     using winrt::Windows::UI::Core::CoreCursorType;
     using winrt::Windows::UI::Core::CoreInputDeviceTypes;
     using winrt::Windows::UI::Core::PointerEventArgs;
+
+    namespace
+    {
+        uint32_t Pack(Color color)
+        {
+            return (uint32_t(color.a) << 24) | (uint32_t(color.r) << 16) | (uint32_t(color.g) << 8) | color.b;
+        }
+    }
 
     InkLayer::InkLayer(InkHost& host, std::function<void()> ready,
         std::function<void()> commit)
@@ -75,8 +84,55 @@ namespace inkpages::detail
         ready();
     }
 
+    void InkLayer::PenColors::Start(uint32_t pointer)
+    {
+        std::scoped_lock lock(mutex);
+        pending[pointer].push_back(applied.load());
+    }
+
+    void InkLayer::PenColors::Cancel(uint32_t pointer)
+    {
+        std::scoped_lock lock(mutex);
+        auto it = pending.find(pointer);
+        if (it == pending.end()) return;
+        it->second.pop_back();
+        if (it->second.empty()) pending.erase(it);
+    }
+
+    uint64_t InkLayer::PenColors::Take(uint32_t pointer)
+    {
+        std::scoped_lock lock(mutex);
+        auto it = pending.find(pointer);
+        if (it == pending.end()) return 0;
+        auto colors = it->second.front();
+        it->second.pop_front();
+        if (it->second.empty()) pending.erase(it);
+        return colors;
+    }
+
     void InkLayer::Subscribe()
     {
+        auto strokeInput = presenter.StrokeInput();
+        strokeStarted = strokeInput.StrokeStarted([colors = penColors](auto&&, PointerEventArgs const& e) {
+            try
+            {
+                colors->Start(e.CurrentPoint().PointerId());
+            }
+            catch (...)
+            {
+                LogException("ink: recording the starting pen color");
+            }
+        });
+        strokeCanceled = strokeInput.StrokeCanceled([colors = penColors](auto&&, PointerEventArgs const& e) {
+            try
+            {
+                colors->Cancel(e.CurrentPoint().PointerId());
+            }
+            catch (...)
+            {
+                LogException("ink: discarding a canceled pen color");
+            }
+        });
         strokesCollected = presenter.StrokesCollected([this](InkPresenter const&, InkStrokesCollectedEventArgs const& e) {
             try
             {
@@ -84,10 +140,22 @@ namespace inkpages::detail
                 std::vector<Placed> placed;
                 for (InkStroke const& stroke : e.Strokes())
                 {
+                    auto sampledColors = penColors->Take(stroke.PointerId());
                     if (drop && drop(stroke))
                     {
                         ink.Remove({ stroke });
                         continue;
+                    }
+                    if (sampledColors)
+                    {
+                        auto actual = stroke.DrawingAttributes().Color();
+                        constexpr uint32_t rgb = 0xffffff;
+                        if ((Pack({ actual.A, actual.R, actual.G, actual.B }) & rgb) == (sampledColors & rgb))
+                        {
+                            uint32_t original = static_cast<uint32_t>(sampledColors >> 32);
+                            ink.RememberOriginalColor(stroke, { actual.A, static_cast<uint8_t>(original >> 16),
+                                static_cast<uint8_t>(original >> 8), static_cast<uint8_t>(original) });
+                        }
                     }
                     auto pieces = ink.Split(stroke);
                     if (pieces.size() != 1 || pieces[0].stroke != stroke)
@@ -97,7 +165,7 @@ namespace inkpages::detail
                     }
                     for (Placed const& p : pieces)
                     {
-                        ink.owner[p.stroke.Id()] = p.page;
+                        ink.Adopt(p.stroke, p.page);
                         edit->Added(p.stroke, p.page);
                         placed.push_back(p);
                     }
@@ -118,7 +186,7 @@ namespace inkpages::detail
                 for (InkStroke const& stroke : e.Strokes())
                 {
                     edit->Removed(stroke, ink.PageOf(stroke));
-                    ink.owner.erase(stroke.Id());
+                    ink.Forget(stroke);
                 }
                 Log(std::format("ink: {} strokes erased (whole)", e.Strokes().Size()));
                 history.Push(edit);
@@ -151,13 +219,18 @@ namespace inkpages::detail
     {
         if (strokesCollected) presenter.StrokesCollected(*strokesCollected);
         if (strokesErased) presenter.StrokesErased(*strokesErased);
+        if (strokeStarted) presenter.StrokeInput().StrokeStarted(*strokeStarted);
+        if (strokeCanceled) presenter.StrokeInput().StrokeCanceled(*strokeCanceled);
         strokesCollected.reset();
         strokesErased.reset();
+        strokeStarted.reset();
+        strokeCanceled.reset();
     }
 
     void InkLayer::SetLayout(PageLayout layout)
     {
         ink.layout = std::move(layout); // (after a relocation it is the same)
+        SetPenPage(std::nullopt);
         LogHr("IInkPresenterDesktop::SetSize", desktop->SetSize(ink.layout.DocumentSize().width, ink.layout.DocumentSize().height));
         commit();
     }
@@ -165,7 +238,46 @@ namespace inkpages::detail
     void InkLayer::SetPen(PenLook look)
     {
         pen = look;
+        ApplyPen();
+    }
+
+    void InkLayer::SetDarkPages(std::vector<bool> pages)
+    {
+        ink.SetDarkPages(std::move(pages));
+        ApplyPen();
+        ApplyCursor();
+    }
+
+    void InkLayer::SetPenPage(std::optional<int> page)
+    {
+        if (penPage == page) return;
+        penPage = page;
+        ApplyPen();
+        ApplyCursor();
+    }
+
+    void InkLayer::SetViewPage(std::optional<int> page)
+    {
+        if (viewPage != page) penPage.reset();
+        viewPage = page;
+        ApplyPen();
+        ApplyCursor();
+    }
+
+    void InkLayer::ApplyPen()
+    {
         if (!presenter) return;
+        PenLook look = pen;
+        if (PenOverDarkPaper())
+        {
+            look.color = PaperAppearance::DarkToolInk(look.color, look.tool == Tool::Highlighter);
+        }
+        uint64_t colors = look.color == pen.color ? 0 : (uint64_t{ Pack(pen.color) } << 32) | Pack(look.color);
+        if (appliedPen == look)
+        {
+            penColors->applied = colors;
+            return;
+        }
         InkDrawingAttributes a;
         a.Color({ look.color.a, look.color.r, look.color.g, look.color.b });
         a.PenTip(PenTipShape::Circle);
@@ -183,6 +295,8 @@ namespace inkpages::detail
             a.IgnorePressure(false);
         }
         presenter.UpdateDefaultDrawingAttributes(a);
+        appliedPen = look;
+        penColors->applied = colors;
     }
 
     void InkLayer::SetMode(InkInputProcessingMode mode)
@@ -205,16 +319,20 @@ namespace inkpages::detail
         presenter.InputDeviceTypes(penTaken ? CoreInputDeviceTypes::None : CoreInputDeviceTypes::Pen);
     }
 
-    void InkLayer::SetCursor(UINT resourceId)
+    void InkLayer::SetCursor(UINT resourceId, UINT darkResourceId)
     {
         cursor = resourceId;
+        darkCursor = darkResourceId;
         ApplyCursor();
     }
 
     void InkLayer::ApplyCursor()
     {
         if (!input || !cursorInput->active) return;
-        input.PointerCursor(cursor ? CoreCursor(CoreCursorType::Custom, cursor) : nullptr);
-        Log(std::format("ink: pen cursor {}", cursor));
+        UINT resource = darkCursor && PenOverDarkPaper() ? darkCursor : cursor;
+        if (appliedCursor == resource) return;
+        input.PointerCursor(resource ? CoreCursor(CoreCursorType::Custom, resource) : nullptr);
+        appliedCursor = resource;
+        Log(std::format("ink: pen cursor {}", resource));
     }
 }

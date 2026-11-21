@@ -67,6 +67,8 @@ namespace inkpages::detail
         void InvalidatePages(std::set<int> const& changedPages) override;
 
         void SetTool(ToolState tool) override;
+        void SetWorkspaceColor(Color color) override;
+        void SetDarkPaper(bool dark) override;
         void SetRuler(bool shown) override;
         void SetProtractor(bool shown) override;
 
@@ -123,6 +125,10 @@ namespace inkpages::detail
         void AppGesture(MousePhase phase, PointF press, PointF document, int clicks);
 
         SurfaceOptions options;
+        bool darkPaper = false;
+        std::optional<int> penViewPage;
+        std::vector<bool> DarkPages() const;
+        Paper DisplayPaper(PageSpec const& page) const;
         HWND window = nullptr;
         float scale = 1;
         std::unique_ptr<Composition> composition;

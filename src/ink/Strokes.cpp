@@ -30,13 +30,18 @@ namespace inkpages::detail
 
     InkStroke Transformed(InkStroke const& stroke, Affine const& m)
     {
+        return Transformed(stroke, m, stroke.DrawingAttributes());
+    }
+
+    InkStroke Transformed(InkStroke const& stroke, Affine const& m, InkDrawingAttributes const& attributes)
+    {
         std::vector<InkPoint> points;
         for (InkPoint const& p : stroke.GetInkPoints())
         {
             PointF at = m.Apply(PointF{ p.Position().X, p.Position().Y });
             points.emplace_back(winrt::Windows::Foundation::Point{ at.x, at.y }, p.Pressure(), p.TiltX(), p.TiltY(), p.Timestamp());
         }
-        return Build(std::move(points), stroke.DrawingAttributes());
+        return Build(std::move(points), attributes);
     }
 
     std::vector<InkSample> SamplesOf(InkStroke const& stroke)

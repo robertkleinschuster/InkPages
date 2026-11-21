@@ -36,6 +36,7 @@ namespace inkpages::detail
 
         /// The content changed (or a new scale): the next Update draws everything it needs anew.
         void Invalidate() { drawn = {}; }
+        void SetPaper(Paper next) { paper = next; Invalidate(); }
 
         /// The page moved (pages were inserted, removed or moved before it): its drawing goes along, the underlay now
         /// draws for its new index. A new size draws anew.

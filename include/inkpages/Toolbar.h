@@ -98,14 +98,20 @@ namespace inkpages
         std::optional<ToolbarSymbol> symbol; // a shared InkPages bitmap, if set
     };
 
+    struct ToolbarColors
+    {
+        COLORREF background, text, highlight;
+    };
+
     class Toolbar
     {
     public:
         /// `cursorFor`: the pen cursor (cursor resource in the app's exe) for a preset; 0 or none: Windows' default.
+        /// `darkCursorFor` optionally supplies the cursor on dark paper; 0 falls back to `cursorFor`.
         /// The toolbar chains the surface's `historyChanged` and `selectionChanged` (set yours before creating it).
         static std::unique_ptr<Toolbar> Create(HWND parent, WritingSurface& surface, ToolChoices choices,
             ToolbarTexts texts = {}, std::function<UINT(Tool, PenPreset const&)> cursorFor = {},
-            std::vector<ToolbarButton> extensions = {});
+            std::vector<ToolbarButton> extensions = {}, std::function<UINT(Tool, PenPreset const&)> darkCursorFor = {});
         virtual ~Toolbar() = default;
 
         virtual HWND Window() const = 0;
@@ -115,6 +121,9 @@ namespace inkpages
         /// Sets the choices as if the user made them (e.g. the app's keyboard shortcuts for tools).
         virtual void Choose(ToolChoices choices) = 0;
         virtual void EnableButton(int id, bool enabled) = 0;
+        virtual void SetColors(std::optional<ToolbarColors> colors) = 0;
+        /// The page in view uses the dark paper palette, so preset bars and swatches show its ink colors.
+        virtual void SetDarkPaperPreview(bool dark) = 0;
 
         /// The user changed a choice (UI thread): save it.
         std::function<void(ToolChoices const&)> choicesChanged;

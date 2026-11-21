@@ -1,4 +1,5 @@
 #include "surface/TextEditor.h"
+#include "inkpages/model/PaperAppearance.h"
 
 #include <windowsx.h>
 
@@ -152,7 +153,7 @@ namespace inkpages::detail
         float zoom = render / c.scale();
         if (render != laidOutAt)
         {
-            box->SetFormat(now.style.font, RichEditText::Twips(now.style.size, zoom), now.style.color);
+            box->SetFormat(now.style.font, RichEditText::Twips(now.style.size, zoom), DisplayColor());
             laidOutAt = render;
         }
         SIZE natural = box->NaturalSize();
@@ -189,8 +190,21 @@ namespace inkpages::detail
     {
         if (!box) return;
         float render = laidOutAt > 0 ? laidOutAt : c.scale();
-        visual->Draw(*box, { DocumentAt(), textPx, render, c.scale() }, now.style.color, caretOn && GetFocus() == c.window);
+        visual->Draw(*box, { DocumentAt(), textPx, render, c.scale() }, DisplayColor(), caretOn && GetFocus() == c.window);
         c.commit();
+    }
+
+    Color TextEditor::DisplayColor() const
+    {
+        auto color = now.style.color;
+        return c.usesDarkPaper(now.page) ? PaperAppearance::DarkInk(color) : color;
+    }
+
+    void TextEditor::AppearanceChanged()
+    {
+        if (!box) return;
+        laidOutAt = 0;
+        Layout();
     }
 
     void TextEditor::ViewChanged()
@@ -219,8 +233,7 @@ namespace inkpages::detail
     {
         if (!box || style == now.style) return;
         now.style = style;
-        laidOutAt = 0; // the format again
-        Layout();
+        AppearanceChanged();
     }
 
     bool TextEditor::OnMessage(UINT message, WPARAM wp, LPARAM lp, LRESULT& result)

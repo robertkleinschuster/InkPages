@@ -14,6 +14,13 @@
 
 namespace inkpages::detail
 {
+    void Surface::SetWorkspaceColor(Color color)
+    {
+        if (options.background == color) return;
+        options.background = color;
+        winrt::check_bool(RedrawWindow(window, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE));
+    }
+
     namespace
     {
         constexpr UINT_PTR MotionTimer = 2, ScrollTimer = 3;
@@ -272,12 +279,12 @@ namespace inkpages::detail
             return 0;
         case WM_ERASEBKGND:
         {
-            RECT rc;
-            GetClientRect(window, &rc);
+            RECT rc{};
+            winrt::check_bool(GetClientRect(window, &rc));
             Color c = options.background;
-            HBRUSH brush = CreateSolidBrush(RGB(c.r, c.g, c.b));
-            FillRect(reinterpret_cast<HDC>(wp), &rc, brush);
-            DeleteObject(brush);
+            auto dc = reinterpret_cast<HDC>(wp);
+            SetDCBrushColor(dc, RGB(c.r, c.g, c.b));
+            winrt::check_bool(FillRect(dc, &rc, static_cast<HBRUSH>(GetStockObject(DC_BRUSH))));
             return 1;
         }
         }

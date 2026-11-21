@@ -9,7 +9,9 @@
 #include <dcomp.h>
 
 #include <atomic>
+#include <deque>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -57,12 +59,15 @@ namespace inkpages::detail
         InkHost& Host() { return host; }
 
         void SetLayout(PageLayout layout);
+        void SetDarkPages(std::vector<bool> pages);
         void SetPen(PenLook look);
+        void SetPenPage(std::optional<int> page);
+        void SetViewPage(std::optional<int> page);
         void SetMode(InkInputProcessingMode mode);
         /// The pen leaves the presenter (its input goes to the window: the selection is moved there) or comes back.
         void SetPenTaken(bool taken);
         /// The pen cursor (resource id in the app's exe, 0: Windows'), set once the presenter's input is active.
-        void SetCursor(UINT resourceId);
+        void SetCursor(UINT resourceId, UINT darkResourceId);
 
         /// Asked for every collected stroke before it is recorded: true drops it (a tap beside the selection).
         std::function<bool(InkStroke const&)> drop;
@@ -74,6 +79,8 @@ namespace inkpages::detail
         void Subscribe();
         void ApplyDevices();
         void ApplyCursor();
+        void ApplyPen();
+        bool PenOverDarkPaper() const { return ink.DarkPage(penPage ? penPage : viewPage); }
 
         InkHost& host;
         std::function<void()> ready, commit;
@@ -81,11 +88,27 @@ namespace inkpages::detail
         InkPresenter presenter{ nullptr };
         CoreInkIndependentInputSource input{ nullptr };
         std::optional<winrt::event_token> strokesCollected, strokesErased, pointerEntering;
+        std::optional<winrt::event_token> strokeStarted, strokeCanceled;
         InkState ink;
         History history;
         PenLook pen;
+        std::optional<PenLook> appliedPen;
+        std::optional<int> penPage, viewPage;
+        // StrokeInput can run on the input thread. Publish the pair as one atomic value.
+        struct PenColors
+        {
+            std::atomic<uint64_t> applied{};
+            std::mutex mutex;
+            std::map<uint32_t, std::deque<uint64_t>> pending;
+
+            void Start(uint32_t pointer);
+            void Cancel(uint32_t pointer);
+            uint64_t Take(uint32_t pointer);
+        };
+        std::shared_ptr<PenColors> penColors = std::make_shared<PenColors>();
         bool penTaken = false;
-        UINT cursor = 0;
+        UINT cursor = 0, darkCursor = 0;
+        std::optional<UINT> appliedCursor;
         struct CursorInput
         {
             std::mutex mutex;

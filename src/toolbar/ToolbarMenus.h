@@ -12,15 +12,20 @@
 
 namespace inkpages::detail
 {
-    std::optional<ToolChoices> PresetMenu(HWND owner, RECT anchor, ToolChoices choices, Tool tool, int index, ToolbarTexts const& texts);
-    std::optional<ToolChoices> RadiusMenu(HWND owner, RECT anchor, ToolChoices choices, ToolbarTexts const& texts);
-    std::optional<ToolChoices> SelectModeMenu(HWND owner, RECT anchor, ToolChoices choices, ToolbarTexts const& texts);
-    std::optional<ToolChoices> TextMenu(HWND owner, RECT anchor, ToolChoices choices, ToolbarTexts const& texts);
-    std::optional<ToolChoices> ShapeMenu(HWND owner, RECT anchor, ToolChoices choices, ToolbarTexts const& texts);
+    bool MeasureToolMenu(HWND owner, MEASUREITEMSTRUCT& item);
+    bool DrawToolMenu(HWND owner, DRAWITEMSTRUCT const& item, ToolbarColors const& colors);
+
+    std::optional<ToolChoices> PresetMenu(HWND owner, RECT anchor, ToolChoices choices, Tool tool, int index, ToolbarTexts const& texts,
+        std::optional<ToolbarColors> const& colors, bool darkPaper);
+    std::optional<ToolChoices> RadiusMenu(HWND owner, RECT anchor, ToolChoices choices, ToolbarTexts const& texts, std::optional<ToolbarColors> const& colors);
+    std::optional<ToolChoices> SelectModeMenu(HWND owner, RECT anchor, ToolChoices choices, ToolbarTexts const& texts, std::optional<ToolbarColors> const& colors);
+    std::optional<ToolChoices> TextMenu(HWND owner, RECT anchor, ToolChoices choices, ToolbarTexts const& texts,
+        std::optional<ToolbarColors> const& colors, bool darkPaper);
+    std::optional<ToolChoices> ShapeMenu(HWND owner, RECT anchor, ToolChoices choices, ToolbarTexts const& texts, std::optional<ToolbarColors> const& colors);
 
     struct StencilChoice
     {
         bool ruler = false, protractor = false;
     };
-    std::optional<StencilChoice> StencilMenu(HWND owner, RECT anchor, StencilChoice now, ToolbarTexts const& texts);
+    std::optional<StencilChoice> StencilMenu(HWND owner, RECT anchor, StencilChoice now, ToolbarTexts const& texts, std::optional<ToolbarColors> const& colors);
 }

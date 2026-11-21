@@ -49,6 +49,14 @@ namespace inkpages::detail
 
         int PageOf(InkStroke const& stroke) const;
         void Add(InkStroke const& stroke, int page);
+        void Adopt(InkStroke const& stroke, int page);
+        void Forget(InkStroke const& stroke);
+        void SetDarkPages(std::vector<bool> pages);
+        bool DarkPage(std::optional<int> page) const;
+        void RememberOriginalColor(InkStroke const& stroke, winrt::Windows::UI::Color color);
+        winrt::Windows::UI::Color OriginalColor(InkStroke const& stroke) const;
+        InkDrawingAttributes OriginalAttributes(InkStroke const& stroke) const;
+        InkStroke TransformForDocument(InkStroke const& stroke, Affine const& transform) const;
         /// Removes exactly these strokes from the container (by id).
         void Remove(std::vector<InkStroke> const& strokes);
         std::vector<InkStroke> StrokesOn(int page) const;
@@ -62,6 +70,9 @@ namespace inkpages::detail
         std::vector<Placed> Split(InkStroke const& stroke) const;
 
     private:
+        std::vector<bool> darkPages;
+        std::map<uint32_t, winrt::Windows::UI::Color> originalColors;
+        void ApplyDisplayColor(InkStroke const& stroke, int page);
         struct Relocation
         {
             std::vector<PointF> shift;            // by old page

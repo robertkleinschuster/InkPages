@@ -51,6 +51,7 @@ namespace inkpages
     {
         SizeF size{ 595.28f, 841.89f }; // page units (the default: A4 in points, as Xournal++ stores it)
         Paper paper;
+        bool allowDarkPaper = true;
     };
 
     struct SurfaceOptions
@@ -75,6 +76,7 @@ namespace inkpages
         TextStyle text;                             // the Text tool's font, size and color
         bool shapeEnabled = false;
         bool squareEraser = false;
+        UINT darkCursor = 0;                        // optional cursor resource for dark paper
     };
 
     /// A stroke as the app keeps it: page coordinates, the app's key (0: new ink - written, an erased piece, cut at a
@@ -210,6 +212,10 @@ namespace inkpages
 
         // ---- tools
         virtual void SetTool(ToolState tool) = 0;
+        /// Sets the background of the workspace around the sheets (display only).
+        virtual void SetWorkspaceColor(Color color) = 0;
+        /// Changes the rendered paper and ink palette for pages that allow it.
+        virtual void SetDarkPaper(bool dark) = 0;
         virtual void SetRuler(bool shown) = 0;       // Windows' ruler (InkPresenterRuler)
         virtual void SetProtractor(bool shown) = 0;  // Windows' protractor (InkPresenterProtractor)
 

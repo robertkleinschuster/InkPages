@@ -43,6 +43,7 @@ namespace inkpages::detail
             std::function<void(int, ID2D1DeviceContext*, RectF)> underlay);
         /// A page's underlay changed: drawn anew at the next UpdateSheets.
         void Invalidate(int page);
+        void SetPaper(int page, Paper paper);
         /// Draws the sheets near `visible` at `renderScale` (pixels per page unit); far sheets free their drawing.
         void UpdateSheets(RectF visible, float renderScale);
         void Commit();

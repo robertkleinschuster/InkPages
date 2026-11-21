@@ -20,6 +20,7 @@ namespace inkpages::detail
 
     /// The stroke's points mapped by `m` (as a new stroke; the pen's width stays - a scaled stroke keeps its width).
     InkStroke Transformed(InkStroke const& stroke, Affine const& m);
+    InkStroke Transformed(InkStroke const& stroke, Affine const& m, InkDrawingAttributes const& attributes);
 
     /// The stroke's samples (its point transform not applied).
     std::vector<InkSample> SamplesOf(InkStroke const& stroke);

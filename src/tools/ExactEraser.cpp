@@ -65,7 +65,7 @@ namespace inkpages::detail
             auto it = sampled.find(id);
             if (it == sampled.end())
             {
-                auto attributes = stroke.DrawingAttributes();
+                auto attributes = ink.OriginalAttributes(stroke);
                 it = sampled.emplace(id, Sampled{ SamplesOf(stroke), attributes, attributes.Size().Width,
                     attributes.IgnorePressure() }).first;
             }
@@ -115,8 +115,8 @@ namespace inkpages::detail
             for (Piece const& piece : cut.pieces)
             {
                 InkStroke rest = MakeStroke(piece, read.attributes);
-                edit->Added(rest, page);
                 ink.Add(rest, page);
+                edit->Added(rest, page);
                 sampled[rest.Id()] = Sampled{ piece, read.attributes, read.size, read.ignorePressure };
             }
         }

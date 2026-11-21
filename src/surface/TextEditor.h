@@ -42,6 +42,7 @@ namespace inkpages::detail
         std::function<PageLayout const&()> layout;
         std::function<void()> commit;                // the composition
         class SurfaceAutomation* automation = nullptr; // UI Automation of the window (the edited box as its focus)
+        std::function<bool(int)> usesDarkPaper;
     };
 
     class TextEditor
@@ -71,6 +72,7 @@ namespace inkpages::detail
         bool OnMessage(UINT message, WPARAM wp, LPARAM lp, LRESULT& result);
         /// The view moved or zoomed: the box's place in the window follows, at a new settled zoom it is laid out anew.
         void ViewChanged();
+        void AppearanceChanged();
 
         std::function<void(bool editing)> editingChanged;
         std::function<void()> caretMoved;
@@ -80,6 +82,7 @@ namespace inkpages::detail
         void Layout();
         void ScheduleDraw();
         void Draw();
+        Color DisplayColor() const;
         RECT ClientOfText() const;
         PointF DocumentAt() const;
         bool InBox(POINT client) const;

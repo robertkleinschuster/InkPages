@@ -35,6 +35,12 @@ namespace inkpages::detail
         {
             InkStroke was = ink.Current(e.stroke);
             InkStroke copy = was.Clone();
+            auto attributes = copy.DrawingAttributes();
+            if (attributes.Color() != e.color)
+            {
+                attributes.Color(e.color);
+                copy.DrawingAttributes(attributes);
+            }
             ink.keys.Copied(was.Id(), copy.Id()); // a stroke brought back keeps the app's key
             ink.Replaced(was, copy);
             ink.Add(copy, e.page);

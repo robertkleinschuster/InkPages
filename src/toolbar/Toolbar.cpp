@@ -1,4 +1,5 @@
 #include "inkpages/Toolbar.h"
+#include "inkpages/model/PaperAppearance.h"
 #include "WindowData.h"
 
 #include <commctrl.h>
@@ -26,7 +27,8 @@ namespace inkpages
         {
         public:
             Bar(HWND parent, WritingSurface& surface, ToolChoices choices, ToolbarTexts texts,
-                std::function<UINT(Tool, PenPreset const&)> cursorFor, std::vector<ToolbarButton> extensions);
+                std::function<UINT(Tool, PenPreset const&)> cursorFor, std::vector<ToolbarButton> extensions,
+                std::function<UINT(Tool, PenPreset const&)> darkCursorFor);
             ~Bar() override;
 
             HWND Window() const override { return container; }
@@ -34,6 +36,8 @@ namespace inkpages
             ToolChoices const& Choices() const override { return choices; }
             void Choose(ToolChoices next) override;
             void EnableButton(int id, bool enabled) override;
+            void SetColors(std::optional<ToolbarColors> palette) override;
+            void SetDarkPaperPreview(bool dark) override;
 
             static LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wp, LPARAM lp);
 
@@ -47,24 +51,29 @@ namespace inkpages
             void UpdateStates();
             SurfaceStatus Status() const;
             RECT ButtonRect(int id) const;
+            void DrawDropdownArrow(NMCUSTOMDRAW const& draw) const;
             HBITMAP IconOf(ButtonSpec const& spec, int size) const;
 
             WritingSurface& surface;
             ToolChoices choices;
             ToolbarTexts texts;
             std::function<UINT(Tool, PenPreset const&)> cursorFor;
+            std::function<UINT(Tool, PenPreset const&)> darkCursorFor;
             std::vector<ToolbarButton> extensions;
             StencilChoice stencils;
             std::vector<std::wstring> names; // the buttons' texts (accessible names), alive as long as the buttons
             HWND container = nullptr, bar = nullptr;
             HIMAGELIST images = nullptr;
+            std::optional<ToolbarColors> colors;
+            bool darkPaperPreview = false;
             std::shared_ptr<bool> alive = std::make_shared<bool>(true);
         };
 
         Bar::Bar(HWND parent, WritingSurface& surface, ToolChoices choices, ToolbarTexts texts,
-            std::function<UINT(Tool, PenPreset const&)> cursorFor, std::vector<ToolbarButton> extensions)
+            std::function<UINT(Tool, PenPreset const&)> cursorFor, std::vector<ToolbarButton> extensions,
+            std::function<UINT(Tool, PenPreset const&)> darkCursorFor)
             : surface(surface), choices(std::move(choices)), texts(std::move(texts)), cursorFor(std::move(cursorFor)),
-              extensions(std::move(extensions))
+              darkCursorFor(std::move(darkCursorFor)), extensions(std::move(extensions))
         {
             static bool registered = [] {
                 WNDCLASSEXW wc{ sizeof(wc) };
@@ -182,7 +191,10 @@ namespace inkpages
                 if (b.glyph) return GlyphIcon(b.glyph, NotebookBlue, {}, size);
                 return PathIcon(b.path, b.pathSize, NotebookBlue, size);
             }
-            return ArtworkIcon(spec.symbol, spec.bar, size);
+            auto accent = spec.bar;
+            if (accent && darkPaperPreview)
+                accent = PaperAppearance::DarkToolInk(*accent, IsPreset(spec.id, ButtonId::Highlighter));
+            return ArtworkIcon(spec.symbol, accent, size);
         }
 
         int Bar::Height() const
@@ -250,6 +262,7 @@ namespace inkpages
             state.width = preset.width;
             bool pens = IsDrawingTool(choices.tool);
             state.cursor = cursorFor && pens ? cursorFor(choices.tool, preset) : 0;
+            state.darkCursor = darkCursorFor && pens ? darkCursorFor(choices.tool, preset) : 0;
             surface.SetTool(state);
             UpdateStates();
             Log(std::format("toolbar: {}", choices.Serialize()));
@@ -321,11 +334,13 @@ namespace inkpages
         {
             RECT anchor = ButtonRect(id);
             std::optional<ToolChoices> next;
-            if (IsPreset(id, ButtonId::Pen)) next = PresetMenu(container, anchor, choices, Tool::Pen, id - ButtonId::Pen, texts);
-            else if (IsPreset(id, ButtonId::Highlighter)) next = PresetMenu(container, anchor, choices, Tool::Highlighter, id - ButtonId::Highlighter, texts);
+            if (IsPreset(id, ButtonId::Pen))
+                next = PresetMenu(container, anchor, choices, Tool::Pen, id - ButtonId::Pen, texts, colors, darkPaperPreview);
+            else if (IsPreset(id, ButtonId::Highlighter))
+                next = PresetMenu(container, anchor, choices, Tool::Highlighter, id - ButtonId::Highlighter, texts, colors, darkPaperPreview);
             else if (id == ButtonId::Eraser)
             {
-                if (auto chosen = RadiusMenu(container, anchor, choices, texts))
+                if (auto chosen = RadiusMenu(container, anchor, choices, texts, colors))
                 {
                     choices.eraserRadius = chosen->eraserRadius;
                     choices.squareEraser = chosen->squareEraser;
@@ -333,20 +348,20 @@ namespace inkpages
                 }
                 return;
             }
-            else if (id == ButtonId::Select) next = SelectModeMenu(container, anchor, choices, texts);
+            else if (id == ButtonId::Select) next = SelectModeMenu(container, anchor, choices, texts, colors);
             else if (id == ButtonId::Shape)
             {
-                if (auto chosen = ShapeMenu(container, anchor, choices, texts))
+                if (auto chosen = ShapeMenu(container, anchor, choices, texts, colors))
                 {
                     choices = std::move(*chosen);
                     Apply(true);
                 }
                 return;
             }
-            else if (id == ButtonId::Text) next = TextMenu(container, anchor, choices, texts);
+            else if (id == ButtonId::Text) next = TextMenu(container, anchor, choices, texts, colors, darkPaperPreview);
             else if (id == ButtonId::Ruler)
             {
-                if (auto chosen = StencilMenu(container, anchor, stencils, texts))
+                if (auto chosen = StencilMenu(container, anchor, stencils, texts, colors))
                 {
                     if (chosen->ruler != stencils.ruler) surface.SetRuler(chosen->ruler);
                     if (chosen->protractor != stencils.protractor) surface.SetProtractor(chosen->protractor);
@@ -380,16 +395,101 @@ namespace inkpages
             return DefWindowProcW(window, message, wp, lp);
         }
 
+        void Bar::SetColors(std::optional<ToolbarColors> palette)
+        {
+            colors = palette;
+            winrt::check_bool(RedrawWindow(container, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN));
+        }
+
+        void Bar::SetDarkPaperPreview(bool dark)
+        {
+            if (darkPaperPreview == dark) return;
+            darkPaperPreview = dark;
+            int size = MulDiv(16, GetDpiForWindow(container), 96);
+            for (auto const& spec : ToolbarButtons(choices, extensions))
+            {
+                if (!spec.bar) continue;
+                TBBUTTONINFOW button{ sizeof(button), TBIF_IMAGE };
+                if (SendMessageW(bar, TB_GETBUTTONINFOW, spec.id, reinterpret_cast<LPARAM>(&button)) < 0)
+                    winrt::throw_hresult(E_FAIL);
+                HBITMAP bitmap = IconOf(spec, size);
+                if (!bitmap) winrt::throw_hresult(E_FAIL);
+                BOOL replaced = ImageList_Replace(images, button.iImage, bitmap, nullptr);
+                if (!DeleteObject(bitmap)) LogError("DeleteObject (toolbar preview bitmap)");
+                if (!replaced) winrt::throw_hresult(E_FAIL);
+            }
+            winrt::check_bool(InvalidateRect(bar, nullptr, FALSE));
+        }
+
+        void Bar::DrawDropdownArrow(NMCUSTOMDRAW const& draw) const
+        {
+            TBBUTTONINFOW button{ sizeof(button), TBIF_STYLE };
+            if (SendMessageW(bar, TB_GETBUTTONINFOW, draw.dwItemSpec, reinterpret_cast<LPARAM>(&button)) < 0 ||
+                !(button.fsStyle & BTNS_DROPDOWN)) return;
+            // Keep the control's split button and notification. Paint its indicator in the contrasting palette.
+            UINT dpi = GetDpiForWindow(bar);
+            int cx = draw.rc.right - MulDiv(9, dpi, 96);
+            int cy = (draw.rc.top + draw.rc.bottom) / 2;
+            int half = MulDiv(4, dpi, 96);
+            int rise = MulDiv(2, dpi, 96);
+            POINT arrow[] { { cx - half, cy - rise }, { cx + half, cy - rise }, { cx, cy + rise } };
+            auto dc = draw.hdc;
+            int saved = SaveDC(dc);
+            if (!saved) winrt::throw_hresult(E_FAIL);
+            SetDCBrushColor(dc, colors->text);
+            SelectObject(dc, GetStockObject(DC_BRUSH));
+            SelectObject(dc, GetStockObject(NULL_PEN));
+            BOOL drawn = Polygon(dc, arrow, ARRAYSIZE(arrow));
+            if (!RestoreDC(dc, saved)) LogError("RestoreDC (toolbar dropdown arrow)");
+            if (!drawn) LogError("Polygon (toolbar dropdown arrow)");
+        }
+
         LRESULT Bar::Handle(UINT message, WPARAM wp, LPARAM lp)
         {
             switch (message)
             {
+            case WM_MEASUREITEM:
+                if (colors && MeasureToolMenu(container, *reinterpret_cast<MEASUREITEMSTRUCT*>(lp))) return TRUE;
+                break;
+            case WM_DRAWITEM:
+                if (colors && DrawToolMenu(container, *reinterpret_cast<DRAWITEMSTRUCT const*>(lp), *colors)) return TRUE;
+                break;
+            case WM_ERASEBKGND:
+                if (colors)
+                {
+                    RECT rect{};
+                    winrt::check_bool(GetClientRect(container, &rect));
+                    auto dc = reinterpret_cast<HDC>(wp);
+                    SetDCBrushColor(dc, colors->background);
+                    winrt::check_bool(FillRect(dc, &rect, static_cast<HBRUSH>(GetStockObject(DC_BRUSH))));
+                    return TRUE;
+                }
+                break;
             case WM_COMMAND:
                 if (reinterpret_cast<HWND>(lp) == bar) Click(LOWORD(wp));
                 return 0;
             case WM_NOTIFY:
             {
                 auto header = reinterpret_cast<NMHDR*>(lp);
+                if (colors && header->hwndFrom == bar && header->code == NM_CUSTOMDRAW)
+                {
+                    auto& draw = *reinterpret_cast<NMTBCUSTOMDRAW*>(lp);
+                    if (draw.nmcd.dwDrawStage == CDDS_PREPAINT)
+                    {
+                        SetDCBrushColor(draw.nmcd.hdc, colors->background);
+                        winrt::check_bool(FillRect(draw.nmcd.hdc, &draw.nmcd.rc,
+                            static_cast<HBRUSH>(GetStockObject(DC_BRUSH))));
+                        return CDRF_NOTIFYITEMDRAW;
+                    }
+                    if (draw.nmcd.dwDrawStage == CDDS_ITEMPREPAINT)
+                    {
+                        draw.clrText = colors->text;
+                        draw.clrTextHighlight = colors->text;
+                        draw.clrHighlightHotTrack = colors->highlight;
+                        return TBCDRF_USECDCOLORS | TBCDRF_HILITEHOTTRACK | CDRF_NOTIFYPOSTPAINT;
+                    }
+                    if (draw.nmcd.dwDrawStage == CDDS_ITEMPOSTPAINT) DrawDropdownArrow(draw.nmcd);
+                }
                 if (header->code == TBN_DROPDOWN)
                 {
                     Menu(reinterpret_cast<NMTOOLBARW*>(lp)->iItem);
@@ -416,9 +516,10 @@ namespace inkpages
     }
 
     std::unique_ptr<Toolbar> Toolbar::Create(HWND parent, WritingSurface& surface, ToolChoices choices, ToolbarTexts texts,
-        std::function<UINT(Tool, PenPreset const&)> cursorFor, std::vector<ToolbarButton> extensions)
+        std::function<UINT(Tool, PenPreset const&)> cursorFor, std::vector<ToolbarButton> extensions,
+        std::function<UINT(Tool, PenPreset const&)> darkCursorFor)
     {
         return std::make_unique<Bar>(parent, surface, std::move(choices), std::move(texts), std::move(cursorFor),
-            std::move(extensions));
+            std::move(extensions), std::move(darkCursorFor));
     }
 }

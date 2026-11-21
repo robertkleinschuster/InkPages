@@ -1,4 +1,5 @@
 #include "surface/Surface.h"
+#include "inkpages/model/PaperAppearance.h"
 #include "WindowData.h"
 
 #include <cmath>
@@ -162,7 +163,9 @@ namespace inkpages::detail
             composition->TextLayer(), &host, ui.get(), [this] { return ink.get(); }, [this] { return tools.get(); },
             [this] { return textHost; }, [this] { return CurrentView(); }, [this] { return scale; },
             [this] { return sheetScale; }, [this]() -> PageLayout const& { return layout; },
-            [this] { composition->Commit(); }, automation.get() });
+            [this] { composition->Commit(); }, automation.get(), [this](int page) {
+                return darkPaper && page >= 0 && page < static_cast<int>(pages.size()) && pages[page].allowDarkPaper;
+            } });
         textEditor->editingChanged = [this](bool editing) { EditChanged(editing); };
         textEditor->caretMoved = [this] { RevealTextCaret(); };
 
@@ -471,6 +474,40 @@ namespace inkpages::detail
             viewport->ZoomToRect(*target, false);
     }
 
+    std::vector<bool> Surface::DarkPages() const
+    {
+        std::vector<bool> flags;
+        flags.reserve(pages.size());
+        for (auto const& page : pages) flags.push_back(darkPaper && page.allowDarkPaper);
+        return flags;
+    }
+
+    Paper Surface::DisplayPaper(PageSpec const& page) const
+    {
+        Paper paper = page.paper;
+        if (darkPaper && page.allowDarkPaper)
+        {
+            paper.sheetColor = PaperAppearance::DarkSheet;
+            paper.lineColor = { paper.lineColor.a, 67, 67, 67 };
+        }
+        return paper;
+    }
+
+    void Surface::SetDarkPaper(bool dark)
+    {
+        if (darkPaper == dark) return;
+        darkPaper = dark;
+        textEditor->AppearanceChanged();
+        winrt::check_hresult(host.Post("ink display palette", [this, flags = DarkPages()] {
+            ink->SetDarkPages(std::move(flags));
+            ui->Post([this] { composition->Commit(); });
+        }));
+        for (int i = 0; i < static_cast<int>(pages.size()); ++i)
+            if (pages[i].allowDarkPaper) composition->SetPaper(i, DisplayPaper(pages[i]));
+        if (sheetScale > 0) composition->UpdateSheets(Visible(), sheetScale);
+        composition->Commit();
+    }
+
     void Surface::BuildLayout(std::vector<PageSpec> specs, std::vector<Paper>& papers)
     {
         pages = std::move(specs);
@@ -478,7 +515,7 @@ namespace inkpages::detail
         for (PageSpec const& p : pages)
         {
             sizes.push_back(p.size);
-            papers.push_back(p.paper);
+            papers.push_back(DisplayPaper(p));
         }
         layout = PageLayout(sizes, options.gap, options.margin);
     }
@@ -519,7 +556,7 @@ namespace inkpages::detail
         held = map.Apply(held);
         live = map.Apply(live);
         ++pagesGeneration; // selections made on the old pages are dropped
-        host.Post("rearrange pages", [this, map, layout = layout] {
+        host.Post("rearrange pages", [this, map, layout = layout, flags = DarkPages()] {
             ++inkPagesGeneration;
             if (tools) // a gesture running on the old pages ends, before the history follows the pages
             {
@@ -530,6 +567,7 @@ namespace inkpages::detail
             state.BeginRelocation(map, layout);
             ink->Edits().RemapPages(map);
             state.EndRelocation();
+            ink->SetDarkPages(std::move(flags));
             if (pageStore) pageStore->Remap(map);
             // The app's stored strokes follow in the same work item: load/store queued before it carry the old
             // indices, those after it the new ones.
@@ -554,7 +592,7 @@ namespace inkpages::detail
         live.clear();
         held.clear();
         ++pagesGeneration;
-        host.Post("pages", [this, layout = layout] {
+        host.Post("pages", [this, layout = layout, flags = DarkPages()] {
             ++inkPagesGeneration;
             if (tools)
             {
@@ -563,6 +601,7 @@ namespace inkpages::detail
             }
             if (pageStore) pageStore->ReleaseAll(); // the old document's ink goes to `store`
             ink->Edits().Clear();
+            ink->SetDarkPages(std::move(flags));
             ink->SetLayout(layout);
         });
         composition->SetPages(layout, papers, [this](int page, ID2D1DeviceContext* dc, RectF area) {
@@ -596,6 +635,12 @@ namespace inkpages::detail
         }
         if (presenterReady)
         {
+            auto visiblePage = layout.PageInView(visible);
+            if (penViewPage != visiblePage)
+            {
+                penViewPage = visiblePage;
+                host.Post("ink page in view", [this, visiblePage] { ink->SetViewPage(visiblePage); });
+            }
             std::set<int> keep = held;
             for (int page : ink->Edits().State().pages) keep.insert(page);
             std::set<int> next = LivePages(layout, visible, live, keep);
@@ -755,9 +800,9 @@ namespace inkpages::detail
         currentTool = state.tool;
         if (state.tool == Tool::Text) textEditor->SetStyle(state.text); // the edited text takes the menu's choice
         else textEditor->End();
-        host.Post("tool", [this, settings, look, pens, cursor = state.cursor] {
+        host.Post("tool", [this, settings, look, pens, cursor = state.cursor, darkCursor = state.darkCursor] {
             if (pens) ink->SetPen(look);
-            ink->SetCursor(cursor);
+            ink->SetCursor(cursor, darkCursor);
             if (tools) tools->SetTool(settings);
         });
     }

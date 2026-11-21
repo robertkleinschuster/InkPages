@@ -1,4 +1,5 @@
 #include "tools/ShapeTool.h"
+#include "inkpages/model/PaperAppearance.h"
 
 #include <cmath>
 
@@ -24,15 +25,16 @@ namespace inkpages::detail
     {
         look = shape;
         start = p;
+        previewColor = ink.DarkPage(ink.layout.PageAt(start)) ?
+            PaperAppearance::DarkToolInk(look.color, look.highlighter) : look.color;
+        if (look.highlighter) previewColor.a = 0x7F;
         running = true;
     }
 
     void ShapeTool::Move(PointF p)
     {
         if (!running) return;
-        Color preview = look.color;
-        if (look.highlighter) preview.a = 0x7F;
-        overlay.SetShape(ShapeOutline(look.kind, start, p, look.width), preview, look.width);
+        overlay.SetShape(ShapeOutline(look.kind, start, p, look.width), previewColor, look.width);
     }
 
     std::shared_ptr<StrokeEdit> ShapeTool::End(PointF end)
