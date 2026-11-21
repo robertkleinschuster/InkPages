@@ -78,11 +78,16 @@ namespace inkpages::detail
                 std::vector<Piece> next;
                 for (Piece const& piece : pieces)
                 {
-                    auto cut = EraseCircle(piece, half, center, radius);
+                    auto cut = square ? EraseSquare(piece, half, center, radius) : EraseCircle(piece, half, center, radius);
                     if (!cut) next.push_back(piece);
                     else
                     {
                         touched = true;
+                        if (wholeStrokes)
+                        {
+                            next.clear();
+                            break;
+                        }
                         next.insert(next.end(), cut->begin(), cut->end());
                     }
                 }

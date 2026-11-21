@@ -235,6 +235,7 @@ namespace inkpages
             state.tool = choices.tool;
             state.wholeStrokeErasing = choices.wholeStrokeErasing;
             state.eraserRadius = choices.eraserRadius;
+            state.squareEraser = choices.squareEraser;
             state.selectMode = choices.selectMode;
             state.shape = choices.shape;
             state.shapeEnabled = choices.DrawingShape();
@@ -327,6 +328,7 @@ namespace inkpages
                 if (auto chosen = RadiusMenu(container, anchor, choices, texts))
                 {
                     choices.eraserRadius = chosen->eraserRadius;
+                    choices.squareEraser = chosen->squareEraser;
                     Apply(true);
                 }
                 return;

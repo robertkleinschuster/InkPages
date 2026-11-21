@@ -25,4 +25,7 @@ namespace inkpages
     /// all of it is erased. `halfWidth`: half the drawn width at a sample.
     std::optional<std::vector<Piece>> EraseCircle(std::vector<InkSample> const& samples,
         std::function<double(InkSample const&)> const& halfWidth, PointF center, double radius);
+
+    std::optional<std::vector<Piece>> EraseSquare(std::vector<InkSample> const& samples,
+        std::function<double(InkSample const&)> const& halfWidth, PointF center, double halfSide);
 }

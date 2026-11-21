@@ -84,6 +84,10 @@ namespace inkpages
 
     int PenWidths::StepOf(float width) { return Nearest(Steps, width); }
     int HighlighterWidths::StepOf(float width) { return Nearest(Steps, width); }
+    int EraserSizes::StepOf(float extent, bool square)
+    {
+        return Nearest(SquareHalfSides, extent / Extent(1, square));
+    }
 
     TextStyle ToolChoices::Text() const
     {
@@ -97,9 +101,10 @@ namespace inkpages
     std::string ToolChoices::Serialize() const
     {
         return std::format("pens={};highlighters={};eraser={};whole={};tool={};preset={};select={};shape={};recognize={};"
-            "text={}:{}:{};shapeEnabled={}",
+            "text={}:{}:{};shapeEnabled={};squareEraser={}",
             Presets(pens), Presets(highlighters), eraserRadius, wholeStrokeErasing ? 1 : 0, static_cast<int>(tool), preset,
-            static_cast<int>(selectMode), static_cast<int>(shape), recognizeShapes ? 1 : 0, textFont, textSize, textColor, shapeEnabled ? 1 : 0);
+            static_cast<int>(selectMode), static_cast<int>(shape), recognizeShapes ? 1 : 0, textFont, textSize, textColor,
+            shapeEnabled ? 1 : 0, squareEraser ? 1 : 0);
     }
 
     ToolChoices ToolChoices::Parse(std::string const& text)
@@ -116,7 +121,9 @@ namespace inkpages
             float f = 0;
             if (key == "pens") c.pens = ParsePresets(value, Palette::Pens.size());
             else if (key == "highlighters") c.highlighters = ParsePresets(value, Palette::Highlighters.size());
-            else if (key == "eraser" && Number(value, f)) c.eraserRadius = std::clamp(f, 1.f, 20.f);
+            else if (key == "eraser" && Number(value, f))
+                c.eraserRadius = std::clamp(f, 1.f, EraserSizes::Extent(EraserSizes::SquareHalfSides.back(), false));
+            else if (key == "squareEraser" && Number(value, i)) c.squareEraser = i != 0;
             else if (key == "whole" && Number(value, i)) c.wholeStrokeErasing = i != 0;
             else if (key == "tool" && Number(value, i) && i >= 0 && i <= 5) c.tool = static_cast<Tool>(i);
             else if (key == "text") ParseText(value, c);

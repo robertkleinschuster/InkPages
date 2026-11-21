@@ -81,7 +81,7 @@ toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize(
   one) and selected, moved, scaled, deleted through your `PictureHost` (same id space). `EditingText`,
   `textEditingChanged` (leave your key shortcuts alone meanwhile), `EndTextEditing` (e.g. before saving). Plain text,
   one font, size and color per text, as Xournal++'s `<text>`.
-- **Tools:** `SetTool(ToolState)` (the toolbar does it): pen, highlighter, eraser (whole strokes or exact circle),
+- **Tools:** `SetTool(ToolState)` (the toolbar does it): pen, highlighter, eraser (whole strokes or partial, round or square),
   select (lasso/rectangle; the barrel lassos with any tool), shapes (+ recognition), text, `SetRuler`/`SetProtractor`. The
   pen's eraser end erases with any tool. Pen cursor: a cursor resource of the app's exe (`cursorFor`).
 - **Selection:** `Cut`, `Copy`, `Paste`, `Duplicate`, `DeleteSelection`, `SelectAll`, `ClearSelection`,
@@ -89,7 +89,7 @@ toolbar->choicesChanged = [](inkpages::ToolChoices const& c) { save(c.Serialize(
 - **History:** `Undo`, `Redo`, `historyChanged`, `MarkSaved`/`AtSavePoint` – one history across pages.
 - **UI dispatch:** InkPages uses the current thread's Windows `DispatcherQueue`. The demo keeps a
   `UiDispatcherScope` around its message loop so the dispatcher shuts down after the window and writing surface.
-- **Toolbar:** comctl32, Segoe Fluent icons, menus at the presets (color, width), at the eraser toggle (size), at
+- **Toolbar:** comctl32 with shared custom icons, menus at the presets (color, width), at the eraser (size, square mode), at
   select (lasso/rectangle), shapes (kind, recognition), text (font, size, color) and the ruler; `ToolbarTexts` in your language; app buttons
   (`ToolbarButton`: a Segoe Fluent glyph or a vector `path` in XAML path syntax, `pathSize` = its box; `name` = the
   accessible name; `groupStart` = a separator before it; `atStart` = at the toolbar's start, before undo/redo). Every button has an accessible name (MSAA, so native UI Automation and Narrator find it).

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cmath>
+
 #include "inkpages/model/Pens.h"
 #include "inkpages/model/StrokeEraser.h"
 #include "inkpages/model/UndoHistory.h"
@@ -13,12 +15,24 @@ namespace inkpages::tests
         EXPECT_EQ(1, PenWidths::StepOf(1.0f));
         EXPECT_EQ(2, PenWidths::StepOf(1.41f));
         EXPECT_EQ(0, PenWidths::StepOf(0.3f));
-        EXPECT_EQ(5, PenWidths::StepOf(10));
+        EXPECT_EQ(4, PenWidths::StepOf(10));
         for (int step = 0; step < static_cast<int>(PenWidths::Steps.size()); ++step)
         {
             EXPECT_EQ(step, PenWidths::StepOf(PenWidths::Steps[step])) << "every step round-trips";
         }
-        EXPECT_EQ(1, HighlighterWidths::StepOf(ToolChoices::DefaultHighlighterWidth));
+        EXPECT_EQ(2, HighlighterWidths::StepOf(ToolChoices::DefaultHighlighterWidth));
+    }
+
+    TEST(EraserSizes, TheSameStepHasEqualAreaInBothModes)
+    {
+        for (int i = 0; i < static_cast<int>(EraserSizes::SquareHalfSides.size()); ++i)
+        {
+            float side = EraserSizes::SquareHalfSides[i];
+            float radius = EraserSizes::Extent(side, false);
+            EXPECT_NEAR(4 * side * side, 3.14159265 * radius * radius, 0.001);
+            EXPECT_EQ(i, EraserSizes::StepOf(radius, false));
+            EXPECT_EQ(i, EraserSizes::StepOf(side, true));
+        }
     }
 
     TEST(InkWidth, PressureForIsTheInverseOfTheFactor)
@@ -54,6 +68,7 @@ namespace inkpages::tests
         choices.highlighters = { { 2, 12 } };
         choices.eraserRadius = 7.5f;
         choices.wholeStrokeErasing = true;
+        choices.squareEraser = true;
         choices.tool = Tool::Highlighter;
         choices.preset = 1;
         choices.selectMode = SelectMode::Rectangle;
@@ -64,6 +79,7 @@ namespace inkpages::tests
         EXPECT_EQ(choices.highlighters, back.highlighters);
         EXPECT_EQ(7.5f, back.eraserRadius);
         EXPECT_TRUE(back.wholeStrokeErasing);
+        EXPECT_TRUE(back.squareEraser);
         EXPECT_EQ(Tool::Highlighter, back.tool);
         EXPECT_EQ(1, back.preset);
         EXPECT_EQ(SelectMode::Rectangle, back.selectMode);
@@ -105,6 +121,18 @@ namespace inkpages::tests
         return samples;
     }
     double Half(InkSample const&) { return 1; } // a stroke 2 pt wide
+
+    TEST(StrokeEraser, SquareCutsAHighlighterAtItsVisibleEdge)
+    {
+        auto markerHalf = [](InkSample const&) { return 4.25; };
+        auto pieces = EraseSquare(Line({ -20, 8, 20, 8 }), markerHalf, { 0, 0 }, 5);
+        ASSERT_TRUE(pieces.has_value());
+        ASSERT_EQ(2u, pieces->size());
+        float cut = 5.f + std::sqrt(4.25f * 4.25f - 9.f);
+        EXPECT_NEAR(-cut, pieces->front().back().position.x, 1e-4);
+        EXPECT_NEAR(cut, pieces->back().front().position.x, 1e-4);
+        EXPECT_FALSE(EraseSquare(Line({ -20, 9.3f, 20, 9.3f }), markerHalf, { 0, 0 }, 5));
+    }
 
     TEST(StrokeEraser, CircleInTheMiddleCutsTheStrokeWhereTheInkEdgeMeetsIt)
     {

@@ -1,8 +1,6 @@
 #pragma once
 
-// The exact eraser (an agreed exception: Windows ink only erases whole strokes): erases exactly the circle at the pen -
-// strokes are cut by EraseCircle and replaced by what is left of them, one undo step per drag. Ported from
-// PartialEraser.cs (winui-final). Ink host thread only.
+// Geometry-based pen eraser, one undo step per drag. Windows ink's native stroke eraser has no configurable square.
 
 #include <map>
 #include <memory>
@@ -18,10 +16,12 @@ namespace inkpages::detail
         explicit ExactEraser(InkState& ink) : ink(ink) {}
 
         float radius = 4; // page units
+        bool square = false;
+        bool wholeStrokes = false;
 
         void Begin(PointF p);
         /// Erases along the way from the last point through `path` (one pointer event's points, oldest first; circles
-        /// every half radius: nothing is skipped) in one pass over the strokes.
+        /// or squares every half extent) in one pass over the strokes.
         void MoveAlong(std::vector<PointF> const& path);
         /// The drag ended (or was canceled - what was erased stays erased): its edit, for the history.
         std::shared_ptr<StrokeEdit> End();

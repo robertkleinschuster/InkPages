@@ -13,11 +13,10 @@
 
 namespace inkpages
 {
-    /// The pens' widths: Xournal++'s pen widths (very fine, fine, medium, thick) and two thicker ones - the width at full
-    /// pressure, in page units (the document's unit, as the pages' sizes).
+    /// Xournal++'s pen widths at full pressure, in page units.
     struct PenWidths
     {
-        static constexpr std::array<float, 6> Steps{ 0.42f, 0.85f, 1.41f, 2.26f, 3.4f, 5.67f };
+        static constexpr std::array<float, 5> Steps{ 0.42f, 0.85f, 1.41f, 2.26f, 5.67f };
 
         /// The step (0-based) whose width is nearest to a width.
         static int StepOf(float width);
@@ -26,8 +25,17 @@ namespace inkpages
     /// The highlighter's widths offered in its menu (drawn width, no pressure); Xournal's default is 8.5.
     struct HighlighterWidths
     {
-        static constexpr std::array<float, 4> Steps{ 6, 8.5f, 12, 16 };
+        static constexpr std::array<float, 5> Steps{ 1, 2.83f, 8.5f, 19.84f, 30 };
         static int StepOf(float width);
+    };
+
+    struct EraserSizes
+    {
+        static constexpr std::array<float, 5> SquareHalfSides{ 1, 2.83f, 8.5f, 12, 18 };
+        // A circle of radius 2a / sqrt(pi) has the area of a square of side 2a.
+        static constexpr float CircleFactor = 1.12837917f;
+        static constexpr float Extent(float halfSide, bool square) { return square ? halfSide : halfSide * CircleFactor; }
+        static int StepOf(float extent, bool square);
     };
 
     /// How Windows ink draws a stroke (measured): a stroke of size s at pressure p is about s * (0.25 + 1.5 p) wide,
@@ -90,7 +98,7 @@ namespace inkpages
 
         std::vector<PenPreset> pens;          // empty: DefaultPens
         std::vector<PenPreset> highlighters;  // empty: DefaultHighlighters
-        float eraserRadius = DefaultEraserRadius; // the exact eraser's circle radius (page points, 1..20)
+        float eraserRadius = DefaultEraserRadius; // circle radius or square half-side, in page points
         bool wholeStrokeErasing = false;      // the eraser erases whole strokes (Windows ink's eraser) instead of the circle
         Tool tool = Tool::Pen;                // the active tool
         SelectMode selectMode = SelectMode::Lasso;
@@ -102,6 +110,7 @@ namespace inkpages
         int textColor = 0;
 
         bool shapeEnabled = false;
+        bool squareEraser = false;
 
         bool DrawingShape() const { return IsDrawingTool(tool) && shapeEnabled; }
         void ToggleShape(ShapeKind kind)

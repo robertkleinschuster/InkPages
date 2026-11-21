@@ -12,8 +12,6 @@ namespace inkpages::detail
 {
     namespace
     {
-        constexpr std::array<float, 9> Radii{ 1, 2, 3, 4, 6, 8, 12, 16, 20 };
-
         struct Item
         {
             std::wstring text;
@@ -101,7 +99,7 @@ namespace inkpages::detail
         std::vector<float> widths = pen ? std::vector<float>(PenWidths::Steps.begin(), PenWidths::Steps.end())
                                         : std::vector<float>(HighlighterWidths::Steps.begin(), HighlighterWidths::Steps.end());
         int current = pen ? PenWidths::StepOf(preset.width) : HighlighterWidths::StepOf(preset.width);
-        for (size_t i = 0; i < widths.size(); ++i) items.push_back({ Size(t, widths[i]), static_cast<int>(i) == current });
+        for (size_t i = 0; i < widths.size(); ++i) items.push_back({ t.sizeSteps[i], static_cast<int>(i) == current });
         int chosen = Show(owner, anchor, items);
         if (chosen < 0) return std::nullopt;
         if (chosen < static_cast<int>(colors)) preset.color = chosen;
@@ -115,10 +113,16 @@ namespace inkpages::detail
     std::optional<ToolChoices> RadiusMenu(HWND owner, RECT anchor, ToolChoices c, ToolbarTexts const& t)
     {
         std::vector<Item> items;
-        for (float r : Radii) items.push_back({ Size(t, r), r == c.eraserRadius });
+        int current = EraserSizes::StepOf(c.eraserRadius, c.squareEraser);
+        for (size_t i = 0; i < t.sizeSteps.size(); ++i)
+            items.push_back({ t.sizeSteps[i], static_cast<int>(i) == current });
+        items.push_back({ {}, false, std::nullopt, true });
+        items.push_back({ t.squareEraser, c.squareEraser });
         int chosen = Show(owner, anchor, items);
         if (chosen < 0) return std::nullopt;
-        c.eraserRadius = Radii[chosen];
+        if (chosen == static_cast<int>(items.size()) - 1) c.squareEraser = !c.squareEraser;
+        else current = chosen;
+        c.eraserRadius = EraserSizes::Extent(EraserSizes::SquareHalfSides[current], c.squareEraser);
         return c;
     }
 

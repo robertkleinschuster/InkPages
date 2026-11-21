@@ -30,6 +30,8 @@ namespace inkpages::detail
         ShapeLook shape;
         bool recognizeShapes = false;
         bool shapeEnabled = false;
+        bool squareEraser = false;
+        bool NativeEraser() const { return wholeStrokeErasing && !squareEraser; }
     };
 
     class ToolInput

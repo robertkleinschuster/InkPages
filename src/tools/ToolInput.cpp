@@ -171,7 +171,8 @@ namespace inkpages::detail
                 if (!p.IsInContact()) return;
                 PointF at = At(p);
                 dispatch->Post("circle", [at](ToolInput& tools) {
-                    if (tools.gesture == Gesture::Erase) tools.overlay.SetCircle(at, tools.settings.eraserRadius);
+                    if (tools.gesture == Gesture::Erase)
+                        tools.overlay.SetEraser(at, tools.settings.eraserRadius, tools.settings.squareEraser);
                 });
             });
         });
@@ -192,7 +193,9 @@ namespace inkpages::detail
     {
         settings = next;
         eraser.radius = next.eraserRadius;
-        if (next.tool != Tool::Eraser || next.wholeStrokeErasing) overlay.SetCircle(std::nullopt, 0);
+        eraser.square = next.squareEraser;
+        eraser.wholeStrokes = next.wholeStrokeErasing;
+        overlay.SetEraser(std::nullopt, 0, next.squareEraser);
         ApplyMode();
     }
 
@@ -201,7 +204,7 @@ namespace inkpages::detail
         InkInputProcessingMode mode = InkInputProcessingMode::Inking;
         switch (settings.tool)
         {
-        case Tool::Eraser: mode = settings.wholeStrokeErasing ? InkInputProcessingMode::Erasing : InkInputProcessingMode::None; break;
+        case Tool::Eraser: mode = settings.NativeEraser() ? InkInputProcessingMode::Erasing : InkInputProcessingMode::None; break;
         case Tool::Select:
         case Tool::Text: mode = InkInputProcessingMode::None; break;
         default: mode = settings.shapeEnabled ? InkInputProcessingMode::None : InkInputProcessingMode::Inking; break;
@@ -209,7 +212,7 @@ namespace inkpages::detail
         if (eraserEndHover)
         {
             // The presenter handles whole strokes, even when the current tool normally takes unprocessed input.
-            if (!settings.wholeStrokeErasing) mode = InkInputProcessingMode::None;
+            if (!settings.NativeEraser()) mode = InkInputProcessingMode::None;
             else if (mode == InkInputProcessingMode::None) mode = InkInputProcessingMode::Erasing;
         }
         ink.SetMode(mode);
@@ -248,9 +251,8 @@ namespace inkpages::detail
 
     void ToolInput::OnHover(Hover const& h)
     {
-        bool exact = !settings.wholeStrokeErasing;
-        bool circle = !h.leaving && ((settings.tool == Tool::Eraser && exact) || (h.inverted && exact));
-        overlay.SetCircle(circle ? std::optional(h.at) : std::nullopt, settings.eraserRadius);
+        bool showEraser = !h.leaving && !settings.NativeEraser() && (settings.tool == Tool::Eraser || h.inverted);
+        overlay.SetEraser(showEraser ? std::optional(h.at) : std::nullopt, settings.eraserRadius, settings.squareEraser);
         if (!h.pen) return;
         bool inverted = h.inverted && !h.leaving;
         if (inverted != eraserEndHover)
@@ -280,7 +282,7 @@ namespace inkpages::detail
             lasso.clear();
             overlay.SetLasso({});
         }
-        if (inverted && settings.wholeStrokeErasing) return; // only the native eraser handles this press
+        if (inverted && settings.NativeEraser()) return; // only the native eraser handles this press
         if (!inverted && (barrel || settings.tool == Tool::Select))
         {
             gesture = Gesture::Select;
@@ -292,11 +294,11 @@ namespace inkpages::detail
                 cleared();
             }
         }
-        else if ((settings.tool == Tool::Eraser && !settings.wholeStrokeErasing) || inverted)
+        else if ((settings.tool == Tool::Eraser && !settings.NativeEraser()) || inverted)
         {
             gesture = Gesture::Erase;
             eraser.Begin(at);
-            overlay.SetCircle(at, settings.eraserRadius);
+            overlay.SetEraser(at, settings.eraserRadius, settings.squareEraser);
         }
         else if (settings.shapeEnabled)
         {

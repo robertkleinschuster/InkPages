@@ -20,9 +20,9 @@ namespace inkpages::detail
         if (changed) changed();
     }
 
-    void OverlayModel::SetCircle(std::optional<PointF> at, float radius)
+    void OverlayModel::SetEraser(std::optional<PointF> at, float extent, bool square)
     {
-        Change([&](OverlayContent& c) { c.circleAt = at; c.circleRadius = radius; });
+        Change([&](OverlayContent& c) { c.circleAt = at; c.circleRadius = extent; c.squareEraser = square; });
     }
 
     void OverlayModel::SetLasso(std::vector<PointF> points)
@@ -125,7 +125,12 @@ namespace inkpages::detail
             float hair = 1 / s; // one pixel
             if (c.circleAt) // the ring's outer edge is the radius
             {
-                dc->DrawEllipse(D2D1::Ellipse({ c.circleAt->x, c.circleAt->y }, c.circleRadius - hair / 2, c.circleRadius - hair / 2), gray.get(), hair);
+                auto [x, y] = *c.circleAt;
+                float extent = std::max(0.f, c.circleRadius - hair / 2);
+                if (c.squareEraser)
+                    dc->DrawRectangle(D2D1::RectF(x - extent, y - extent, x + extent, y + extent), gray.get(), hair);
+                else
+                    dc->DrawEllipse(D2D1::Ellipse({ x, y }, extent, extent), gray.get(), hair);
             }
             if (!c.lasso.empty())
             {

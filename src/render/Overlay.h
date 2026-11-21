@@ -24,6 +24,7 @@ namespace inkpages::detail
     {
         std::optional<PointF> circleAt;
         float circleRadius = 0;
+        bool squareEraser = false;
         std::vector<PointF> lasso;
         std::optional<SelectionFrame> frame;
         std::vector<PointF> shape;
@@ -37,7 +38,7 @@ namespace inkpages::detail
         /// Any thread: the content changed (the owner has it drawn on the UI thread).
         std::function<void()> changed;
 
-        void SetCircle(std::optional<PointF> at, float radius);
+        void SetEraser(std::optional<PointF> at, float extent, bool square);
         void SetLasso(std::vector<PointF> points);
         void SetFrame(std::optional<SelectionFrame> frame);
         void SetShape(std::vector<PointF> points, Color color, float width);

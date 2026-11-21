@@ -35,8 +35,10 @@ namespace inkpages
         std::wstring eraserTip = L"Eraser – the pen's eraser button erases too, with any tool. The arrow sets the eraser size.";
         std::wstring wholeStrokeErase = L"Erase whole strokes";
         std::wstring wholeStrokeEraseTip = L"Erase whole strokes: the eraser and the pen's eraser button erase every "
-            L"stroke they touch. Off: only what is in the circle.";
+            L"stroke they touch. Off: erase only within the eraser outline.";
         std::wstring eraserRadius = L"Size";
+        std::array<std::wstring, 5> sizeSteps{ L"Very fine", L"Fine", L"Medium", L"Thick", L"Very thick" };
+        std::wstring squareEraser = L"Square eraser (Xournal++)";
         std::wstring select = L"Select";
         std::wstring selectTip = L"Select: lasso or rectangle (the arrow); drag to move, corners to scale. With the "
             L"pen, a lasso works with any tool: drag with the barrel button held";

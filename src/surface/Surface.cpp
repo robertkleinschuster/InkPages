@@ -749,7 +749,7 @@ namespace inkpages::detail
         bool pens = IsDrawingTool(state.tool);
         ToolSettings settings{ state.tool, state.wholeStrokeErasing, state.eraserRadius, state.selectMode,
             ShapeLook{ state.shape, state.color, state.width, state.tool == Tool::Highlighter },
-            state.recognizeShapes, pens && state.shapeEnabled };
+            state.recognizeShapes, pens && state.shapeEnabled, state.squareEraser };
         PenLook look{ state.tool == Tool::Highlighter ? Tool::Highlighter : Tool::Pen, state.color, state.width };
         textStyle = state.text;
         currentTool = state.tool;
