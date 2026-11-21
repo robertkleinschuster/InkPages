@@ -17,7 +17,7 @@ namespace inkpages::detail
         constexpr int Undo = 100, Redo = 101;
         constexpr int Pen = 200, Highlighter = 300; // + preset index
         constexpr int Eraser = 400, WholeStrokes = 401;
-        constexpr int Select = 500, Shape = 501, Ruler = 502, Text = 503;
+        constexpr int Select = 500, Shape = 501, Ruler = 502, Text = 503, Laser = 504;
         constexpr int Cut = 600, Copy = 601, Paste = 602, Duplicate = 603, Delete = 604;
         constexpr int Extension = 1000; // + index of the app's button
         constexpr int PresetRange = 20;

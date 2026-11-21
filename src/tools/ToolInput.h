@@ -31,6 +31,7 @@ namespace inkpages::detail
         bool recognizeShapes = false;
         bool shapeEnabled = false;
         bool squareEraser = false;
+        int laserSeconds = 2;
     };
 
     class ToolInput
@@ -73,7 +74,8 @@ namespace inkpages::detail
         Stencils& Stencil() { return stencils; }
 
     private:
-        enum class Gesture { None, Erase, Select, Shape, Text };
+        enum class Gesture { None, Erase, Select, Shape, Text, Laser };
+        PointF laserAt{};
         struct Hover
         {
             PointF at;

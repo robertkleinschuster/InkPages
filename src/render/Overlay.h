@@ -8,6 +8,7 @@
 #include <dcomp.h>
 
 #include <functional>
+#include <cstdint>
 #include <mutex>
 #include <optional>
 #include <vector>
@@ -20,6 +21,13 @@ namespace inkpages::detail
 {
     struct Graphics;
 
+    struct LaserSegment
+    {
+        PointF from, to;
+        float width;
+        uint64_t expires, duration;
+    };
+
     struct OverlayContent
     {
         std::optional<PointF> circleAt;
@@ -30,6 +38,8 @@ namespace inkpages::detail
         std::vector<PointF> shape;
         Color shapeColor;
         float shapeWidth = 1;
+        std::vector<LaserSegment> laser;
+        uint64_t now = 0;
     };
 
     class OverlayModel
@@ -42,7 +52,9 @@ namespace inkpages::detail
         void SetLasso(std::vector<PointF> points);
         void SetFrame(std::optional<SelectionFrame> frame);
         void SetShape(std::vector<PointF> points, Color color, float width);
-        OverlayContent Get() const;
+        PointF AddLaser(PointF from, std::vector<PointF> const& points, float width, int seconds);
+        void ClearLaser();
+        OverlayContent Get();
 
     private:
         template <typename F> void Change(F&& f);

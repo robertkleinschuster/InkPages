@@ -89,7 +89,7 @@ namespace inkpages
         friend bool operator==(PenPreset const&, PenPreset const&) = default;
     };
 
-    enum class Tool { Pen, Highlighter, Eraser, Select, Shape, Text };
+    enum class Tool { Pen, Highlighter, Eraser, Select, Shape, Text, Laser };
 
     constexpr bool IsDrawingTool(Tool tool) { return tool == Tool::Pen || tool == Tool::Highlighter; }
 
@@ -118,6 +118,8 @@ namespace inkpages
 
         bool shapeEnabled = false;
         bool squareEraser = false;
+        static constexpr std::array LaserDurations{ 1, 2, 3, 5, 10 };
+        int laserSeconds = 2;
 
         bool DrawingShape() const { return IsDrawingTool(tool) && shapeEnabled; }
         void ToggleShape(ShapeKind kind)

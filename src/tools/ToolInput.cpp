@@ -206,6 +206,7 @@ namespace inkpages::detail
         {
         case Tool::Eraser:
         case Tool::Select:
+        case Tool::Laser:
         case Tool::Text: mode = InkInputProcessingMode::None; break;
         default: mode = settings.shapeEnabled ? InkInputProcessingMode::None : InkInputProcessingMode::Inking; break;
         }
@@ -295,6 +296,12 @@ namespace inkpages::detail
             eraser.Begin(at);
             overlay.SetEraser(at, settings.eraserRadius, settings.squareEraser);
         }
+        else if (settings.tool == Tool::Laser)
+        {
+            gesture = Gesture::Laser;
+            laserAt = at;
+            Move({ at });
+        }
         else if (settings.shapeEnabled)
         {
             gesture = Gesture::Shape;
@@ -346,6 +353,9 @@ namespace inkpages::detail
         switch (gesture)
         {
         case Gesture::Erase: eraser.MoveAlong(path); break;
+        case Gesture::Laser:
+            laserAt = overlay.AddLaser(laserAt, path, 4 / Zoom(), settings.laserSeconds);
+            break;
         case Gesture::Shape: shapes.Move(path.back()); break;
         case Gesture::Text: // how far the pen went: a drag is no text
             for (PointF p : path) textFarthest = std::max(textFarthest, std::abs(p.x - textPress.x) + std::abs(p.y - textPress.y));
@@ -366,6 +376,7 @@ namespace inkpages::detail
     {
         switch (gesture)
         {
+        case Gesture::Laser: Move({ at }); break;
         case Gesture::Erase:
             if (eraser.Running())
             {

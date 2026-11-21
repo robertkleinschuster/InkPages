@@ -76,6 +76,7 @@ namespace inkpages
         TextStyle text;                             // the Text tool's font, size and color
         bool shapeEnabled = false;
         bool squareEraser = false;
+        int laserSeconds = 2;
         UINT darkCursor = 0;                        // optional cursor resource for dark paper
     };
 

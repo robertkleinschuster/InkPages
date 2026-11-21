@@ -146,7 +146,7 @@ namespace inkpages::detail
                 if (page < 0) return cursorAt ? cursorAt(page, point) : nullptr;
                 RectF paper = layout.Page(page);
                 LPCWSTR toolCursor = selection->CursorAt({ paper.left + point.x, paper.top + point.y });
-                if (!toolCursor && currentTool == Tool::Select) toolCursor = IDC_CROSS;
+                if (!toolCursor && (currentTool == Tool::Select || currentTool == Tool::Laser)) toolCursor = IDC_CROSS;
                 if (!toolCursor && currentTool == Tool::Text) toolCursor = IDC_IBEAM;
                 if (!toolCursor) return cursorAt ? cursorAt(page, point) : nullptr;
                 if (cursorAt) cursorAt(-1, {}); // close the app's link tooltip while the tool owns the cursor
@@ -603,6 +603,7 @@ namespace inkpages::detail
             ink->Edits().Clear();
             ink->SetDarkPages(std::move(flags));
             ink->SetLayout(layout);
+            overlay.ClearLaser();
         });
         composition->SetPages(layout, papers, [this](int page, ID2D1DeviceContext* dc, RectF area) {
             if (drawUnderlay) drawUnderlay(page, dc, area);
@@ -696,7 +697,12 @@ namespace inkpages::detail
     void Surface::DrawOverlay()
     {
         overlayPending = false;
-        composition->Overlay().Draw(overlay.Get(), sheetScale > 0 ? sheetScale : scale);
+        auto content = overlay.Get();
+        bool fading = !content.laser.empty();
+        if (fading && !laserTimerActive) winrt::check_bool(SetTimer(window, LaserTimer, 40, nullptr) != 0);
+        if (!fading && laserTimerActive) winrt::check_bool(KillTimer(window, LaserTimer));
+        laserTimerActive = fading;
+        composition->Overlay().Draw(content, sheetScale > 0 ? sheetScale : scale);
         composition->Commit();
     }
 
@@ -794,7 +800,7 @@ namespace inkpages::detail
         bool pens = IsDrawingTool(state.tool);
         ToolSettings settings{ state.tool, state.wholeStrokeErasing, state.eraserRadius, state.selectMode,
             ShapeLook{ state.shape, state.color, state.width, state.tool == Tool::Highlighter },
-            state.recognizeShapes, pens && state.shapeEnabled, state.squareEraser };
+            state.recognizeShapes, pens && state.shapeEnabled, state.squareEraser, state.laserSeconds };
         PenLook look{ state.tool == Tool::Highlighter ? Tool::Highlighter : Tool::Pen, state.color, state.width };
         textStyle = state.text;
         currentTool = state.tool;

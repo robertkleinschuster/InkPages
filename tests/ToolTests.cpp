@@ -1,13 +1,33 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <chrono>
+#include <thread>
 
 #include "inkpages/model/Pens.h"
 #include "inkpages/model/StrokeEraser.h"
 #include "inkpages/model/UndoHistory.h"
+#include "render/Overlay.h"
 
 namespace inkpages::tests
 {
+    TEST(LaserTrail, EachSegmentExpiresAfterItsOwnDuration)
+    {
+        detail::OverlayModel overlay;
+        auto end = overlay.AddLaser({ 10, 12 }, { { 20, 22 }, { 30, 32 } }, 4, 1);
+        overlay.AddLaser(end, { { 40, 42 } }, 4, 5);
+        auto first = overlay.Get();
+        ASSERT_EQ(3u, first.laser.size());
+        EXPECT_EQ(20.f, first.laser[1].from.x);
+        EXPECT_EQ(30.f, first.laser[1].to.x);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1050));
+        auto remaining = overlay.Get();
+        ASSERT_EQ(1u, remaining.laser.size());
+        EXPECT_EQ(40.f, remaining.laser.front().to.x);
+        overlay.ClearLaser();
+        EXPECT_TRUE(overlay.Get().laser.empty());
+    }
+
     // ---- PenWidths, InkWidth (ported from PenWidthsTests / SavePointTests)
 
     TEST(PenWidths, SavedWidthsGoToTheNearestStep)
@@ -93,6 +113,17 @@ namespace inkpages::tests
         EXPECT_EQ(Tool::Highlighter, back.tool);
         EXPECT_EQ(1, back.preset);
         EXPECT_TRUE(back.recognizeShapes);
+    }
+
+    TEST(ToolChoices, LaserAndItsDurationRoundTrip)
+    {
+        ToolChoices choices;
+        choices.tool = Tool::Laser;
+        choices.laserSeconds = 5;
+        auto restored = ToolChoices::Parse(choices.Serialize());
+        EXPECT_EQ(Tool::Laser, restored.tool);
+        EXPECT_EQ(5, restored.laserSeconds);
+        EXPECT_EQ(2, ToolChoices::Parse("laserSeconds=999").laserSeconds);
     }
 
     TEST(ToolChoices, MissingOrDamagedFieldsKeepTheirDefaults)

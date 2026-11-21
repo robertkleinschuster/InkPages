@@ -276,6 +276,7 @@ namespace inkpages::detail
         case WM_TIMER:
             if (wp == MotionTimer) Changed(false);
             else if (wp == ScrollTimer) selection->OnScrollTimer();
+            else if (wp == LaserTimer && laserTimerActive) DrawOverlay();
             return 0;
         case WM_ERASEBKGND:
         {

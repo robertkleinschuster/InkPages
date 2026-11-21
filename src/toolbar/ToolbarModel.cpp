@@ -32,6 +32,7 @@ namespace inkpages::detail
         b.push_back({ ButtonId::WholeStrokes, ToolbarSymbol::WholeStrokes, std::nullopt, Check, false });
         b.push_back({ ButtonId::Shape, ToolbarSymbol::Shapes, std::nullopt, CheckWithMenu, false });
         b.push_back({ ButtonId::Select, ToolbarSymbol::Select, std::nullopt, CheckWithMenu, true });
+        b.push_back({ ButtonId::Laser, ToolbarSymbol::Laser, {}, CheckWithMenu, false });
         b.push_back({ ButtonId::Text, ToolbarSymbol::Text, Palette::Pens[std::clamp(choices.textColor, 0, 9)], CheckWithMenu, false });
         b.push_back({ ButtonId::Ruler, ToolbarSymbol::Ruler, std::nullopt, CheckWithMenu, false });
         b.push_back({ ButtonId::Cut, ToolbarSymbol::Cut, std::nullopt, Command, true });
@@ -66,6 +67,7 @@ namespace inkpages::detail
         case ButtonId::WholeStrokes: return c.wholeStrokeErasing;
         case ButtonId::Select: return c.tool == Tool::Select;
         case ButtonId::Shape: return c.DrawingShape();
+        case ButtonId::Laser: return c.tool == Tool::Laser;
         case ButtonId::Text: return c.tool == Tool::Text;
         case ButtonId::Ruler: return s.ruler || s.protractor;
         default: return false;
@@ -110,6 +112,7 @@ namespace inkpages::detail
         case ButtonId::WholeStrokes: return t.wholeStrokeErase;
         case ButtonId::Select: return t.select;
         case ButtonId::Shape: return t.shapes;
+        case ButtonId::Laser: return t.laser;
         case ButtonId::Text: return t.text;
         case ButtonId::Ruler: return t.ruler;
         default: return TipOf(id, c, t, extensions); // the commands' tips are their names
@@ -141,6 +144,7 @@ namespace inkpages::detail
         case ButtonId::WholeStrokes: return t.wholeStrokeEraseTip;
         case ButtonId::Select: return t.selectTip;
         case ButtonId::Shape: return writeTip(t.shapesTip);
+        case ButtonId::Laser: return t.laser;
         case ButtonId::Text: return t.textTip;
         case ButtonId::Ruler: return t.rulerTip;
         case ButtonId::Cut: return t.cut;

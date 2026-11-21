@@ -263,6 +263,7 @@ namespace inkpages
             state.shapeEnabled = choices.DrawingShape();
             state.recognizeShapes = choices.recognizeShapes;
             state.text = choices.Text();
+            state.laserSeconds = choices.laserSeconds;
             Tool look = choices.tool == Tool::Highlighter ? Tool::Highlighter : Tool::Pen;
             auto presets = look == Tool::Pen ? choices.PensOrDefault() : choices.HighlightersOrDefault();
             int index = IsDrawingTool(choices.tool) ? choices.preset : 0;
@@ -317,6 +318,7 @@ namespace inkpages
                 choices.ToggleShape(choices.shape);
                 Apply(true);
                 break;
+            case ButtonId::Laser: choose(Tool::Laser, choices.preset); break;
             case ButtonId::Text: choose(Tool::Text, choices.preset); break;
             case ButtonId::Ruler:
                 stencils.ruler = !stencils.ruler;
@@ -368,6 +370,7 @@ namespace inkpages
                 }
                 return;
             }
+            else if (id == ButtonId::Laser) next = LaserMenu(container, anchor, choices, colors);
             else if (id == ButtonId::Text) next = TextMenu(container, anchor, choices, texts, colors, darkPaperPreview);
             else if (id == ButtonId::Ruler)
             {

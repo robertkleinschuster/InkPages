@@ -105,6 +105,8 @@ namespace inkpages::detail
         void SetScale();
         void Changed(bool settled);
         void DrawOverlay();
+        static constexpr UINT_PTR LaserTimer = 4;
+        bool laserTimerActive = false;
         void ShowPageMark();
         void ReadAccent();
         void WhenReady(std::function<void()> action);

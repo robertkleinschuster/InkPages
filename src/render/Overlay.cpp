@@ -1,5 +1,6 @@
 #include "render/Overlay.h"
 
+#include <Windows.h>
 #include <d2d1_1.h>
 #include <d2d1_1helper.h>
 
@@ -40,9 +41,30 @@ namespace inkpages::detail
         Change([&](OverlayContent& c) { c.shape = std::move(points); c.shapeColor = color; c.shapeWidth = width; });
     }
 
-    OverlayContent OverlayModel::Get() const
+    PointF OverlayModel::AddLaser(PointF from, std::vector<PointF> const& points, float width, int seconds)
+    {
+        auto duration = static_cast<uint64_t>(std::clamp(seconds, 1, 10)) * 1000;
+        auto expires = GetTickCount64() + duration;
+        Change([&](OverlayContent& c) {
+            for (auto to : points)
+            {
+                c.laser.push_back({ from, to, width, expires, duration });
+                from = to;
+            }
+        });
+        return from;
+    }
+
+    void OverlayModel::ClearLaser()
+    {
+        Change([](OverlayContent& c) { c.laser.clear(); });
+    }
+
+    OverlayContent OverlayModel::Get()
     {
         std::scoped_lock guard(lock);
+        content.now = GetTickCount64();
+        std::erase_if(content.laser, [&](LaserSegment const& segment) { return segment.expires <= content.now; });
         return content;
     }
 
@@ -98,6 +120,11 @@ namespace inkpages::detail
             }
         }
         for (PointF p : c.shape) Grow(bounds, any, p, c.shapeWidth + 2);
+        for (auto const& segment : c.laser)
+        {
+            Grow(bounds, any, segment.from, segment.width + 1);
+            Grow(bounds, any, segment.to, segment.width + 1);
+        }
         if (!any)
         {
             winrt::check_hresult(visual->SetContent(nullptr));
@@ -175,6 +202,22 @@ namespace inkpages::detail
                     }
                 }
                 dc->SetTransform(drawn);
+            }
+            if (!c.laser.empty())
+            {
+                winrt::com_ptr<ID2D1SolidColorBrush> red;
+                winrt::check_hresult(dc->CreateSolidColorBrush(D2D1::ColorF(1.f, 0.12f, 0.17f), red.put()));
+                auto caps = D2D1::StrokeStyleProperties(D2D1_CAP_STYLE_ROUND, D2D1_CAP_STYLE_ROUND);
+                winrt::com_ptr<ID2D1StrokeStyle> rounded;
+                winrt::check_hresult(graphics.d2dFactory->CreateStrokeStyle(caps, nullptr, 0, rounded.put()));
+                for (auto const& segment : c.laser)
+                {
+                    red->SetOpacity(static_cast<float>(segment.expires - c.now) / static_cast<float>(segment.duration));
+                    D2D1_POINT_2F from{ segment.from.x, segment.from.y }, to{ segment.to.x, segment.to.y };
+                    if (from.x == to.x && from.y == to.y)
+                        dc->FillEllipse(D2D1::Ellipse(to, segment.width / 2, segment.width / 2), red.get());
+                    else dc->DrawLine(from, to, red.get(), segment.width, rounded.get());
+                }
             }
             if (!c.shape.empty())
             {

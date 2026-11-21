@@ -244,6 +244,18 @@ namespace inkpages::detail
         return c;
     }
 
+    std::optional<ToolChoices> LaserMenu(HWND owner, RECT anchor, ToolChoices c, std::optional<ToolbarColors> const& colors)
+    {
+        std::vector<Item> items;
+        for (int seconds : ToolChoices::LaserDurations)
+            items.push_back({ std::to_wstring(seconds) + L" s", seconds == c.laserSeconds });
+        int chosen = Show(owner, anchor, items, colors);
+        if (chosen < 0) return std::nullopt;
+        c.laserSeconds = ToolChoices::LaserDurations[chosen];
+        c.tool = Tool::Laser;
+        return c;
+    }
+
     std::optional<ToolChoices> TextMenu(HWND owner, RECT anchor, ToolChoices c, ToolbarTexts const& t,
         std::optional<ToolbarColors> const& colors, bool darkPaper)
     {
