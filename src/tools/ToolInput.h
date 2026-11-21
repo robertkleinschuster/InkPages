@@ -29,6 +29,7 @@ namespace inkpages::detail
         SelectMode selectMode = SelectMode::Lasso;
         ShapeLook shape;
         bool recognizeShapes = false;
+        bool shapeEnabled = false;
     };
 
     class ToolInput

@@ -203,9 +203,8 @@ namespace inkpages::detail
         {
         case Tool::Eraser: mode = settings.wholeStrokeErasing ? InkInputProcessingMode::Erasing : InkInputProcessingMode::None; break;
         case Tool::Select:
-        case Tool::Shape:
         case Tool::Text: mode = InkInputProcessingMode::None; break;
-        default: mode = eraserEndTaken ? InkInputProcessingMode::None : InkInputProcessingMode::Inking; break;
+        default: mode = (eraserEndTaken || settings.shapeEnabled) ? InkInputProcessingMode::None : InkInputProcessingMode::Inking; break;
         }
         ink.SetMode(mode);
     }
@@ -293,7 +292,7 @@ namespace inkpages::detail
             eraser.Begin(at);
             overlay.SetCircle(at, settings.eraserRadius);
         }
-        else if (settings.tool == Tool::Shape)
+        else if (settings.shapeEnabled)
         {
             gesture = Gesture::Shape;
             shapes.Begin(at, settings.shape);

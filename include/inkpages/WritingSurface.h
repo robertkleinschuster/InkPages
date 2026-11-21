@@ -73,6 +73,7 @@ namespace inkpages
         ShapeKind shape = ShapeKind::Line;
         bool recognizeShapes = false;
         TextStyle text;                             // the Text tool's font, size and color
+        bool shapeEnabled = false;
     };
 
     /// A stroke as the app keeps it: page coordinates, the app's key (0: new ink - written, an erased piece, cut at a

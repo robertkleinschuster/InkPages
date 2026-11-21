@@ -65,7 +65,7 @@ namespace inkpages::detail
         case ButtonId::Eraser: return c.tool == Tool::Eraser;
         case ButtonId::WholeStrokes: return c.wholeStrokeErasing;
         case ButtonId::Select: return c.tool == Tool::Select;
-        case ButtonId::Shape: return c.tool == Tool::Shape;
+        case ButtonId::Shape: return c.DrawingShape();
         case ButtonId::Text: return c.tool == Tool::Text;
         case ButtonId::Ruler: return s.ruler || s.protractor;
         default: return false;

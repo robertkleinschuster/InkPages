@@ -211,7 +211,7 @@ namespace inkpages
             for (ButtonSpec const& spec : ToolbarButtons(choices, extensions))
             {
                 if (spec.id >= ButtonId::Extension) continue; // the app enables its own
-                SendMessageW(bar, TB_ENABLEBUTTON, spec.id, IsEnabled(spec.id, status));
+                SendMessageW(bar, TB_ENABLEBUTTON, spec.id, IsEnabled(spec.id, status) && (spec.id != ButtonId::Shape || IsDrawingTool(choices.tool)));
                 SendMessageW(bar, TB_CHECKBUTTON, spec.id, IsChecked(spec.id, choices, status));
             }
         }
@@ -226,23 +226,28 @@ namespace inkpages
         // The surface gets the tool the choices describe; `changed`: tell the app.
         void Bar::Apply(bool changed)
         {
+            if (choices.tool == Tool::Shape)
+            {
+                choices.tool = Tool::Pen;
+                choices.shapeEnabled = true;
+            }
             ToolState state;
             state.tool = choices.tool;
             state.wholeStrokeErasing = choices.wholeStrokeErasing;
             state.eraserRadius = choices.eraserRadius;
             state.selectMode = choices.selectMode;
             state.shape = choices.shape;
+            state.shapeEnabled = choices.DrawingShape();
             state.recognizeShapes = choices.recognizeShapes;
             state.text = choices.Text();
-            // Shapes and recognition draw with the last pen preset's look.
             Tool look = choices.tool == Tool::Highlighter ? Tool::Highlighter : Tool::Pen;
             auto presets = look == Tool::Pen ? choices.PensOrDefault() : choices.HighlightersOrDefault();
-            int index = choices.tool == Tool::Pen || choices.tool == Tool::Highlighter ? choices.preset : 0;
+            int index = IsDrawingTool(choices.tool) ? choices.preset : 0;
             index = std::clamp(index, 0, static_cast<int>(presets.size()) - 1);
             PenPreset preset = presets[index];
             state.color = look == Tool::Pen ? Palette::Pens[preset.color] : Palette::Highlighters[preset.color];
             state.width = preset.width;
-            bool pens = choices.tool == Tool::Pen || choices.tool == Tool::Highlighter;
+            bool pens = IsDrawingTool(choices.tool);
             state.cursor = cursorFor && pens ? cursorFor(choices.tool, preset) : 0;
             surface.SetTool(state);
             UpdateStates();
@@ -283,7 +288,11 @@ namespace inkpages
                 Apply(true);
                 break;
             case ButtonId::Select: choose(Tool::Select, choices.preset); break;
-            case ButtonId::Shape: choose(Tool::Shape, choices.preset); break;
+            case ButtonId::Shape:
+                if (!IsDrawingTool(choices.tool)) return;
+                choices.ToggleShape(choices.shape);
+                Apply(true);
+                break;
             case ButtonId::Text: choose(Tool::Text, choices.preset); break;
             case ButtonId::Ruler:
                 stencils.ruler = !stencils.ruler;

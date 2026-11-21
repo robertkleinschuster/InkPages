@@ -57,7 +57,7 @@ namespace inkpages::tests
         choices.tool = Tool::Highlighter;
         choices.preset = 1;
         choices.selectMode = SelectMode::Rectangle;
-        choices.shape = ShapeKind::Ellipse;
+        choices.ToggleShape(ShapeKind::Ellipse);
         choices.recognizeShapes = true;
         ToolChoices back = ToolChoices::Parse(choices.Serialize());
         EXPECT_EQ(choices.pens, back.pens);
@@ -68,11 +68,23 @@ namespace inkpages::tests
         EXPECT_EQ(1, back.preset);
         EXPECT_EQ(SelectMode::Rectangle, back.selectMode);
         EXPECT_EQ(ShapeKind::Ellipse, back.shape);
+        EXPECT_TRUE(back.DrawingShape());
+        back.ToggleShape(ShapeKind::Rectangle);
+        EXPECT_TRUE(back.DrawingShape());
+        EXPECT_EQ(ShapeKind::Rectangle, back.shape);
+        back.ToggleShape(ShapeKind::Rectangle);
+        EXPECT_FALSE(back.DrawingShape());
+        EXPECT_EQ(Tool::Highlighter, back.tool);
+        EXPECT_EQ(1, back.preset);
         EXPECT_TRUE(back.recognizeShapes);
     }
 
     TEST(ToolChoices, MissingOrDamagedFieldsKeepTheirDefaults)
     {
+        auto legacy = ToolChoices::Parse("tool=4;shape=2");
+        EXPECT_EQ(Tool::Pen, legacy.tool);
+        EXPECT_TRUE(legacy.DrawingShape());
+        EXPECT_EQ(ShapeKind::Rectangle, legacy.shape);
         ToolChoices back = ToolChoices::Parse("");
         EXPECT_TRUE(back.pens.empty());
         EXPECT_EQ(4, back.eraserRadius);

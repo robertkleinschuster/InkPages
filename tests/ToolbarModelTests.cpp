@@ -48,7 +48,9 @@ namespace inkpages::tests
         choices.preset = 1;
         choices.wholeStrokeErasing = true;
         SurfaceStatus status{ true, false, false, false, true };
+        choices.ToggleShape(ShapeKind::Arrow);
         EXPECT_TRUE(IsChecked(ButtonId::Highlighter + 1, choices, status));
+        EXPECT_TRUE(IsChecked(ButtonId::Shape, choices, status));
         EXPECT_FALSE(IsChecked(ButtonId::Pen, choices, status));
         EXPECT_TRUE(IsChecked(ButtonId::WholeStrokes, choices, status)) << "a toggle, whatever the tool";
         EXPECT_TRUE(IsChecked(ButtonId::Ruler, choices, status)) << "the protractor is shown";

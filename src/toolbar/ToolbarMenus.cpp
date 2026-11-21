@@ -134,16 +134,13 @@ namespace inkpages::detail
     std::optional<ToolChoices> ShapeMenu(HWND owner, RECT anchor, ToolChoices c, ToolbarTexts const& t)
     {
         std::vector<Item> items;
-        for (int i = 0; i < 4; ++i) items.push_back({ t.shapeKinds[i], c.shape == static_cast<ShapeKind>(i) });
+        for (int i = 0; i < 4; ++i) items.push_back({ t.shapeKinds[i], c.DrawingShape() && c.shape == static_cast<ShapeKind>(i) });
         items.push_back({ {}, false, std::nullopt, true });
         items.push_back({ t.recognizeShapes, c.recognizeShapes });
         int chosen = Show(owner, anchor, items);
         if (chosen < 0) return std::nullopt;
         if (chosen < 4)
-        {
-            c.shape = static_cast<ShapeKind>(chosen);
-            c.tool = Tool::Shape;
-        }
+            c.ToggleShape(static_cast<ShapeKind>(chosen));
         else c.recognizeShapes = !c.recognizeShapes; // a setting of the pen: the tool stays
         return c;
     }

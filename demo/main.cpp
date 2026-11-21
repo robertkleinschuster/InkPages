@@ -232,7 +232,13 @@ namespace
             choices.selectMode = inkpages::SelectMode::Rectangle;
             toolbar->Choose(choices);
         }
-        else if (key == '7') ChooseTool(inkpages::Tool::Shape, 0);
+        else if (key == '7')
+        {
+            auto choices = toolbar->Choices();
+            if (!inkpages::IsDrawingTool(choices.tool)) return;
+            choices.ToggleShape(choices.shape);
+            toolbar->Choose(choices);
+        }
         else if (key == 'S') ChooseTool(inkpages::Tool::Text, 0);
         else if (key == '8') surface->SetRuler(ruler = !ruler);
         else if (key == 'R')

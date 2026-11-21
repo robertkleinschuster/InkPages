@@ -16,6 +16,7 @@ namespace inkpages::detail
         ShapeKind kind = ShapeKind::Line;
         Color color{ 0xFF, 0, 0, 0 };
         float width = 1.41f; // the pen's width at full pressure: shapes have no pressure
+        bool highlighter = false;
     };
 
     class ShapeTool
@@ -39,5 +40,5 @@ namespace inkpages::detail
     };
 
     /// A stroke along points in a pen's look, without pressure (shapes and recognized shapes).
-    InkStroke ShapeStroke(std::vector<PointF> const& outline, Color color, float width);
+    InkStroke ShapeStroke(std::vector<PointF> const& outline, Color color, float width, bool highlighter = false);
 }

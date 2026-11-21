@@ -76,6 +76,8 @@ namespace inkpages
 
     enum class Tool { Pen, Highlighter, Eraser, Select, Shape, Text };
 
+    constexpr bool IsDrawingTool(Tool tool) { return tool == Tool::Pen || tool == Tool::Highlighter; }
+
     enum class SelectMode { Lasso, Rectangle };
 
     /// What the user chose in the toolbar and keeps across sessions. The app stores it (e.g. with `Serialize`) where it
@@ -98,6 +100,15 @@ namespace inkpages
         int textFont = 0;                     // the Text tool: TextFonts::Faces index, size, Palette::Pens index
         float textSize = 12;
         int textColor = 0;
+
+        bool shapeEnabled = false;
+
+        bool DrawingShape() const { return IsDrawingTool(tool) && shapeEnabled; }
+        void ToggleShape(ShapeKind kind)
+        {
+            shapeEnabled = !shapeEnabled || shape != kind;
+            shape = kind;
+        }
 
         static std::vector<PenPreset> DefaultPens() { return { { 0, DefaultPenWidth }, { 1, DefaultPenWidth }, { 2, DefaultPenWidth } }; }
         static std::vector<PenPreset> DefaultHighlighters() { return { { 0, DefaultHighlighterWidth }, { 1, DefaultHighlighterWidth } }; }

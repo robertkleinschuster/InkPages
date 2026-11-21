@@ -741,10 +741,16 @@ namespace inkpages::detail
 
     void Surface::SetTool(ToolState state)
     {
+        if (state.tool == Tool::Shape)
+        {
+            state.tool = Tool::Pen;
+            state.shapeEnabled = true;
+        }
+        bool pens = IsDrawingTool(state.tool);
         ToolSettings settings{ state.tool, state.wholeStrokeErasing, state.eraserRadius, state.selectMode,
-            ShapeLook{ state.shape, state.color, state.width }, state.recognizeShapes };
+            ShapeLook{ state.shape, state.color, state.width, state.tool == Tool::Highlighter },
+            state.recognizeShapes, pens && state.shapeEnabled };
         PenLook look{ state.tool == Tool::Highlighter ? Tool::Highlighter : Tool::Pen, state.color, state.width };
-        bool pens = state.tool == Tool::Pen || state.tool == Tool::Highlighter;
         textStyle = state.text;
         currentTool = state.tool;
         if (state.tool == Tool::Text) textEditor->SetStyle(state.text); // the edited text takes the menu's choice

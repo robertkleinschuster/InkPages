@@ -97,9 +97,9 @@ namespace inkpages
     std::string ToolChoices::Serialize() const
     {
         return std::format("pens={};highlighters={};eraser={};whole={};tool={};preset={};select={};shape={};recognize={};"
-            "text={}:{}:{}",
+            "text={}:{}:{};shapeEnabled={}",
             Presets(pens), Presets(highlighters), eraserRadius, wholeStrokeErasing ? 1 : 0, static_cast<int>(tool), preset,
-            static_cast<int>(selectMode), static_cast<int>(shape), recognizeShapes ? 1 : 0, textFont, textSize, textColor);
+            static_cast<int>(selectMode), static_cast<int>(shape), recognizeShapes ? 1 : 0, textFont, textSize, textColor, shapeEnabled ? 1 : 0);
     }
 
     ToolChoices ToolChoices::Parse(std::string const& text)
@@ -122,8 +122,14 @@ namespace inkpages
             else if (key == "text") ParseText(value, c);
             else if (key == "select" && Number(value, i) && i >= 0 && i <= 1) c.selectMode = static_cast<SelectMode>(i);
             else if (key == "shape" && Number(value, i) && i >= 0 && i <= 3) c.shape = static_cast<ShapeKind>(i);
+            else if (key == "shapeEnabled" && Number(value, i)) c.shapeEnabled = i != 0;
             else if (key == "recognize" && Number(value, i)) c.recognizeShapes = i != 0;
             else if (key == "preset" && Number(value, i) && i >= 0) c.preset = i;
+        }
+        if (c.tool == Tool::Shape)
+        {
+            c.tool = Tool::Pen;
+            c.shapeEnabled = true;
         }
         return c;
     }
