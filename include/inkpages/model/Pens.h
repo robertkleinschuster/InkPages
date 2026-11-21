@@ -99,7 +99,7 @@ namespace inkpages
         std::vector<PenPreset> pens;          // empty: DefaultPens
         std::vector<PenPreset> highlighters;  // empty: DefaultHighlighters
         float eraserRadius = DefaultEraserRadius; // circle radius or square half-side, in page points
-        bool wholeStrokeErasing = false;      // the eraser erases whole strokes (Windows ink's eraser) instead of the circle
+        bool wholeStrokeErasing = false;      // remove a hit stroke in full
         Tool tool = Tool::Pen;                // the active tool
         SelectMode selectMode = SelectMode::Lasso;
         ShapeKind shape = ShapeKind::Line;

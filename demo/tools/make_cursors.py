@@ -1,5 +1,5 @@
 # Generates the demo's pen cursors (demo/cursors/*.cur) and their resource script (demo/cursors/cursors.rc): a filled dot
-# in the preset's color with a thin white halo, its diameter the stroke's drawn width - pens: Xournal's width at full
+# in the preset's color, its diameter the stroke's drawn width - pens: Xournal's width at full
 # pressure / 1.75 (Windows ink draws that at half pressure), highlighters: their width. One cursor per palette color x
 # width step (InkPages' Palette, PenWidths, HighlighterWidths). Each .cur holds 32 and 48 px images (100 / 150 %);
 # Windows picks the image for its cursor size and DPI. Resource ids: pens 1000 + color * 10 + step, highlighters
@@ -16,34 +16,34 @@ SIZES = [32, 48]
 
 
 def coverage(px, py, c, r):
+    near_x = max(px - c, c - px - 1, 0)
+    near_y = max(py - c, c - py - 1, 0)
+    if near_x ** 2 + near_y ** 2 >= r * r:
+        return 0
+    if max(abs(px - c), abs(px + 1 - c)) ** 2 + max(abs(py - c), abs(py + 1 - c)) ** 2 <= r * r:
+        return 1
+    samples = 16
     hits = 0
-    for sy in range(4):
-        for sx in range(4):
-            x = px + (sx + 0.5) / 4
-            y = py + (sy + 0.5) / 4
+    for sy in range(samples):
+        for sx in range(samples):
+            x = px + (sx + 0.5) / samples
+            y = py + (sy + 0.5) / samples
             if (x - c) ** 2 + (y - c) ** 2 <= r * r:
                 hits += 1
-    return hits / 16
+    return hits / (samples * samples)
 
 
 def image(size, rgb, diameter_dip):
     scale = size / 32
     c = size / 2
-    r = max(0.75, diameter_dip * scale / 2)
-    halo = r + max(1.0, scale)
+    r = diameter_dip * scale / 2
     color = ((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF)
     rows = []
     for y in range(size - 1, -1, -1):  # bottom-up
         row = bytearray()
         for x in range(size):
-            dot = coverage(x, y, c, r)
-            ring = coverage(x, y, c, halo) * 0.8
-            a = dot + ring * (1 - dot)
-            if a <= 0:
-                row += bytes(4)
-                continue
-            col = [(color[i] * dot + 255 * ring * (1 - dot)) / a for i in range(3)]
-            row += bytes((round(col[2]), round(col[1]), round(col[0]), round(a * 255)))
+            alpha = round(coverage(x, y, c, r) * 255)
+            row += bytes((color[2], color[1], color[0], alpha)) if alpha else bytes(4)
         rows.append(bytes(row))
     xor = b"".join(rows)
     and_mask = bytes(((size + 31) // 32) * 4 * size)

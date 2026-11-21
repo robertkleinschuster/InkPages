@@ -14,7 +14,7 @@
 //   - Taps: a mouse click or finger tap that no selection gesture took is the app's (`tapped`: links).
 //   - The app's mouse gestures: a drag or double/triple click where the app claims the mouse (`mouseClaims`) is the
 //     app's (`mouseGesture`) in viewer mode, e.g. selecting PDF text through ink.
-//   - Pen: the active tool (ToolState): pen, highlighter, eraser (whole strokes or exactly the circle), selection
+//   - Pen: the active tool (ToolState): pen, highlighter, eraser (whole or partial strokes), selection
 //     (lasso or rectangle; the barrel button lassos with any tool; the pen over the selection moves and scales it),
 //     shapes (and recognition of drawn shapes). The pen's eraser end erases with any tool. Windows' ruler/protractor.
 //   - One undo history across pages. Strokes belong to pages and never cross one (cut at the page's edge).
@@ -68,7 +68,7 @@ namespace inkpages
         float width = ToolChoices::DefaultPenWidth; // pens and shapes: width at full pressure; highlighters: drawn width
         UINT cursor = 0;                            // cursor resource in the app's exe (0: Windows' default)
         bool wholeStrokeErasing = false;            // the eraser (and the pen's eraser end) erases whole strokes
-        float eraserRadius = ToolChoices::DefaultEraserRadius; // the exact eraser's circle (page units)
+        float eraserRadius = ToolChoices::DefaultEraserRadius; // circle radius or square half-side (page units)
         SelectMode selectMode = SelectMode::Lasso;
         ShapeKind shape = ShapeKind::Line;
         bool recognizeShapes = false;

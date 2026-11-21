@@ -1,5 +1,5 @@
 # Phase 2a tools: pen presets ink in their color, the highlighter, the eraser (exact and whole strokes), the pen's eraser
-# end (whole: Windows ink's; exact: taken on its inverted hover), undo/redo across two pages, the pen cursor on the first
+# end (taken on its inverted hover), undo/redo across two pages, the pen cursor on the first
 # hover (cursorprobe) and the exact eraser's circle.
 #   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\ToolsTest.ps1 -Data .local-build\tools\cursorprobe.exe
 # Tools are chosen with the demo's keys (1/2/3 pens, 4 highlighter, 0 eraser, X whole strokes, Ctrl+Z/Y); the log
@@ -63,7 +63,7 @@ Invoke-Test {
     Stroke 'whole erase' 300 190 300 225
     ZShot '04-whole-erased' 300 205
 
-    # 5. the pen's eraser end with the pen tool: whole strokes (Windows ink) - black goes
+    # 5. the pen's eraser end with the pen tool: whole strokes - black goes
     Key 0x31
     Stroke 'eraser end (whole)' 350 90 350 125 -eraser
     # exact again: the eraser end is taken on its inverted hover and cuts blue's left piece

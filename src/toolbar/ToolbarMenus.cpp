@@ -98,8 +98,7 @@ namespace inkpages::detail
         items.push_back({ {}, false, std::nullopt, true });
         std::vector<float> widths = pen ? std::vector<float>(PenWidths::Steps.begin(), PenWidths::Steps.end())
                                         : std::vector<float>(HighlighterWidths::Steps.begin(), HighlighterWidths::Steps.end());
-        int current = pen ? PenWidths::StepOf(preset.width) : HighlighterWidths::StepOf(preset.width);
-        for (size_t i = 0; i < widths.size(); ++i) items.push_back({ t.sizeSteps[i], static_cast<int>(i) == current });
+        for (size_t i = 0; i < widths.size(); ++i) items.push_back({ t.sizeSteps[i], widths[i] == preset.width });
         int chosen = Show(owner, anchor, items);
         if (chosen < 0) return std::nullopt;
         if (chosen < static_cast<int>(colors)) preset.color = chosen;
@@ -115,14 +114,21 @@ namespace inkpages::detail
         std::vector<Item> items;
         int current = EraserSizes::StepOf(c.eraserRadius, c.squareEraser);
         for (size_t i = 0; i < t.sizeSteps.size(); ++i)
-            items.push_back({ t.sizeSteps[i], static_cast<int>(i) == current });
+            items.push_back({ t.sizeSteps[i],
+                EraserSizes::Extent(EraserSizes::SquareHalfSides[i], c.squareEraser) == c.eraserRadius });
         items.push_back({ {}, false, std::nullopt, true });
         items.push_back({ t.squareEraser, c.squareEraser });
         int chosen = Show(owner, anchor, items);
         if (chosen < 0) return std::nullopt;
-        if (chosen == static_cast<int>(items.size()) - 1) c.squareEraser = !c.squareEraser;
-        else current = chosen;
-        c.eraserRadius = EraserSizes::Extent(EraserSizes::SquareHalfSides[current], c.squareEraser);
+        if (chosen == static_cast<int>(items.size()) - 1)
+        {
+            float extent = EraserSizes::Extent(EraserSizes::SquareHalfSides[current], c.squareEraser);
+            bool named = extent == c.eraserRadius;
+            c.squareEraser = !c.squareEraser;
+            c.eraserRadius = named ? EraserSizes::Extent(EraserSizes::SquareHalfSides[current], c.squareEraser)
+                                  : c.eraserRadius * (c.squareEraser ? 1.f / EraserSizes::CircleFactor : EraserSizes::CircleFactor);
+        }
+        else c.eraserRadius = EraserSizes::Extent(EraserSizes::SquareHalfSides[chosen], c.squareEraser);
         return c;
     }
 

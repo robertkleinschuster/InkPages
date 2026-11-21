@@ -28,4 +28,7 @@ namespace inkpages
 
     std::optional<std::vector<Piece>> EraseSquare(std::vector<InkSample> const& samples,
         std::function<double(InkSample const&)> const& halfWidth, PointF center, double halfSide);
+    // Upstream-style square: accept runs through the inner box, cut those runs at the padded box.
+    std::optional<std::vector<Piece>> EraseSquareCenterline(std::vector<InkSample> const& samples,
+        PointF center, double halfSide, double padding);
 }

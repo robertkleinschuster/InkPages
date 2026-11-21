@@ -122,6 +122,21 @@ namespace inkpages::tests
     }
     double Half(InkSample const&) { return 1; } // a stroke 2 pt wide
 
+    TEST(StrokeEraser, SquarePenCutRequiresAnInnerBoxHit)
+    {
+        EXPECT_FALSE(EraseSquareCenterline(Line({ -20, 5.5f, 20, 5.5f }), { 0, 0 }, 5, 1));
+        auto pieces = EraseSquareCenterline(Line({ -20, 4, 20, 4 }), { 0, 0 }, 5, 1);
+        ASSERT_TRUE(pieces);
+        ASSERT_EQ(2u, pieces->size());
+        EXPECT_NEAR(-6, pieces->front().back().position.x, 1e-4);
+        EXPECT_NEAR(6, pieces->back().front().position.x, 1e-4);
+
+        auto twice = EraseSquareCenterline(Line({ -20, 5.5f, 20, 5.5f, 20, 4, -20, 4 }), { 0, 0 }, 5, 1);
+        ASSERT_TRUE(twice);
+        ASSERT_EQ(2u, twice->size());
+        EXPECT_EQ((PointF{ 20, 5.5f }), twice->front()[1].position);
+    }
+
     TEST(StrokeEraser, SquareCutsAHighlighterAtItsVisibleEdge)
     {
         auto markerHalf = [](InkSample const&) { return 4.25; };

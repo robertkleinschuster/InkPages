@@ -122,7 +122,8 @@ namespace inkpages
             if (key == "pens") c.pens = ParsePresets(value, Palette::Pens.size());
             else if (key == "highlighters") c.highlighters = ParsePresets(value, Palette::Highlighters.size());
             else if (key == "eraser" && Number(value, f))
-                c.eraserRadius = std::clamp(f, 1.f, EraserSizes::Extent(EraserSizes::SquareHalfSides.back(), false));
+                c.eraserRadius = std::clamp(f, 1.f / EraserSizes::CircleFactor,
+                    EraserSizes::Extent(EraserSizes::SquareHalfSides.back(), false));
             else if (key == "squareEraser" && Number(value, i)) c.squareEraser = i != 0;
             else if (key == "whole" && Number(value, i)) c.wholeStrokeErasing = i != 0;
             else if (key == "tool" && Number(value, i) && i >= 0 && i <= 5) c.tool = static_cast<Tool>(i);

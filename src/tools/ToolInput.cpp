@@ -204,17 +204,12 @@ namespace inkpages::detail
         InkInputProcessingMode mode = InkInputProcessingMode::Inking;
         switch (settings.tool)
         {
-        case Tool::Eraser: mode = settings.NativeEraser() ? InkInputProcessingMode::Erasing : InkInputProcessingMode::None; break;
+        case Tool::Eraser:
         case Tool::Select:
         case Tool::Text: mode = InkInputProcessingMode::None; break;
         default: mode = settings.shapeEnabled ? InkInputProcessingMode::None : InkInputProcessingMode::Inking; break;
         }
-        if (eraserEndHover)
-        {
-            // The presenter handles whole strokes, even when the current tool normally takes unprocessed input.
-            if (!settings.NativeEraser()) mode = InkInputProcessingMode::None;
-            else if (mode == InkInputProcessingMode::None) mode = InkInputProcessingMode::Erasing;
-        }
+        if (eraserEndHover) mode = InkInputProcessingMode::None;
         ink.SetMode(mode);
     }
 
@@ -251,7 +246,7 @@ namespace inkpages::detail
 
     void ToolInput::OnHover(Hover const& h)
     {
-        bool showEraser = !h.leaving && !settings.NativeEraser() && (settings.tool == Tool::Eraser || h.inverted);
+        bool showEraser = !h.leaving && (settings.tool == Tool::Eraser || h.inverted);
         overlay.SetEraser(showEraser ? std::optional(h.at) : std::nullopt, settings.eraserRadius, settings.squareEraser);
         if (!h.pen) return;
         bool inverted = h.inverted && !h.leaving;
@@ -282,7 +277,6 @@ namespace inkpages::detail
             lasso.clear();
             overlay.SetLasso({});
         }
-        if (inverted && settings.NativeEraser()) return; // only the native eraser handles this press
         if (!inverted && (barrel || settings.tool == Tool::Select))
         {
             gesture = Gesture::Select;
@@ -294,7 +288,7 @@ namespace inkpages::detail
                 cleared();
             }
         }
-        else if ((settings.tool == Tool::Eraser && !settings.NativeEraser()) || inverted)
+        else if (settings.tool == Tool::Eraser || inverted)
         {
             gesture = Gesture::Erase;
             eraser.Begin(at);

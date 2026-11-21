@@ -78,7 +78,13 @@ namespace inkpages::detail
                 std::vector<Piece> next;
                 for (Piece const& piece : pieces)
                 {
-                    auto cut = square ? EraseSquare(piece, half, center, radius) : EraseCircle(piece, half, center, radius);
+                    auto cut = [&] {
+                        if (!square) return EraseCircle(piece, half, center, radius);
+                        if (read.attributes.DrawAsHighlighter()) return EraseSquare(piece, half, center, radius);
+                        // Upstream's round pen cap uses 40% of the nominal width as padding for a partial cut.
+                        double padding = wholeStrokes ? 0 : 0.4 * read.size * InkWidth::FullPressureFactor;
+                        return EraseSquareCenterline(piece, center, radius, padding);
+                    }();
                     if (!cut) next.push_back(piece);
                     else
                     {

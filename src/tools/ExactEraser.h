@@ -1,6 +1,6 @@
 #pragma once
 
-// Geometry-based pen eraser, one undo step per drag. Windows ink's native stroke eraser has no configurable square.
+// Geometry-based pen eraser with a configurable footprint and one undo step per drag.
 
 #include <map>
 #include <memory>

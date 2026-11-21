@@ -72,6 +72,28 @@ namespace inkpages
             return span;
         }
 
+        std::vector<Interval> SquareCenterlineCuts(Piece const& samples, PointF center, double side, double padding)
+        {
+            std::vector<Interval> cuts(samples.size());
+            size_t runStart = 1;
+            bool entersInner = false;
+            for (size_t i = 1; i < samples.size(); ++i)
+            {
+                PointF a = samples[i - 1].position, b = samples[i].position;
+                double outer = side + padding;
+                cuts[i] = InsideBox(a, b, center, outer, outer);
+                if (cuts[i])
+                {
+                    entersInner |= InsideBox(a, b, center, side, side).has_value();
+                    if (cuts[i]->second == 1 && i + 1 < samples.size()) continue;
+                }
+                if (!entersInner) std::fill(cuts.begin() + runStart, cuts.begin() + i + 1, std::nullopt);
+                runStart = i + 1;
+                entersInner = false;
+            }
+            return cuts;
+        }
+
         InkSample At(InkSample const& a, InkSample const& b, double t)
         {
             return { { static_cast<float>(a.position.x + t * (b.position.x - a.position.x)),
@@ -89,7 +111,8 @@ namespace inkpages
     }
 
     static std::optional<std::vector<Piece>> Erase(std::vector<InkSample> const& samples,
-        std::function<double(InkSample const&)> const& halfWidth, PointF center, double extent, bool square)
+        std::function<double(InkSample const&)> const& halfWidth, PointF center, double extent, bool square,
+        std::optional<double> squarePadding = std::nullopt)
     {
         if (samples.empty()) return std::nullopt;
         auto insideAt = [&](PointF p, double padding)
@@ -97,6 +120,7 @@ namespace inkpages
             if (!square) return Distance(p, center) < extent + padding;
             double dx = std::max(0.0, std::abs(double(p.x) - center.x) - extent);
             double dy = std::max(0.0, std::abs(double(p.y) - center.y) - extent);
+            if (squarePadding) return dx == 0 && dy == 0;
             return std::hypot(dx, dy) <= padding;
         };
         if (samples.size() == 1) // a dot
@@ -108,12 +132,13 @@ namespace inkpages
         Piece current;
         bool touched = false;
         if (!insideAt(samples[0].position, halfWidth(samples[0]))) current.push_back(samples[0]);
+        auto cuts = squarePadding ? SquareCenterlineCuts(samples, center, extent, *squarePadding) : std::vector<Interval>{};
         for (size_t i = 1; i < samples.size(); ++i)
         {
             InkSample const& a = samples[i - 1];
             InkSample const& b = samples[i];
             double padding = std::max(halfWidth(a), halfWidth(b));
-            auto inside = square ? InsideSquare(a.position, b.position, center, extent, padding)
+            auto inside = squarePadding ? cuts[i] : square ? InsideSquare(a.position, b.position, center, extent, padding)
                                  : InsideCircle(a.position, b.position, center, extent + padding);
             if (current.empty() && (!inside || inside->first > 0)) current.push_back(a);
             if (!inside)
@@ -146,5 +171,10 @@ namespace inkpages
         std::function<double(InkSample const&)> const& halfWidth, PointF center, double halfSide)
     {
         return Erase(samples, halfWidth, center, halfSide, true);
+    }
+
+    std::optional<std::vector<Piece>> EraseSquareCenterline(Piece const& samples, PointF center, double halfSide, double padding)
+    {
+        return Erase(samples, [](InkSample const&) { return 0.; }, center, halfSide, true, padding);
     }
 }
