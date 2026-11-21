@@ -68,7 +68,9 @@ namespace inkpages
         wchar_t decimalSeparator = L'.';
         std::array<std::wstring, 10> penColors{ L"Black", L"Blue", L"Red", L"Green", L"Gray", L"Light blue",
             L"Light green", L"Magenta", L"Orange", L"Yellow" };
-        std::array<std::wstring, 5> highlighterColors{ L"Yellow", L"Green", L"Light blue", L"Magenta", L"Orange" };
+        std::array<std::wstring, Palette::Highlighters.size()> highlighterColors{
+            L"Yellow", L"Green", L"Light blue", L"Magenta", L"Orange", L"Red", L"Pink", L"Lavender", L"Blue",
+            L"Turquoise", L"Mint", L"Apricot" };
     };
 
     /// An app's own button at the end of the toolbar (or, with `atStart`, before undo/redo): a Segoe Fluent Icons glyph, or a vector path where the font has no
