@@ -83,7 +83,7 @@ namespace inkpages::detail
         void Unsubscribe() noexcept;
         void ApplyMode();
         void OnHover(Hover const& h);
-        void Press(PointF at, bool barrel);
+        void Press(PointF at, bool barrel, bool inverted);
         void Move(std::vector<PointF> const& path);
         void Release(PointF at);
         bool DropTap(InkStroke const& stroke);
@@ -108,7 +108,7 @@ namespace inkpages::detail
         PointF textPress;
         uint64_t textPressMs = 0;
         float textFarthest = 0; // how far the gesture went from the press (page units)
-        bool eraserEndTaken = false;
+        bool eraserEndHover = false;
         bool penTakenNow = false;
         Gesture gesture = Gesture::None;
         bool rectangle = false;

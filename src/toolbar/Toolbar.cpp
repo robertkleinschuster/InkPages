@@ -324,7 +324,15 @@ namespace inkpages
             else if (IsPreset(id, ButtonId::Highlighter)) next = PresetMenu(container, anchor, choices, Tool::Highlighter, id - ButtonId::Highlighter, texts);
             else if (id == ButtonId::WholeStrokes) next = RadiusMenu(container, anchor, choices, texts);
             else if (id == ButtonId::Select) next = SelectModeMenu(container, anchor, choices, texts);
-            else if (id == ButtonId::Shape) next = ShapeMenu(container, anchor, choices, texts);
+            else if (id == ButtonId::Shape)
+            {
+                if (auto chosen = ShapeMenu(container, anchor, choices, texts))
+                {
+                    choices = std::move(*chosen);
+                    Apply(true);
+                }
+                return;
+            }
             else if (id == ButtonId::Text) next = TextMenu(container, anchor, choices, texts);
             else if (id == ButtonId::Ruler)
             {

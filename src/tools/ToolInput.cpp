@@ -131,7 +131,8 @@ namespace inkpages::detail
                 auto p = e.CurrentPoint();
                 PointF at = At(p);
                 bool barrel = IsBarrel(p);
-                dispatch->Post("tool press", [at, barrel](ToolInput& tools) { tools.Press(at, barrel); });
+                bool inverted = IsEraserEnd(p);
+                dispatch->Post("tool press", [at, barrel, inverted](ToolInput& tools) { tools.Press(at, barrel, inverted); });
             });
         });
         moved = events.PointerMoved([dispatch, guard](InkUnprocessedInput const&, PointerEventArgs const& e) {
@@ -191,7 +192,6 @@ namespace inkpages::detail
     {
         settings = next;
         eraser.radius = next.eraserRadius;
-        if (next.tool == Tool::Eraser || next.wholeStrokeErasing) eraserEndTaken = false;
         if (next.tool != Tool::Eraser || next.wholeStrokeErasing) overlay.SetCircle(std::nullopt, 0);
         ApplyMode();
     }
@@ -204,7 +204,13 @@ namespace inkpages::detail
         case Tool::Eraser: mode = settings.wholeStrokeErasing ? InkInputProcessingMode::Erasing : InkInputProcessingMode::None; break;
         case Tool::Select:
         case Tool::Text: mode = InkInputProcessingMode::None; break;
-        default: mode = (eraserEndTaken || settings.shapeEnabled) ? InkInputProcessingMode::None : InkInputProcessingMode::Inking; break;
+        default: mode = settings.shapeEnabled ? InkInputProcessingMode::None : InkInputProcessingMode::Inking; break;
+        }
+        if (eraserEndHover)
+        {
+            // The presenter handles whole strokes, even when the current tool normally takes unprocessed input.
+            if (!settings.wholeStrokeErasing) mode = InkInputProcessingMode::None;
+            else if (mode == InkInputProcessingMode::None) mode = InkInputProcessingMode::Erasing;
         }
         ink.SetMode(mode);
     }
@@ -245,15 +251,14 @@ namespace inkpages::detail
         bool exact = !settings.wholeStrokeErasing;
         bool circle = !h.leaving && ((settings.tool == Tool::Eraser && exact) || (h.inverted && exact));
         overlay.SetCircle(circle ? std::optional(h.at) : std::nullopt, settings.eraserRadius);
-        if (!h.pen || h.leaving) return;
-        // The pen's eraser end erases exactly: taken before it touches (only the mode changes), given back for the tip.
-        bool take = h.inverted && exact && settings.tool != Tool::Eraser;
-        if (take != eraserEndTaken)
+        if (!h.pen) return;
+        bool inverted = h.inverted && !h.leaving;
+        if (inverted != eraserEndHover)
         {
-            eraserEndTaken = take;
-            Log(std::format("tools: the pen's eraser end {}", take ? "taken (exact eraser)" : "given back"));
+            eraserEndHover = inverted;
             ApplyMode();
         }
+        if (h.leaving) return;
         // Over the selection the tip (or the barrel) moves and scales it, over the edited text box it edits there: the
         // pen goes to the window.
         bool overSelection = frame && frame->At(h.at) != Handle::None;
@@ -266,7 +271,7 @@ namespace inkpages::detail
         }
     }
 
-    void ToolInput::Press(PointF at, bool barrel)
+    void ToolInput::Press(PointF at, bool barrel, bool inverted)
     {
         if (mouseGesture) // the pen takes over from the mouse
         {
@@ -275,7 +280,8 @@ namespace inkpages::detail
             lasso.clear();
             overlay.SetLasso({});
         }
-        if (barrel || settings.tool == Tool::Select)
+        if (inverted && settings.wholeStrokeErasing) return; // only the native eraser handles this press
+        if (!inverted && (barrel || settings.tool == Tool::Select))
         {
             gesture = Gesture::Select;
             rectangle = !barrel && settings.selectMode == SelectMode::Rectangle; // the barrel always lassos
@@ -286,7 +292,7 @@ namespace inkpages::detail
                 cleared();
             }
         }
-        else if ((settings.tool == Tool::Eraser && !settings.wholeStrokeErasing) || eraserEndTaken)
+        else if ((settings.tool == Tool::Eraser && !settings.wholeStrokeErasing) || inverted)
         {
             gesture = Gesture::Erase;
             eraser.Begin(at);
