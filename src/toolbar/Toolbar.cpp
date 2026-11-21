@@ -322,7 +322,15 @@ namespace inkpages
             std::optional<ToolChoices> next;
             if (IsPreset(id, ButtonId::Pen)) next = PresetMenu(container, anchor, choices, Tool::Pen, id - ButtonId::Pen, texts);
             else if (IsPreset(id, ButtonId::Highlighter)) next = PresetMenu(container, anchor, choices, Tool::Highlighter, id - ButtonId::Highlighter, texts);
-            else if (id == ButtonId::WholeStrokes) next = RadiusMenu(container, anchor, choices, texts);
+            else if (id == ButtonId::Eraser)
+            {
+                if (auto chosen = RadiusMenu(container, anchor, choices, texts))
+                {
+                    choices.eraserRadius = chosen->eraserRadius;
+                    Apply(true);
+                }
+                return;
+            }
             else if (id == ButtonId::Select) next = SelectModeMenu(container, anchor, choices, texts);
             else if (id == ButtonId::Shape)
             {

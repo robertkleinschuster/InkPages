@@ -28,8 +28,8 @@ namespace inkpages::detail
         {
             b.push_back({ ButtonId::Highlighter + i, ToolbarSymbol::Highlighter, Palette::Highlighters[highlighters[i].color], CheckWithMenu, i == 0 });
         }
-        b.push_back({ ButtonId::Eraser, ToolbarSymbol::Eraser, std::nullopt, Check, true });
-        b.push_back({ ButtonId::WholeStrokes, ToolbarSymbol::WholeStrokes, std::nullopt, CheckWithMenu, false });
+        b.push_back({ ButtonId::Eraser, ToolbarSymbol::Eraser, std::nullopt, CheckWithMenu, true });
+        b.push_back({ ButtonId::WholeStrokes, ToolbarSymbol::WholeStrokes, std::nullopt, Check, false });
         b.push_back({ ButtonId::Shape, ToolbarSymbol::Shapes, std::nullopt, CheckWithMenu, false });
         b.push_back({ ButtonId::Select, ToolbarSymbol::Select, std::nullopt, CheckWithMenu, true });
         b.push_back({ ButtonId::Text, ToolbarSymbol::Text, Palette::Pens[std::clamp(choices.textColor, 0, 9)], CheckWithMenu, false });
