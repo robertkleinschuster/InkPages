@@ -14,6 +14,11 @@
 
 namespace inkpages
 {
+    HBITMAP CreateToolbarSymbolBitmap(ToolbarSymbol symbol, int size)
+    {
+        return detail::ArtworkIcon(symbol, std::nullopt, size);
+    }
+
     HBITMAP CreateFluentGlyphBitmap(wchar_t glyph, COLORREF color, int size)
     {
         if (size <= 0) throw winrt::hresult_invalid_argument(L"Glyph bitmap size");

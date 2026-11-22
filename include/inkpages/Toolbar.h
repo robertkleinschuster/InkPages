@@ -85,8 +85,11 @@ namespace inkpages
     enum class ToolbarSymbol
     {
         Save, ExportPdf, Undo, Redo, Pen, Highlighter, Eraser, WholeStrokes, Shapes, Select, Text, Ruler, Cut, Copy,
-        Paste, Duplicate, Delete, InsertPage, DeletePage, Laser, CopyArea
+        Paste, Duplicate, Delete, InsertPage, DeletePage, Laser, CopyArea, Sync, RevealFile
     };
+
+    /// Creates a DPI-sized shared toolbar bitmap. The caller owns the HBITMAP.
+    HBITMAP CreateToolbarSymbolBitmap(ToolbarSymbol symbol, int size);
 
     struct ToolbarButton
     {
