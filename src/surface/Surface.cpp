@@ -170,7 +170,7 @@ namespace inkpages::detail
         textEditor->caretMoved = [this] { RevealTextCaret(); };
 
         ink = std::make_unique<InkLayer>(host,
-            [this] { OnPresenterReady(); }, [this] { ui->Post([this] { composition->Commit(); }); });
+            [this] { OnPresenterReady(); }, [this] { RequestInkCommit(); });
         ink->Start(composition->Ink());
         Resized();
         composition->Commit();
@@ -692,6 +692,25 @@ namespace inkpages::detail
             if (auto current = PageInView()) page = layout.Page(*current);
         }
         pageMark->Show(page, accent, sheetScale);
+    }
+
+    void Surface::RequestInkCommit()
+    {
+        // Commit submits all pending changes, including requests made before this callback runs.
+        if (inkCommitPending.exchange(true)) return;
+        try
+        {
+            if (ui->Post([this] {
+                inkCommitPending = false;
+                composition->Commit();
+            })) return;
+        }
+        catch (...)
+        {
+            inkCommitPending = false;
+            throw;
+        }
+        inkCommitPending = false;
     }
 
     void Surface::DrawOverlay()

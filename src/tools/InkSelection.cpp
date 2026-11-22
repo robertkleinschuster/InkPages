@@ -77,9 +77,11 @@ namespace inkpages::detail
 
     void InkSelection::Preview(Affine const& m)
     {
+        auto start = std::chrono::steady_clock::now();
         if (!previewStrokes) previewStrokes = Strokes();
         auto matrix = ToMatrix(m);
         for (InkStroke const& s : *previewStrokes) s.PointTransform(matrix);
+        slowestPreview = std::max(slowestPreview, std::chrono::steady_clock::now() - start);
     }
 
     void InkSelection::EndPreview()
@@ -87,6 +89,10 @@ namespace inkpages::detail
         if (!previewStrokes) return;
         auto strokes = std::move(*previewStrokes);
         previewStrokes.reset();
+        auto slowest = std::exchange(slowestPreview, {});
+        if (!strokes.empty())
+            Log(std::format("selection: previewed {} strokes, slowest update {:.2f} ms",
+                strokes.size(), std::chrono::duration<double, std::milli>(slowest).count()));
         auto identity = ToMatrix({});
         for (InkStroke const& s : strokes) s.PointTransform(identity);
     }

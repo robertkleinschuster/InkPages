@@ -102,6 +102,25 @@ namespace inkpages::detail
 
     void OverlayLayer::Draw(OverlayContent const& c, float scale)
     {
+        bool frameOnly = c.frame && !c.circleAt && c.lasso.empty() && c.shape.empty() && c.laser.empty();
+        if (frameOnly && drawnFrame && frameRenderScale == scale &&
+            drawnFrame->bounds == c.frame->bounds && drawnFrame->margin == c.frame->margin &&
+            drawnFrame->handle == c.frame->handle)
+        {
+            auto previous = drawnFrame->orientation;
+            auto current = c.frame->orientation;
+            float dx = current.dx - previous.dx, dy = current.dy - previous.dy;
+            previous.dx = current.dx;
+            previous.dy = current.dy;
+            if (previous == current)
+            {
+                // A translation only moves the existing DirectComposition surface.
+                D2D1_MATRIX_3X2_F m{ 1 / drawnScale, 0, 0, 1 / drawnScale, drawnOrigin.x + dx, drawnOrigin.y + dy };
+                winrt::check_hresult(visual->SetTransform(m));
+                return;
+            }
+        }
+        drawnFrame.reset();
         RectF bounds{};
         bool any = false;
         if (c.circleAt) Grow(bounds, any, *c.circleAt, c.circleRadius + 1);
@@ -238,5 +257,12 @@ namespace inkpages::detail
         D2D1_MATRIX_3X2_F m{ 1 / s, 0, 0, 1 / s, bounds.left, bounds.top };
         winrt::check_hresult(visual->SetTransform(m));
         winrt::check_hresult(visual->SetContent(surface.get()));
+        if (frameOnly)
+        {
+            drawnFrame = c.frame;
+            drawnOrigin = { bounds.left, bounds.top };
+            drawnScale = s;
+            frameRenderScale = scale;
+        }
     }
 }

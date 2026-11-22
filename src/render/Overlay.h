@@ -74,5 +74,9 @@ namespace inkpages::detail
         Graphics& graphics;
         winrt::com_ptr<IDCompositionVisual> visual;
         winrt::com_ptr<IDCompositionSurface> surface;
+        std::optional<SelectionFrame> drawnFrame;
+        PointF drawnOrigin{};
+        float drawnScale = 0;
+        float frameRenderScale = 0;
     };
 }

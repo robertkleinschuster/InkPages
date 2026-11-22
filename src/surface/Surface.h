@@ -105,6 +105,7 @@ namespace inkpages::detail
         void SetScale();
         void Changed(bool settled);
         void DrawOverlay();
+        void RequestInkCommit();
         static constexpr UINT_PTR LaserTimer = 4;
         bool laserTimerActive = false;
         void ShowPageMark();
@@ -139,6 +140,7 @@ namespace inkpages::detail
         InkHost host;
         OverlayModel overlay;
         std::atomic<bool> overlayPending = false;
+        std::atomic<bool> inkCommitPending = false;
         std::unique_ptr<InkLayer> ink;
         std::unique_ptr<PageStore> pageStore; // ink thread
         std::unique_ptr<ToolInput> tools;    // ink thread

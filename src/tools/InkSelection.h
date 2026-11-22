@@ -6,6 +6,7 @@
 // delete, duplicate, copy (Windows ink's clipboard or copies for the app's clipboard), add pasted strokes.
 
 #include <memory>
+#include <chrono>
 #include <optional>
 #include <set>
 #include <vector>
@@ -57,5 +58,6 @@ namespace inkpages::detail
         InkState& ink;
         StrokeSelection selection;
         std::optional<std::vector<InkStroke>> previewStrokes;
+        std::chrono::steady_clock::duration slowestPreview{};
     };
 }
