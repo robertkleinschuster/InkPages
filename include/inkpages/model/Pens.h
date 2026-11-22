@@ -89,7 +89,7 @@ namespace inkpages
         friend bool operator==(PenPreset const&, PenPreset const&) = default;
     };
 
-    enum class Tool { Pen, Highlighter, Eraser, Select, Shape, Text, Laser };
+    enum class Tool { Pen, Highlighter, Eraser, Select, Shape, Text, Laser, CopyArea };
 
     constexpr bool IsDrawingTool(Tool tool) { return tool == Tool::Pen || tool == Tool::Highlighter; }
 

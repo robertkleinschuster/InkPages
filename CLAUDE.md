@@ -210,7 +210,9 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   (a swatch bitmap replaces the check mark, so the current color is bold) – windowed popups, pen taps reach them. A
   second tap on the active preset opens its menu (WinUI behavior). Numbers use `ToolbarTexts::decimalSeparator`
   ("0,85 pt"). InkPages owns the shared icon set. The embedded `assets/toolbar-icons.png` atlas has five columns
-  and four rows of 64 px tiles in `ToolbarSymbol` order. WIC scales the selected tile to the toolbar's current DPI.
+  and five rows of 64 px tiles in `ToolbarSymbol` order. WIC scales the selected tile to the toolbar's current DPI.
+  Apps providing `WritingSurface::copyArea` get the separate Copy PDF Area tool. It sends a clipped rectangle from
+  the pen or mouse to the app. The normal selection tool continues to select objects.
 - [measured 2026-11-20] After setting a hidden toolbar's bitmap size to 16 or 24 pixels, `TB_LOADIMAGES` with
   the matching standard set returned zero on its first call. `TB_GETIMAGELIST` returned the requested dimensions and
   all 15 images. Verify the list and its count to check that the load succeeded.

@@ -5,7 +5,7 @@
 
 namespace inkpages::detail
 {
-    std::vector<ButtonSpec> ToolbarButtons(ToolChoices const& choices, std::vector<ToolbarButton> const& extensions)
+    std::vector<ButtonSpec> ToolbarButtons(ToolChoices const& choices, std::vector<ToolbarButton> const& extensions, bool copyArea)
     {
         using enum ButtonKind;
         std::vector<ButtonSpec> b;
@@ -32,6 +32,7 @@ namespace inkpages::detail
         b.push_back({ ButtonId::WholeStrokes, ToolbarSymbol::WholeStrokes, std::nullopt, Check, false });
         b.push_back({ ButtonId::Shape, ToolbarSymbol::Shapes, std::nullopt, CheckWithMenu, false });
         b.push_back({ ButtonId::Select, ToolbarSymbol::Select, std::nullopt, CheckWithMenu, true });
+        if (copyArea) b.push_back({ ButtonId::CopyArea, ToolbarSymbol::CopyArea, {}, Check, false });
         b.push_back({ ButtonId::Laser, ToolbarSymbol::Laser, {}, CheckWithMenu, false });
         b.push_back({ ButtonId::Text, ToolbarSymbol::Text, Palette::Pens[std::clamp(choices.textColor, 0, 9)], CheckWithMenu, false });
         b.push_back({ ButtonId::Ruler, ToolbarSymbol::Ruler, std::nullopt, CheckWithMenu, false });
@@ -66,6 +67,7 @@ namespace inkpages::detail
         case ButtonId::Eraser: return c.tool == Tool::Eraser;
         case ButtonId::WholeStrokes: return c.wholeStrokeErasing;
         case ButtonId::Select: return c.tool == Tool::Select;
+        case ButtonId::CopyArea: return c.tool == Tool::CopyArea;
         case ButtonId::Shape: return c.DrawingShape();
         case ButtonId::Laser: return c.tool == Tool::Laser;
         case ButtonId::Text: return c.tool == Tool::Text;
@@ -113,6 +115,7 @@ namespace inkpages::detail
         case ButtonId::Select: return t.select;
         case ButtonId::Shape: return t.shapes;
         case ButtonId::Laser: return t.laser;
+        case ButtonId::CopyArea: return t.copyArea;
         case ButtonId::Text: return t.text;
         case ButtonId::Ruler: return t.ruler;
         default: return TipOf(id, c, t, extensions); // the commands' tips are their names
@@ -145,6 +148,7 @@ namespace inkpages::detail
         case ButtonId::Select: return t.selectTip;
         case ButtonId::Shape: return writeTip(t.shapesTip);
         case ButtonId::Laser: return t.laser;
+        case ButtonId::CopyArea: return t.copyArea;
         case ButtonId::Text: return t.textTip;
         case ButtonId::Ruler: return t.rulerTip;
         case ButtonId::Cut: return t.cut;

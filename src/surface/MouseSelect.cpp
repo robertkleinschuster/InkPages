@@ -106,6 +106,7 @@ namespace inkpages::detail
         End(true, at);
         ReleaseCapture();
         if (mode == Mode::Lasso) return wasDrag; // an ordinary right click opens the native context menu
+        if (mode == Mode::CopyArea) return true;
         if (wasDrag || !tap) return true;
         if (!consumed && textClick && textClick(*tap)) return true; // the Text tool: a text there
         if (selection.SelectPictureAt(*tap)) // also when the press cleared a selection: one click, as the pen's tap

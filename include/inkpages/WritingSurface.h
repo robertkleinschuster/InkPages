@@ -171,8 +171,8 @@ namespace inkpages
         /// double click too.
         std::function<bool(int page, PointF point)> mouseClaims;
         std::function<void(MouseGesture const& gesture)> mouseGesture;
-        /// A rectangle selected no objects. Gives the clipped rectangle in the press page's coordinates.
-        std::function<void(int page, RectF area)> emptyRectangle;
+        /// The CopyArea tool's rectangle, clipped to the page where the gesture began.
+        std::function<void(int page, RectF area)> copyArea;
         std::function<void()> mousePannedWithWriteTool;
         std::function<void()> firstPenStroke;
         /// A finger's press-and-hold over a page in viewer mode (page coordinates and menu screen position).

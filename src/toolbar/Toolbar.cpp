@@ -144,7 +144,7 @@ namespace inkpages
                 ImageList_Create(size, size, ILC_COLOR32, 24, 4), ImageList_Destroy);
             if (!nextImages) throw winrt::hresult_error(E_FAIL, L"ImageList_Create (toolbar)");
             std::vector<TBBUTTON> buttons;
-            auto specs = ToolbarButtons(choices, extensions);
+            auto specs = ToolbarButtons(choices, extensions, bool(surface.copyArea));
             std::vector<std::wstring> nextNames;
             nextNames.reserve(specs.size()); // the toolbar keeps pointers into these
             for (ButtonSpec const& spec : specs)
@@ -230,7 +230,7 @@ namespace inkpages
         void Bar::UpdateStates()
         {
             SurfaceStatus status = Status();
-            for (ButtonSpec const& spec : ToolbarButtons(choices, extensions))
+            for (ButtonSpec const& spec : ToolbarButtons(choices, extensions, bool(surface.copyArea)))
             {
                 if (spec.id >= ButtonId::Extension) continue; // the app enables its own
                 SendMessageW(bar, TB_ENABLEBUTTON, spec.id, IsEnabled(spec.id, status) && (spec.id != ButtonId::Shape || IsDrawingTool(choices.tool)));
@@ -313,6 +313,7 @@ namespace inkpages
                 Apply(true);
                 break;
             case ButtonId::Select: choose(Tool::Select, choices.preset); break;
+            case ButtonId::CopyArea: choose(Tool::CopyArea, choices.preset); break;
             case ButtonId::Shape:
                 if (!IsDrawingTool(choices.tool)) return;
                 choices.ToggleShape(choices.shape);
@@ -427,7 +428,7 @@ namespace inkpages
             if (darkPaperPreview == dark) return;
             darkPaperPreview = dark;
             int size = IconSize();
-            for (auto const& spec : ToolbarButtons(choices, extensions))
+            for (auto const& spec : ToolbarButtons(choices, extensions, bool(surface.copyArea)))
             {
                 if (!spec.bar) continue;
                 TBBUTTONINFOW button{ sizeof(button), TBIF_IMAGE };

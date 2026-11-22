@@ -188,8 +188,9 @@ namespace inkpages::detail
             TakeFocus(window);
             // A press that cleared the selection or ended a text's edit is no click of its own.
             bool had = selection->HasSelection() || (wasEditing && !textEditor->Editing());
-            if (selection->OnPointer(message, wp, lp)) return 0; // on the selection: move or scale
+            if (currentTool != Tool::CopyArea && selection->OnPointer(message, wp, lp)) return 0;
             mouse->Press({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) }, had,
+                currentTool == Tool::CopyArea ? MouseSelect::Mode::CopyArea :
                 currentTool == Tool::Select ? MouseSelect::Mode::Select : MouseSelect::Mode::Viewer);
             return 0;
         }
@@ -203,7 +204,7 @@ namespace inkpages::detail
             POINT at{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
             if (touchSelection) return 0;
             if (viewer->PanMove(at)) return 0;
-            if (selection->OnPointer(message, wp, lp)) return 0;
+            if (currentTool != Tool::CopyArea && selection->OnPointer(message, wp, lp)) return 0;
             if (wp & (mouse->UsesRightButton() ? MK_RBUTTON : MK_LBUTTON)) mouse->Move(at);
             if (wp & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON | MK_XBUTTON1 | MK_XBUTTON2)) viewer->NotHovering();
             else viewer->Hover(at);
@@ -243,7 +244,7 @@ namespace inkpages::detail
         case WM_LBUTTONUP:
             if (!IsRealMouse()) break;
             if (touchSelection || mouse->UsesRightButton()) return 0;
-            if (selection->OnPointer(message, wp, lp)) return 0;
+            if (currentTool != Tool::CopyArea && selection->OnPointer(message, wp, lp)) return 0;
             mouse->Release({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) });
             return 0;
         case WM_CAPTURECHANGED:

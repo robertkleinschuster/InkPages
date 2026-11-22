@@ -42,7 +42,7 @@ namespace inkpages::detail
               zoom(std::move(zoom)), tapped(std::move(tapped)), textClick(std::move(textClick)), app(std::move(app)) {}
 
         /// The left button went down beside the selection; `clearedSelection`: the press cleared one (then it is no tap).
-        enum class Mode { Viewer, Select, Lasso };
+        enum class Mode { Viewer, Select, Lasso, CopyArea };
         void Press(POINT client, bool clearedSelection, Mode mode);
         bool UsesRightButton() const { return gesture.Active() && mode == Mode::Lasso; }
         void Move(POINT client);

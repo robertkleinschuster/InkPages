@@ -206,6 +206,7 @@ namespace inkpages::detail
         {
         case Tool::Eraser:
         case Tool::Select:
+        case Tool::CopyArea:
         case Tool::Laser:
         case Tool::Text: mode = InkInputProcessingMode::None; break;
         default: mode = settings.shapeEnabled ? InkInputProcessingMode::None : InkInputProcessingMode::Inking; break;
@@ -263,7 +264,7 @@ namespace inkpages::detail
         if (h.leaving) return;
         // Over the selection the tip (or the barrel) moves and scales it, over the edited text box it edits there: the
         // pen goes to the window.
-        bool overSelection = frame && frame->At(h.at) != Handle::None;
+        bool overSelection = (settings.tool != Tool::CopyArea || h.barrel) && frame && frame->At(h.at) != Handle::None;
         bool overText = textBox && textBox->Contains(h.at);
         if ((overSelection || overText) && !h.inverted && !penTakenNow)
         {
@@ -282,7 +283,12 @@ namespace inkpages::detail
             lasso.clear();
             overlay.SetLasso({});
         }
-        if (!inverted && (barrel || settings.tool == Tool::Select))
+        if (!inverted && !barrel && settings.tool == Tool::CopyArea)
+        {
+            gesture = Gesture::CopyArea;
+            lasso = { at };
+        }
+        else if (!inverted && (barrel || settings.tool == Tool::Select))
         {
             gesture = Gesture::Select;
             rectangle = !barrel && settings.selectMode == SelectMode::Rectangle; // the barrel always lassos
@@ -324,7 +330,7 @@ namespace inkpages::detail
     {
         if (path.empty() || gesture != Gesture::None) return; // the pen's gesture runs
         mouseGesture = true;
-        gesture = Gesture::Select;
+        gesture = !forceLasso && settings.tool == Tool::CopyArea ? Gesture::CopyArea : Gesture::Select;
         rectangle = !forceLasso && settings.selectMode == SelectMode::Rectangle;
         lasso = { path.front() };
         Move(path);
@@ -371,6 +377,9 @@ namespace inkpages::detail
                 overlay.SetLasso(lasso);
             }
             break;
+        case Gesture::CopyArea:
+            overlay.SetLasso(RectanglePolygon(lasso.front(), path.back()));
+            break;
         default: break;
         }
     }
@@ -415,6 +424,14 @@ namespace inkpages::detail
             StrokeSelection made = selection.Select(polygon);
             Log(std::format("tools: {} selected {} strokes", rectangle ? "rectangle" : "lasso", made.ids.size()));
             if (selected) selected(made, polygon, rectangle);
+            break;
+        }
+        case Gesture::CopyArea:
+        {
+            auto start = lasso.front();
+            overlay.SetLasso({});
+            lasso.clear();
+            if (areaPicked) areaPicked(start, at);
             break;
         }
         default: break;

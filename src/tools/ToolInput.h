@@ -43,6 +43,7 @@ namespace inkpages::detail
         /// Ink thread: a selection was made with the lasso or rectangle (strokes and the polygon, for the app's
         /// pictures); the selection was cleared by writing or tapping beside it; the pen goes to the window / comes back.
         std::function<void(StrokeSelection const&, std::vector<PointF> const& polygon, bool rectangle)> selected;
+        std::function<void(PointF from, PointF to)> areaPicked;
         std::function<void()> cleared;
         std::function<void(bool taken)> penTaken;
         /// Ink thread: a pen tap with the Text tool (document point: edit the text there or start one).
@@ -74,7 +75,7 @@ namespace inkpages::detail
         Stencils& Stencil() { return stencils; }
 
     private:
-        enum class Gesture { None, Erase, Select, Shape, Text, Laser };
+        enum class Gesture { None, Erase, Select, Shape, Text, Laser, CopyArea };
         PointF laserAt{};
         struct Hover
         {

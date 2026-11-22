@@ -148,7 +148,8 @@ namespace inkpages::detail
                 if (page < 0) return cursorAt ? cursorAt(page, point) : nullptr;
                 RectF paper = layout.Page(page);
                 LPCWSTR toolCursor = selection->CursorAt({ paper.left + point.x, paper.top + point.y });
-                if (!toolCursor && (currentTool == Tool::Select || currentTool == Tool::Laser)) toolCursor = IDC_CROSS;
+                if (!toolCursor && (currentTool == Tool::Select || currentTool == Tool::Laser ||
+                    currentTool == Tool::CopyArea)) toolCursor = IDC_CROSS;
                 if (!toolCursor && currentTool == Tool::Text) toolCursor = IDC_IBEAM;
                 if (!toolCursor) return cursorAt ? cursorAt(page, point) : nullptr;
                 if (cursorAt) cursorAt(-1, {}); // close the app's link tooltip while the tool owns the cursor
@@ -299,16 +300,19 @@ namespace inkpages::detail
         pageStore->load = [this](int page) { return load ? load(page) : std::vector<KeyedStroke>{}; };
         pageStore->store = [this](int page, std::vector<KeyedStroke> strokes) { if (store) store(page, std::move(strokes)); };
         tools = std::make_unique<ToolInput>(*ink, overlay);
-        tools->selected = [this](StrokeSelection const& made, std::vector<PointF> const& polygon, bool rectangle) {
-            ui->Post([this, made, polygon, rectangle, generation = inkPagesGeneration.load()] {
+        tools->selected = [this](StrokeSelection const& made, std::vector<PointF> const& polygon, bool) {
+            ui->Post([this, made, polygon, generation = inkPagesGeneration.load()] {
                 if (generation != pagesGeneration) return; // made on pages that changed since
                 textEditor->End(); // one thing at a time: a selection ends editing
                 selection->Selected(made, polygon);
-                if (!emptyRectangle || !rectangle || selection->HasSelection()) return;
-                auto page = layout.PageAt(polygon.front());
+            });
+        };
+        tools->areaPicked = [this](PointF a, PointF b) {
+            ui->Post([this, a, b, generation = inkPagesGeneration.load()] {
+                if (generation != pagesGeneration || currentTool != Tool::CopyArea || !copyArea) return;
+                auto page = layout.PageAt(a);
                 if (!page) return;
                 RectF paper = layout.Page(*page);
-                PointF a = polygon.front(), b = polygon[2];
                 RectF area{
                     std::max(paper.left, std::min(a.x, b.x)) - paper.left,
                     std::max(paper.top, std::min(a.y, b.y)) - paper.top,
@@ -316,7 +320,7 @@ namespace inkpages::detail
                     std::min(paper.bottom, std::max(a.y, b.y)) - paper.top,
                 };
                 float minimum = Tap::MaxDistance(viewport->Current().zoom);
-                if (area.Width() >= minimum && area.Height() >= minimum) emptyRectangle(*page, area);
+                if (area.Width() >= minimum && area.Height() >= minimum) copyArea(*page, area);
             });
         };
         tools->cleared = [this] { ui->Post([this] { selection->Cleared(); }); };
@@ -826,6 +830,7 @@ namespace inkpages::detail
             state.recognizeShapes, pens && state.shapeEnabled, state.squareEraser, state.laserSeconds };
         PenLook look{ state.tool == Tool::Highlighter ? Tool::Highlighter : Tool::Pen, state.color, state.width };
         textStyle = state.text;
+        if (state.tool == Tool::CopyArea && currentTool != Tool::CopyArea) selection->Clear();
         currentTool = state.tool;
         if (state.tool == Tool::Text) textEditor->SetStyle(state.text); // the edited text takes the menu's choice
         else textEditor->End();

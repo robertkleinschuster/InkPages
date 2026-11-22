@@ -126,7 +126,7 @@ namespace inkpages
                     EraserSizes::Extent(EraserSizes::SquareHalfSides.back(), false));
             else if (key == "squareEraser" && Number(value, i)) c.squareEraser = i != 0;
             else if (key == "whole" && Number(value, i)) c.wholeStrokeErasing = i != 0;
-            else if (key == "tool" && Number(value, i) && i >= 0 && i <= static_cast<int>(Tool::Laser)) c.tool = static_cast<Tool>(i);
+            else if (key == "tool" && Number(value, i) && i >= 0 && i <= static_cast<int>(Tool::CopyArea)) c.tool = static_cast<Tool>(i);
             else if (key == "laserSeconds" && Number(value, i) &&
                 std::find(LaserDurations.begin(), LaserDurations.end(), i) != LaserDurations.end()) c.laserSeconds = i;
             else if (key == "text") ParseText(value, c);

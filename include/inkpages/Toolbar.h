@@ -50,6 +50,7 @@ namespace inkpages
         std::wstring recognizeShapes = L"Recognize drawn shapes";
         std::wstring text = L"Text";
         std::wstring laser = L"Laser pointer";
+        std::wstring copyArea = L"Copy PDF area";
         std::wstring textTip = L"Text: tap on the page to write (the keyboard types), tap a text to edit it, tap beside "
             L"it to finish. The arrow: font, size and color";
         std::wstring ruler = L"Ruler";
@@ -81,7 +82,7 @@ namespace inkpages
     enum class ToolbarSymbol
     {
         Save, ExportPdf, Undo, Redo, Pen, Highlighter, Eraser, WholeStrokes, Shapes, Select, Text, Ruler, Cut, Copy,
-        Paste, Duplicate, Delete, InsertPage, DeletePage, Laser
+        Paste, Duplicate, Delete, InsertPage, DeletePage, Laser, CopyArea
     };
 
     struct ToolbarButton

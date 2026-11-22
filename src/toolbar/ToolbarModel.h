@@ -17,7 +17,7 @@ namespace inkpages::detail
         constexpr int Undo = 100, Redo = 101;
         constexpr int Pen = 200, Highlighter = 300; // + preset index
         constexpr int Eraser = 400, WholeStrokes = 401;
-        constexpr int Select = 500, Shape = 501, Ruler = 502, Text = 503, Laser = 504;
+        constexpr int Select = 500, Shape = 501, Ruler = 502, Text = 503, Laser = 504, CopyArea = 505;
         constexpr int Cut = 600, Copy = 601, Paste = 602, Duplicate = 603, Delete = 604;
         constexpr int Extension = 1000; // + index of the app's button
         constexpr int PresetRange = 20;
@@ -40,7 +40,8 @@ namespace inkpages::detail
         bool canUndo = false, canRedo = false, hasSelection = false, ruler = false, protractor = false;
     };
 
-    std::vector<ButtonSpec> ToolbarButtons(ToolChoices const& choices, std::vector<ToolbarButton> const& extensions);
+    std::vector<ButtonSpec> ToolbarButtons(ToolChoices const& choices, std::vector<ToolbarButton> const& extensions,
+        bool copyArea = false);
     bool IsChecked(int id, ToolChoices const& choices, SurfaceStatus const& status);
     bool IsEnabled(int id, SurfaceStatus const& status);
     /// A width or size in the texts' number format ("0,85 pt" with a decimal comma).
