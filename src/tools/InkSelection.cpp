@@ -79,8 +79,32 @@ namespace inkpages::detail
     {
         auto start = std::chrono::steady_clock::now();
         if (!previewStrokes) previewStrokes = Strokes();
-        auto matrix = ToMatrix(m);
-        for (InkStroke const& s : *previewStrokes) s.PointTransform(matrix);
+        if (previewStrokes->empty()) return;
+        if (m.m11 == 1 && m.m12 == 0 && m.m21 == 0 && m.m22 == 1)
+        {
+            if (!previewTranslation)
+            {
+                for (InkStroke const& s : *previewStrokes)
+                {
+                    s.PointTransform(ToMatrix({}));
+                    s.Selected(true);
+                }
+                previewTranslation = PointF{};
+            }
+            // The container applies a delta to the current stroke transforms.
+            ink.container.MoveSelected({ m.dx - previewTranslation->x, m.dy - previewTranslation->y });
+            previewTranslation = PointF{ m.dx, m.dy };
+        }
+        else
+        {
+            auto matrix = ToMatrix(m);
+            for (InkStroke const& s : *previewStrokes)
+            {
+                if (previewTranslation) s.Selected(false);
+                s.PointTransform(matrix);
+            }
+            previewTranslation.reset();
+        }
         slowestPreview = std::max(slowestPreview, std::chrono::steady_clock::now() - start);
     }
 
@@ -94,7 +118,13 @@ namespace inkpages::detail
             Log(std::format("selection: previewed {} strokes, slowest update {:.2f} ms",
                 strokes.size(), std::chrono::duration<double, std::milli>(slowest).count()));
         auto identity = ToMatrix({});
-        for (InkStroke const& s : strokes) s.PointTransform(identity);
+        bool translated = previewTranslation.has_value();
+        previewTranslation.reset();
+        for (InkStroke const& s : strokes)
+        {
+            if (translated) s.Selected(false);
+            s.PointTransform(identity);
+        }
     }
 
     void InkSelection::Place(std::vector<InkStroke> const& strokes, StrokeEdit& edit)

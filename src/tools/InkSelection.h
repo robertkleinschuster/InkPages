@@ -59,5 +59,6 @@ namespace inkpages::detail
         StrokeSelection selection;
         std::optional<std::vector<InkStroke>> previewStrokes;
         std::chrono::steady_clock::duration slowestPreview{};
+        std::optional<PointF> previewTranslation;
     };
 }

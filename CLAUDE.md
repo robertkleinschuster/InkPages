@@ -274,9 +274,12 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   (`tests/StrokeEditTests`, real Windows ink objects). Undo/redo clear the selection.
 - **Selection:** lasso/rectangle on unprocessed input (the barrel lassos with any tool outside an existing selection); strokes via the container's
   `SelectWithPolyLine` (its `Selected` flags are reset at once – the library keeps the selection and uses `Selected`
-  only as the removal mark), the app's pictures by `PictureHost::PicturesIn`; a tap on no stroke selects the picture
+  for removal and translation preview), the app's pictures by `PictureHost::PicturesIn`; a tap on no stroke selects the picture
   under the pen (`PictureAt`). Moving, scaling and rotating use window pointer input (the pen hovering over the frame is taken from the
-  presenter). Preview: `PointTransform` + `PictureHost::Preview`, frame and ink changed in one ink-thread work item
+  presenter). Plain arrow keys move the selection by one physical screen pixel at the current zoom and DPI.
+  Preview uses `MoveSelected` for translations, `PointTransform` for scaling/rotation, and `PictureHost::Preview`
+  for pictures. [measured, Windows 11 26200] `MoveSelected` applies a relative delta to `PointTransform` and
+  leaves the raw ink points unchanged. The frame and ink change in one ink-thread work item
   (`ToolInput::PreviewSelection`; hit-testing uses the committed frame until the drag ends); commit: transformed
   strokes replace the originals (width unchanged), cut at page edges, one undo step with the pictures
   (`CompositeEdit`). An inside tap keeps the selection, an outside tap clears it (the pen dot is dropped). Near the

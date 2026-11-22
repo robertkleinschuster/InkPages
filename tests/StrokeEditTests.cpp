@@ -5,9 +5,11 @@
 #include <memory>
 
 #include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Foundation.Numerics.h>
 
 #include "ink/StrokeEdit.h"
 #include "ink/Strokes.h"
+#include "tools/InkSelection.h"
 
 namespace inkpages::tests
 {
@@ -81,5 +83,26 @@ namespace inkpages::tests
         EXPECT_TRUE(ink.Touches({ 150, 107.5f }, 2)) << "within the radius plus half the drawn width";
         EXPECT_FALSE(ink.Touches({ 150, 130 }, 2)) << "beside the line";
         EXPECT_FALSE(ink.Touches({ 400, 120 }, 2)) << "beyond its end";
+    }
+
+    TEST_F(StrokeEditTest, TranslationPreviewMovesOnlyTheSelectionAndRestoresItOnCancel)
+    {
+        auto selected = Line();
+        auto other = Line();
+        ink.Add(selected, 0);
+        ink.Add(other, 1);
+        InkSelection selection(ink);
+        selection.SelectAll(0);
+        selection.Preview(Affine::Translation(30, 20));
+        selection.Preview(Affine::Translation(-5, 8));
+        EXPECT_FLOAT_EQ(-5, selected.PointTransform().m31);
+        EXPECT_FLOAT_EQ(8, selected.PointTransform().m32);
+        EXPECT_FLOAT_EQ(0, other.PointTransform().m31);
+
+        selection.EndPreview();
+        EXPECT_FLOAT_EQ(0, selected.PointTransform().m31);
+        EXPECT_FLOAT_EQ(0, selected.PointTransform().m32);
+        EXPECT_FALSE(selected.Selected());
+        EXPECT_FALSE(other.Selected());
     }
 }
