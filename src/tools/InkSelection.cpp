@@ -33,7 +33,7 @@ namespace inkpages::detail
 
     StrokeSelection InkSelection::Select(std::vector<PointF> const& polygon)
     {
-        selection = {};
+        Clear();
         if (polygon.size() < 3) return selection;
         std::vector<winrt::Windows::Foundation::Point> points;
         for (PointF p : polygon) points.push_back({ p.x, p.y });
@@ -50,7 +50,7 @@ namespace inkpages::detail
 
     StrokeSelection InkSelection::SelectAll(int page)
     {
-        selection = {};
+        Clear();
         for (InkStroke const& s : ink.StrokesOn(page)) selection.ids.insert(s.Id());
         Measure();
         return selection;
@@ -71,17 +71,29 @@ namespace inkpages::detail
 
     void InkSelection::Clear()
     {
-        Preview({});
+        EndPreview();
         selection = {};
     }
 
     void InkSelection::Preview(Affine const& m)
     {
-        for (InkStroke const& s : Strokes()) s.PointTransform(ToMatrix(m));
+        if (!previewStrokes) previewStrokes = Strokes();
+        auto matrix = ToMatrix(m);
+        for (InkStroke const& s : *previewStrokes) s.PointTransform(matrix);
+    }
+
+    void InkSelection::EndPreview()
+    {
+        if (!previewStrokes) return;
+        auto strokes = std::move(*previewStrokes);
+        previewStrokes.reset();
+        auto identity = ToMatrix({});
+        for (InkStroke const& s : strokes) s.PointTransform(identity);
     }
 
     void InkSelection::Place(std::vector<InkStroke> const& strokes, StrokeEdit& edit)
     {
+        EndPreview();
         selection = {};
         for (InkStroke const& s : strokes)
         {
@@ -99,7 +111,7 @@ namespace inkpages::detail
     {
         auto edit = std::make_shared<StrokeEdit>(ink);
         auto strokes = Strokes();
-        Preview({});
+        EndPreview();
         if (m.IsIdentity() || strokes.empty()) return edit;
         std::vector<InkStroke> moved;
         for (InkStroke const& s : strokes)
@@ -118,6 +130,7 @@ namespace inkpages::detail
 
     std::shared_ptr<StrokeEdit> InkSelection::Delete()
     {
+        EndPreview();
         auto edit = std::make_shared<StrokeEdit>(ink);
         auto strokes = Strokes();
         for (InkStroke const& s : strokes) edit->Removed(s, ink.PageOf(s));

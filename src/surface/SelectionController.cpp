@@ -246,9 +246,7 @@ namespace inkpages::detail
             (drag->barrel && drag->farthest < Tap::MaxDistance(c.viewport->Current().zoom))) return;
         drag->m = frame->Drag(drag->handle, drag->start, at);
         Affine m = drag->m;
-        c.host->Post("selection preview", [tools = c.tools, m] {
-            if (ToolInput* t = tools()) t->PreviewSelection(m); // the ink and its frame move together
-        });
+        PostPreview(m);
         if (PictureHost* host = c.pictures(); host && !pictures.empty()) host->Preview(pictures, m);
         // Near the view's edge the pages scroll (per frame) while the pen holds still too.
         RECT rc;
@@ -257,6 +255,37 @@ namespace inkpages::detail
         bool edge = client.y < band || client.y > rc.bottom - band || client.x < band || client.x > rc.right - band;
         if (edge) SetTimer(c.window, ScrollTimer, ScrollIntervalMs, nullptr);
         else KillTimer(c.window, ScrollTimer);
+    }
+
+    void SelectionController::PostPreview(Affine m)
+    {
+        if (!drag->preview) drag->preview = std::make_shared<Preview>();
+        auto preview = drag->preview;
+        {
+            std::scoped_lock lock(preview->mutex);
+            bool queued = preview->pending.has_value();
+            preview->pending = m;
+            if (queued) return;
+        }
+        HRESULT hr = c.host->Post("selection preview", [tools = c.tools, preview] {
+            std::optional<Affine> latest;
+            {
+                std::scoped_lock lock(preview->mutex);
+                latest.swap(preview->pending);
+            }
+            if (latest)
+            {
+                if (ToolInput* t = tools()) t->PreviewSelection(latest);
+            }
+        });
+        if (FAILED(hr)) DiscardPendingPreview();
+    }
+
+    void SelectionController::DiscardPendingPreview()
+    {
+        if (!drag->preview) return;
+        std::scoped_lock lock(drag->preview->mutex);
+        drag->preview->pending.reset();
     }
 
     void SelectionController::OnScrollTimer()
@@ -311,6 +340,7 @@ namespace inkpages::detail
     {
         if (!drag) return;
         KillTimer(c.window, ScrollTimer);
+        DiscardPendingPreview();
         drag.reset();
         ResetPreview();
     }
@@ -326,6 +356,7 @@ namespace inkpages::detail
     void SelectionController::Release(POINT client)
     {
         KillTimer(c.window, ScrollTimer);
+        DiscardPendingPreview();
         Drag d = *drag;
         drag.reset();
         PointF at = ToDocument(client);

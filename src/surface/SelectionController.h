@@ -8,6 +8,8 @@
 #include <windows.h>
 
 #include <functional>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <vector>
 
@@ -75,6 +77,12 @@ namespace inkpages::detail
         void SelectAll(int page);
 
     private:
+        struct Preview
+        {
+            std::mutex mutex;
+            std::optional<Affine> pending;
+        };
+
         struct Drag
         {
             Handle handle = Handle::None;
@@ -83,6 +91,7 @@ namespace inkpages::detail
             float farthest = 0;
             bool barrel = false;
             Affine m;
+            std::shared_ptr<Preview> preview;
         };
 
         PointF ToDocument(POINT client) const;
@@ -90,6 +99,8 @@ namespace inkpages::detail
         void MoveTo(POINT client);
         void Release(POINT client);
         void ResetPreview();
+        void PostPreview(Affine m);
+        void DiscardPendingPreview();
         void Set(StrokeSelection const& made, std::vector<PictureId> picked);
         void Publish(bool log = true);
         std::optional<SelectionFrame> FrameAround(RectF bounds) const;

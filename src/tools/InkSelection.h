@@ -34,6 +34,7 @@ namespace inkpages::detail
         void Clear();
 
         void Preview(Affine const& m);
+        void EndPreview();
         /// The selection moved/scaled by `m`, as one edit; the moved strokes become the selection.
         std::shared_ptr<StrokeEdit> Commit(Affine const& m);
         std::shared_ptr<StrokeEdit> Delete();
@@ -48,12 +49,13 @@ namespace inkpages::detail
         std::shared_ptr<StrokeEdit> PasteFromClipboard(PointF at);
 
     private:
-        std::vector<InkStroke> Strokes() const { return ink.Find(selection.ids); }
+        std::vector<InkStroke> Strokes() const { return selection.Empty() ? std::vector<InkStroke>{} : ink.Find(selection.ids); }
         /// Adds strokes (cut at the pages' edges) to the edit and makes them the selection.
         void Place(std::vector<InkStroke> const& strokes, StrokeEdit& edit);
         void Measure();
 
         InkState& ink;
         StrokeSelection selection;
+        std::optional<std::vector<InkStroke>> previewStrokes;
     };
 }

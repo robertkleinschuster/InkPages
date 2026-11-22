@@ -221,10 +221,12 @@ namespace inkpages::detail
         if (!f && !textBox) GiveBackPen();
     }
 
-    void ToolInput::PreviewSelection(Affine const& m)
+    void ToolInput::PreviewSelection(std::optional<Affine> transform)
     {
-        selection.Preview(m);
+        if (transform) selection.Preview(*transform);
+        else selection.EndPreview();
         if (!frame) return;
+        Affine m = transform.value_or(Affine{});
         SelectionFrame shown = *frame;
         if (m.m12 != 0 || m.m21 != 0 || m.m11 < 0 || m.m22 < 0) shown.orientation = m;
         else shown.bounds = m.Bounds(frame->bounds); // scaling keeps the handles' size on screen

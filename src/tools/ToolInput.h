@@ -58,7 +58,7 @@ namespace inkpages::detail
         void SetFrame(std::optional<SelectionFrame> frame);
         /// While the selection is dragged: the ink previews `m` (PointTransform) and the frame shows it too, in the same
         /// work item (identity: as they are). The frame the tools hit-test stays until the drag is committed.
-        void PreviewSelection(Affine const& m);
+        void PreviewSelection(std::optional<Affine> transform);
         /// The text box being edited (document), or none: the pen hovering over it goes to the window (it edits there).
         void SetTextBox(std::optional<RectF> box);
         /// The window's pen left the selection: the presenter gets it back.
