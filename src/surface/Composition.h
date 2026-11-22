@@ -14,6 +14,7 @@
 #include "inkpages/model/PageMap.h"
 #include "inkpages/model/Paper.h"
 #include "render/Graphics.h"
+#include "render/InkDragVisual.h"
 #include "render/Overlay.h"
 #include "render/PaperLayer.h"
 
@@ -32,6 +33,7 @@ namespace inkpages::detail
         IDCompositionVisual* TextLayer() const { return texts.get(); }
         IDCompositionVisual* MarkLayer() const { return marks.get(); }
         OverlayLayer& Overlay() { return *overlay; }
+        InkDragVisual& DragInk() { return *dragInk; }
 
         void SetScale(float pixelsPerDip);
         void SetClip(SIZE pixels);
@@ -53,6 +55,7 @@ namespace inkpages::detail
         winrt::com_ptr<IDCompositionTarget> target;
         winrt::com_ptr<IDCompositionVisual> root, content, marks, sheets, layers, texts, ink;
         std::unique_ptr<OverlayLayer> overlay;
+        std::unique_ptr<InkDragVisual> dragInk;
         std::vector<std::unique_ptr<PaperLayer>> papers;
         std::vector<winrt::com_ptr<IDCompositionVisual>> pageLayers;
         PageLayout layout;

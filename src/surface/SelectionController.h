@@ -23,6 +23,7 @@ namespace inkpages::detail
 {
     class ToolInput;
     class InkLayer;
+    class InkDragVisual;
 
     struct SelectionContext
     {
@@ -38,6 +39,9 @@ namespace inkpages::detail
         std::function<void()> changed;               // the selection changed
         std::function<bool(PointF document)> keepsPen; // the window keeps the pen there too (the edited text box)
         WritingSurface* surface = nullptr;           // the app's clipboard callbacks
+        InkDragVisual* dragInk = nullptr;
+        std::function<void(SelectionFrame)> previewFrame;
+        std::function<void()> commit;
     };
 
     class SelectionController
@@ -67,6 +71,7 @@ namespace inkpages::detail
         /// The auto-scroll timer of a drag near the view's edge.
         void OnScrollTimer();
         void CancelDrag();
+        void InvalidateInkPreview();
 
         void Clear();
         void Cut();
@@ -117,5 +122,7 @@ namespace inkpages::detail
         std::optional<SelectionFrame> frame;
         float frameZoom = 0; // the zoom the frame was laid out for
         std::optional<Drag> drag;
+        unsigned previewGeneration = 0;
+        void PrepareInkPreview();
     };
 }

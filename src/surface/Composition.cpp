@@ -15,6 +15,7 @@ namespace inkpages::detail
         winrt::check_hresult(content->AddVisual(texts.get(), FALSE, nullptr));
         winrt::check_hresult(content->AddVisual(overlay->Visual(), FALSE, nullptr));
         winrt::check_hresult(content->AddVisual(ink.get(), FALSE, nullptr));
+        dragInk = std::make_unique<InkDragVisual>(graphics, content.get(), ink.get());
         winrt::check_hresult(target->SetRoot(root.get()));
     }
 

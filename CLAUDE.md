@@ -277,9 +277,12 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   for removal and translation preview), the app's pictures by `PictureHost::PicturesIn`; a tap on no stroke selects the picture
   under the pen (`PictureAt`). Moving, scaling and rotating use window pointer input (the pen hovering over the frame is taken from the
   presenter). Plain arrow keys move the selection by one physical screen pixel at the current zoom and DPI.
-  Preview uses `MoveSelected` for translations, `PointTransform` for scaling/rotation, and `PictureHost::Preview`
-  for pictures. [measured, Windows 11 26200] `MoveSelected` applies a relative delta to `PointTransform` and
-  leaves the raw ink points unchanged. The frame and ink change in one ink-thread work item
+  For large ink-only selections, `InkDragVisual` prepares stationary and selected ink with the Windows
+  `IInkD2DRenderer2`. During translation, the live ink visual is hidden and DirectComposition offsets the selected
+  visual together with the frame. The ink container changes on release. Page changes invalidate the preview.
+  Other previews use `MoveSelected` for translations, `PointTransform` for scaling/rotation, and
+  `PictureHost::Preview` for pictures. [measured, Windows 11 26200] `MoveSelected` applies a relative delta to
+  `PointTransform` and leaves the raw ink points unchanged. In this path the frame and ink change in one ink-thread work item
   (`ToolInput::PreviewSelection`; hit-testing uses the committed frame until the drag ends); commit: transformed
   strokes replace the originals (width unchanged), cut at page edges, one undo step with the pictures
   (`CompositeEdit`). An inside tap keeps the selection, an outside tap clears it (the pen dot is dropped). Near the

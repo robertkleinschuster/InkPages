@@ -109,7 +109,9 @@ namespace inkpages::detail
             [this] { return ink.get(); }, [this] { return tools.get(); }, [this] { return pictureHost; },
             [this] { return scale; }, [this]() -> PageLayout const& { return layout; },
             [this] { if (selectionChanged) selectionChanged(); },
-            [this](PointF at) { return textEditor && textEditor->Contains(at); }, this });
+            [this](PointF at) { return textEditor && textEditor->Contains(at); }, this,
+            &composition->DragInk(), [this](SelectionFrame frame) { overlay.SetFrame(frame); },
+            [this] { composition->Commit(); } });
 
         auto toDocument = [this](POINT client) { return ToDocument(client); };
         auto zoom = [this] { return viewport->Current().zoom; };
@@ -496,6 +498,7 @@ namespace inkpages::detail
     void Surface::SetDarkPaper(bool dark)
     {
         if (darkPaper == dark) return;
+        selection->InvalidateInkPreview();
         darkPaper = dark;
         textEditor->AppearanceChanged();
         winrt::check_hresult(host.Post("ink display palette", [this, flags = DarkPages()] {
@@ -647,6 +650,7 @@ namespace inkpages::detail
             std::set<int> next = LivePages(layout, visible, live, keep);
             if (next != live)
             {
+                selection->InvalidateInkPreview();
                 live = next;
                 host.Post("live pages", [this, next] { if (pageStore) pageStore->SetLive(next); });
             }

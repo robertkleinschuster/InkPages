@@ -6,8 +6,11 @@
 #include <cmath>
 #include <format>
 
+#include <winrt/Windows.Foundation.Collections.h>
+
 #include "ink/InkLayer.h"
 #include "inkpages/Log.h"
+#include "render/InkDragVisual.h"
 #include "tools/PictureEdit.h"
 #include "tools/ToolInput.h"
 
@@ -84,6 +87,7 @@ namespace inkpages::detail
 
     void SelectionController::Set(StrokeSelection const& made, std::vector<PictureId> picked)
     {
+        InvalidateInkPreview();
         strokes = made;
         pictures = std::move(picked);
         frame.reset();
@@ -100,6 +104,43 @@ namespace inkpages::detail
         }
         if (any) frame = FrameAround(b);
         Publish();
+        PrepareInkPreview();
+    }
+
+    void SelectionController::PrepareInkPreview()
+    {
+        constexpr size_t minimumStrokes = 128;
+        if (strokes.ids.size() < minimumStrokes || !pictures.empty()) return;
+        auto selected = strokes.ids;
+        auto generation = previewGeneration;
+        c.host->Post("snapshot drag ink", [this, selected = std::move(selected), generation] {
+            InkLayer* layer = c.ink();
+            if (!layer) return;
+            auto& state = layer->State();
+            InkDragSnapshot snapshot;
+            for (auto const& stroke : state.container.GetStrokes())
+            {
+                if (selected.contains(stroke.Id())) snapshot.moving.push_back(stroke.Clone());
+                else snapshot.stationary[state.PageOf(stroke)].push_back(stroke.Clone());
+            }
+            if (snapshot.moving.size() != selected.size()) return;
+            c.ui->Post([this, snapshot = std::move(snapshot), generation]() mutable {
+                if (generation != previewGeneration || (drag && drag->preview)) return;
+                c.dragInk->Prepare(std::move(snapshot), c.scale() * c.viewport->Current().zoom);
+            });
+        });
+    }
+
+    void SelectionController::InvalidateInkPreview()
+    {
+        ++previewGeneration;
+        bool active = c.dragInk->Active();
+        c.dragInk->Reset();
+        if (active)
+        {
+            if (drag) PostPreview(drag->m);
+            c.commit();
+        }
     }
 
     // The frame and its handles keep their size on the screen: page units = DIPs / zoom.
@@ -149,6 +190,7 @@ namespace inkpages::detail
     void SelectionController::Cleared()
     {
         CancelDrag();
+        InvalidateInkPreview();
         strokes = {};
         pictures.clear();
         frame.reset();
@@ -179,6 +221,7 @@ namespace inkpages::detail
         bool contact = pointer ? IS_POINTER_INCONTACT_WPARAM(wp) : (wp & MK_LBUTTON) != 0;
         if (down)
         {
+            if (c.dragInk->Active() && !drag) return true;
             if (Grabs(ToDocument(client)))
             {
                 Press(client);
@@ -243,7 +286,7 @@ namespace inkpages::detail
         case VK_DOWN: offset = { 0, unit }; break;
         default: return false;
         }
-        if (!drag) TransformSelection(Affine::Translation(offset.x, offset.y));
+        if (!drag && !c.dragInk->Active()) TransformSelection(Affine::Translation(offset.x, offset.y));
         return true;
     }
 
@@ -263,7 +306,13 @@ namespace inkpages::detail
             (drag->barrel && drag->farthest < Tap::MaxDistance(c.viewport->Current().zoom))) return;
         drag->m = frame->Drag(drag->handle, drag->start, at);
         Affine m = drag->m;
-        PostPreview(m);
+        if (drag->handle == Handle::Move && !drag->preview && c.dragInk->Move({ m.dx, m.dy }))
+        {
+            SelectionFrame shown = *frame;
+            shown.orientation = m;
+            c.previewFrame(shown);
+        }
+        else PostPreview(m);
         if (PictureHost* host = c.pictures(); host && !pictures.empty()) host->Preview(pictures, m);
         // Near the view's edge the pages scroll (per frame) while the pen holds still too.
         RECT rc;
@@ -364,6 +413,14 @@ namespace inkpages::detail
 
     void SelectionController::ResetPreview()
     {
+        if (c.dragInk->Active())
+        {
+            c.dragInk->Reset();
+            if (frame) c.previewFrame(*frame);
+            c.commit();
+            Publish(false);
+            PrepareInkPreview();
+        }
         c.host->Post("selection preview end", [tools = c.tools] {
             if (ToolInput* t = tools()) t->PreviewSelection({});
         });
@@ -397,6 +454,12 @@ namespace inkpages::detail
         }
         if (PictureHost* host = c.pictures(); host && !pictures.empty())
             ResetPreview();
+        if (d.handle == Handle::Move && !d.preview && c.dragInk->Move({ d.m.dx, d.m.dy }))
+        {
+            SelectionFrame shown = *frame;
+            shown.orientation = d.m;
+            c.previewFrame(shown);
+        }
         TransformSelection(d.m);
     }
 
@@ -411,20 +474,34 @@ namespace inkpages::detail
         std::shared_ptr<Edit> pictureEdit, bool keep)
     {
         auto kept = pictures;
-        c.host->Post("selection edit", [this, strokesStep, pictureEdit, keep, kept, ink = c.ink, tools = c.tools, ui = c.ui] {
-            ToolInput* t = tools();
-            InkLayer* layer = ink();
-            if (!t || !layer) return;
-            auto edit = std::make_shared<CompositeEdit>();
-            edit->Add(strokesStep(*t));
-            edit->Add(pictureEdit);
-            layer->Edits().Push(edit);
-            StrokeSelection now = t->Selection().Current();
-            ui->Post([this, now, keep, kept] {
-                if (keep) Set(now, kept);
-                else Cleared();
-            });
+        bool shown = c.dragInk->Active();
+        HRESULT hr = c.host->Post("selection edit", [this, strokesStep, pictureEdit, keep, kept, shown] {
+            try
+            {
+                ToolInput* t = c.tools();
+                InkLayer* layer = c.ink();
+                if (!t || !layer)
+                {
+                    if (shown) c.ui->Post([this] { ResetPreview(); });
+                    return;
+                }
+                auto edit = std::make_shared<CompositeEdit>();
+                edit->Add(strokesStep(*t));
+                edit->Add(pictureEdit);
+                layer->Edits().Push(edit);
+                StrokeSelection now = t->Selection().Current();
+                c.ui->Post([this, now, keep, kept] {
+                    if (keep) Set(now, kept);
+                    else Cleared();
+                });
+            }
+            catch (...)
+            {
+                if (shown) c.ui->Post([this] { ResetPreview(); });
+                throw;
+            }
         });
+        if (FAILED(hr) && shown) ResetPreview();
     }
 
     void SelectionController::Delete()
