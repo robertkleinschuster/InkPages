@@ -37,6 +37,7 @@ namespace inkpages::detail
 
         void SetScale(float pixelsPerDip);
         void SetClip(SIZE pixels);
+        void SetSheetPixelSampling(bool exact);
         /// `underlay(page, dc, area)`: the app's drawing under the ink of a page (page coordinates).
         void SetPages(PageLayout const& layout, std::vector<Paper> const& papers,
             std::function<void(int, ID2D1DeviceContext*, RectF)> underlay);
@@ -59,5 +60,6 @@ namespace inkpages::detail
         std::vector<std::unique_ptr<PaperLayer>> papers;
         std::vector<winrt::com_ptr<IDCompositionVisual>> pageLayers;
         PageLayout layout;
+        bool sheetPixelSampling = false;
     };
 }

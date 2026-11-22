@@ -24,7 +24,6 @@ namespace inkpages::detail
         winrt::check_hresult(graphics.dcomp->CreateVirtualSurface(1, 1, DXGI_FORMAT_B8G8R8A8_UNORM,
             DXGI_ALPHA_MODE_PREMULTIPLIED, surface.put()));
         winrt::check_hresult(visual->SetContent(surface.get()));
-        winrt::check_hresult(visual->SetBitmapInterpolationMode(DCOMPOSITION_BITMAP_INTERPOLATION_MODE_LINEAR));
     }
 
     void PaperLayer::MoveTo(RectF to, Underlay next)

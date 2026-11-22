@@ -8,6 +8,7 @@ namespace inkpages::detail
         winrt::check_hresult(dc->CreateTargetForHwnd(window, TRUE, target.put()));
         for (auto* visual : { &root, &content, &marks, &sheets, &layers, &texts, &ink }) winrt::check_hresult(dc->CreateVisual(visual->put()));
         overlay = std::make_unique<OverlayLayer>(graphics);
+        winrt::check_hresult(sheets->SetBitmapInterpolationMode(DCOMPOSITION_BITMAP_INTERPOLATION_MODE_LINEAR));
         winrt::check_hresult(root->AddVisual(content.get(), FALSE, nullptr));
         winrt::check_hresult(content->AddVisual(marks.get(), FALSE, nullptr)); // below the sheets: never over a page
         winrt::check_hresult(content->AddVisual(sheets.get(), FALSE, nullptr));
@@ -37,6 +38,17 @@ namespace inkpages::detail
         winrt::check_hresult(clip->SetRight(static_cast<float>(pixels.cx)));
         winrt::check_hresult(clip->SetBottom(static_cast<float>(pixels.cy)));
         winrt::check_hresult(root->SetClip(clip.get()));
+    }
+
+    void Composition::SetSheetPixelSampling(bool exact)
+    {
+        if (sheetPixelSampling == exact) return;
+        // At the final render scale, each sheet texel is one screen pixel. A fractional page origin must
+        // not make the compositor blend neighbouring texels and blur already antialiased text.
+        winrt::check_hresult(sheets->SetBitmapInterpolationMode(exact
+            ? DCOMPOSITION_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR
+            : DCOMPOSITION_BITMAP_INTERPOLATION_MODE_LINEAR));
+        sheetPixelSampling = exact;
     }
 
     void Composition::Invalidate(int page)

@@ -194,6 +194,9 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
 - Paper: D2D into a DComp virtual surface per sheet at DPI × zoom, only near the view (`Trim`), redrawn when a zoom
   settles (READY); during a pinch the last drawing scales. Lines are page units (thicker when zoomed, like paper). A4 at
   6x and 150 % is a 5357x7578 px virtual surface – only the part in view is allocated.
+  The sheets use linear composition sampling during motion and nearest-pixel sampling at the settled render scale.
+  [measured, Windows 11 26200] Linear composition sampling at a fractional origin softened the already antialiased
+  PDF at 1:1 scale. Sandbox comparisons at 150% DPI showed sharper edges at 68% and 54% document zoom.
 - [measured] `InkPresenterRuler(presenter)` / `InkPresenterProtractor(presenter)` work on the Win32 presenter
   (documented constructors). Without a transform the ruler appeared at the document-sized presenter's top right, out of
   view: the library places it in the view when shown (`Transform`). [doc] The stencil has no property to stay in view

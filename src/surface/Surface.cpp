@@ -79,6 +79,7 @@ namespace inkpages::detail
         viewport->onStatus = [this](bool settled) {
             if (viewport->Moving())
             {
+                composition->SetSheetPixelSampling(false);
                 if (touchTaps) touchTaps->Cancel("the view moves"); // a pan is no tap
                 SetTimer(window, MotionTimer, MotionIntervalMs, nullptr);
             }
@@ -633,6 +634,7 @@ namespace inkpages::detail
         if (sheetScale <= 0 || currentScale < sheetScale * 0.5f ||
             (settled && std::abs(currentScale - sheetScale) > currentScale * 0.0001f))
             sheetScale = currentScale;
+        composition->SetSheetPixelSampling(settled && std::abs(currentScale - sheetScale) <= currentScale * 0.0001f);
         composition->UpdateSheets(visible, sheetScale);
         ShowPageMark();
         if (sheetScale != before)
