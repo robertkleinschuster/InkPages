@@ -248,9 +248,11 @@ namespace inkpages::detail
         std::optional<ToolbarColors> const& colors)
     {
         int chosen = Show(owner, anchor, { { t.copyAreaTransparent, !c.copyAreaBackground },
-            { t.copyAreaWithBackground, c.copyAreaBackground } }, colors);
+            { t.copyAreaWithBackground, c.copyAreaBackground }, { {}, false, std::nullopt, true },
+            { t.copyAreaFrame, c.copyAreaFrame } }, colors);
         if (chosen < 0) return std::nullopt;
-        c.copyAreaBackground = chosen == 1;
+        if (chosen == 3) c.copyAreaFrame = !c.copyAreaFrame;
+        else c.copyAreaBackground = chosen == 1;
         c.tool = Tool::CopyArea;
         return c;
     }
