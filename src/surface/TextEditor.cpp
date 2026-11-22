@@ -258,7 +258,7 @@ namespace inkpages::detail
         }
         if (IsKeyboard(message))
         {
-            bool taken = box->Send(message, wp, lp, &result);
+            box->Send(message, wp, lp, &result);
             if (message == WM_CHAR || message == WM_KEYDOWN || message == WM_IME_COMPOSITION || message == WM_IME_CHAR)
             {
                 caretOn = true; // typing shows the caret
@@ -266,7 +266,9 @@ namespace inkpages::detail
                 Layout();
                 if (caretMoved) caretMoved();
             }
-            return taken;
+            // RichEdit may handle a keystroke on WM_CHAR (for example, Space).
+            // Keep its WM_KEYDOWN out of the document's keyboard shortcuts.
+            return true;
         }
         switch (message)
         {

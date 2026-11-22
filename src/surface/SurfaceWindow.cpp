@@ -237,6 +237,7 @@ namespace inkpages::detail
                 && mouse->Release({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) })) return 0;
             break;
         case WM_KEYDOWN:
+            if (selection->OnKey(wp)) return 0;
             if (viewer->OnKey(wp, lp)) return 0;
             break;
         case WM_LBUTTONUP:

@@ -60,6 +60,7 @@ namespace inkpages::detail
 
         /// Window pointer input (pen given to the window, mouse); true when it was the selection's.
         bool OnPointer(UINT message, WPARAM wp, LPARAM lp);
+        bool OnKey(WPARAM key);
         void BeginTouchDrag(POINT client);
         void UpdateTouchDrag(POINT client);
         void EndTouchDrag(bool cancelled);
@@ -101,6 +102,7 @@ namespace inkpages::detail
         void ResetPreview();
         void PostPreview(Affine m);
         void DiscardPendingPreview();
+        void TransformSelection(Affine m);
         void Set(StrokeSelection const& made, std::vector<PictureId> picked);
         void Publish(bool log = true);
         std::optional<SelectionFrame> FrameAround(RectF bounds) const;

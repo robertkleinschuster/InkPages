@@ -230,6 +230,23 @@ namespace inkpages::detail
         return false;
     }
 
+    bool SelectionController::OnKey(WPARAM key)
+    {
+        if (!HasSelection() || GetKeyState(VK_CONTROL) < 0 || GetKeyState(VK_SHIFT) < 0) return false;
+        float unit = 1.f / (c.scale() * c.viewport->Current().zoom);
+        PointF offset;
+        switch (key)
+        {
+        case VK_LEFT: offset = { -unit, 0 }; break;
+        case VK_RIGHT: offset = { unit, 0 }; break;
+        case VK_UP: offset = { 0, -unit }; break;
+        case VK_DOWN: offset = { 0, unit }; break;
+        default: return false;
+        }
+        if (!drag) TransformSelection(Affine::Translation(offset.x, offset.y));
+        return true;
+    }
+
     void SelectionController::Press(POINT client)
     {
         PointF at = ToDocument(client);
@@ -379,12 +396,14 @@ namespace inkpages::detail
             return;
         }
         if (PictureHost* host = c.pictures(); host && !pictures.empty())
-        {
             ResetPreview();
-            host->Transform(pictures, d.m);
-        }
-        auto pictureEdit = PictureStep(static_cast<int>(PictureEdit::Kind::Transformed), pictures, d.m, 0, {});
-        Affine m = d.m;
+        TransformSelection(d.m);
+    }
+
+    void SelectionController::TransformSelection(Affine m)
+    {
+        if (PictureHost* host = c.pictures(); host && !pictures.empty()) host->Transform(pictures, m);
+        auto pictureEdit = PictureStep(static_cast<int>(PictureEdit::Kind::Transformed), pictures, m, 0, {});
         PushWith([m](ToolInput& t) { return t.Selection().Commit(m); }, pictureEdit, true);
     }
 
