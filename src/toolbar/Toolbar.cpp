@@ -33,6 +33,7 @@ namespace inkpages
 
             HWND Window() const override { return container; }
             int Height() const override;
+            int HeightForWidth(int width) override;
             ToolChoices const& Choices() const override { return choices; }
             void Choose(ToolChoices next) override;
             void EnableButton(int id, bool enabled) override;
@@ -94,7 +95,7 @@ namespace inkpages
             if (!container) winrt::throw_last_error();
             try
             {
-                bar = CreateWindowExW(0, TOOLBARCLASSNAMEW, L"", WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_LIST | TBSTYLE_TOOLTIPS |
+                bar = CreateWindowExW(0, TOOLBARCLASSNAMEW, L"", WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_LIST | TBSTYLE_TOOLTIPS | TBSTYLE_WRAPABLE |
                     CCS_NODIVIDER | CCS_NORESIZE | CCS_NOPARENTALIGN, 0, 0, 100, 40, container, nullptr,
                     GetModuleHandleW(nullptr), nullptr);
                 if (!bar) winrt::throw_last_error();
@@ -209,9 +210,30 @@ namespace inkpages
 
         int Bar::Height() const
         {
-            SIZE size{};
-            SendMessageW(bar, TB_GETMAXSIZE, 0, reinterpret_cast<LPARAM>(&size));
-            return size.cy + MulDiv(4, GetDpiForWindow(container), 96);
+            // The native item rectangles include the actual row positions after wrapping.
+            LONG bottom = 0;
+            auto count = SendMessageW(bar, TB_BUTTONCOUNT, 0, 0);
+            for (LRESULT i = 0; i < count; ++i)
+            {
+                RECT item{};
+                if (!SendMessageW(bar, TB_GETITEMRECT, i, reinterpret_cast<LPARAM>(&item)))
+                    throw winrt::hresult_error(E_FAIL, L"TB_GETITEMRECT (toolbar)");
+                bottom = std::max(bottom, item.bottom);
+            }
+            return bottom + MulDiv(4, GetDpiForWindow(container), 96);
+        }
+
+        int Bar::HeightForWidth(int width)
+        {
+            RECT client{};
+            winrt::check_bool(GetClientRect(container, &client));
+            if (client.right != width)
+            {
+                // The control lays out its rows during WM_SIZE. Set the width before reading their height.
+                winrt::check_bool(SetWindowPos(container, nullptr, 0, 0, width, client.bottom,
+                    SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE));
+            }
+            return Height();
         }
 
         void Bar::EnableButton(int id, bool enabled)
@@ -531,7 +553,8 @@ namespace inkpages
                 break;
             }
             case WM_SIZE:
-                MoveWindow(bar, 0, MulDiv(2, GetDpiForWindow(container), 96), LOWORD(lp), HIWORD(lp), TRUE);
+                winrt::check_bool(MoveWindow(bar, 0, MulDiv(2, GetDpiForWindow(container), 96), LOWORD(lp), HIWORD(lp), TRUE));
+                SendMessageW(bar, TB_AUTOSIZE, 0, 0);
                 return 0;
             case WM_DPICHANGED_AFTERPARENT:
                 Build();

@@ -211,6 +211,9 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   second tap on the active preset opens its menu (WinUI behavior). Numbers use `ToolbarTexts::decimalSeparator`
   ("0,85 pt"). InkPages owns the shared icon set. The embedded `assets/toolbar-icons.png` atlas has five columns
   and five rows of 64 px tiles in `ToolbarSymbol` order. WIC scales the selected tile to the toolbar's current DPI.
+  The native toolbar uses `TBSTYLE_WRAPABLE`. Apps call `HeightForWidth` before laying out the content below it.
+  [measured, Windows 11 26200] `TB_GETMAXSIZE` still reported a single-row height after wrapping here.
+  The layout measures the bottom of the native item rectangles (`TB_GETITEMRECT`).
   Apps providing `WritingSurface::copyArea` get the separate Copy PDF Area tool. It sends a clipped rectangle from
   the pen or mouse to the app. The normal selection tool continues to select objects.
 - [measured 2026-11-20] After setting a hidden toolbar's bitmap size to 16 or 24 pixels, `TB_LOADIMAGES` with

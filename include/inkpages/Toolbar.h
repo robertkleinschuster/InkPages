@@ -122,6 +122,8 @@ namespace inkpages
         virtual HWND Window() const = 0;
         /// The height the toolbar wants (pixels), for the app's layout.
         virtual int Height() const = 0;
+        /// Reflows the native toolbar at the given client width in pixels and returns its required height.
+        virtual int HeightForWidth(int width) = 0;
         virtual ToolChoices const& Choices() const = 0;
         /// Sets the choices as if the user made them (e.g. the app's keyboard shortcuts for tools).
         virtual void Choose(ToolChoices choices) = 0;

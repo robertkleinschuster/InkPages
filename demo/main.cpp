@@ -199,9 +199,10 @@ namespace
         SendMessageW(status, WM_SIZE, 0, 0);
         RECT sr;
         GetWindowRect(status, &sr);
-        int top = toolbar ? toolbar->Height() : 0;
+        int top = toolbar ? toolbar->HeightForWidth(rc.right) : 0;
         if (toolbar) MoveWindow(toolbar->Window(), 0, 0, rc.right, top, TRUE);
-        if (surface) MoveWindow(surface->Window(), 0, top, rc.right, rc.bottom - top - (sr.bottom - sr.top), TRUE);
+        if (surface) MoveWindow(surface->Window(), 0, top, rc.right,
+            std::max(0L, rc.bottom - top - (sr.bottom - sr.top)), TRUE);
     }
 
     void ChooseTool(inkpages::Tool tool, int preset)
@@ -358,6 +359,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
         };
         toolbar = inkpages::Toolbar::Create(window, *surface, LoadChoices(), German(), CursorFor, pageButtons);
         toolbar->choicesChanged = SaveChoices;
+        toolbar->sizeChanged = [window] { Layout(window); };
 
         int count = 4;
         if (auto value = Environment(L"INKPAGES_DEMO_PAGES"); !value.empty()) count = std::max(1, _wtoi(value.c_str()));
