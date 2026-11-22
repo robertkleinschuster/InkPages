@@ -313,7 +313,10 @@ namespace inkpages
                 Apply(true);
                 break;
             case ButtonId::Select: choose(Tool::Select, choices.preset); break;
-            case ButtonId::CopyArea: choose(Tool::CopyArea, choices.preset); break;
+            case ButtonId::CopyArea:
+                if (IsChecked(id, choices, Status())) return Menu(id);
+                choose(Tool::CopyArea, choices.preset);
+                break;
             case ButtonId::Shape:
                 if (!IsDrawingTool(choices.tool)) return;
                 choices.ToggleShape(choices.shape);
