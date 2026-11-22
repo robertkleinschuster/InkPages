@@ -244,6 +244,17 @@ namespace inkpages::detail
         return c;
     }
 
+    std::optional<ToolChoices> CopyAreaMenu(HWND owner, RECT anchor, ToolChoices c, ToolbarTexts const& t,
+        std::optional<ToolbarColors> const& colors)
+    {
+        int chosen = Show(owner, anchor, { { t.copyAreaTransparent, !c.copyAreaBackground },
+            { t.copyAreaWithBackground, c.copyAreaBackground } }, colors);
+        if (chosen < 0) return std::nullopt;
+        c.copyAreaBackground = chosen == 1;
+        c.tool = Tool::CopyArea;
+        return c;
+    }
+
     std::optional<ToolChoices> LaserMenu(HWND owner, RECT anchor, ToolChoices c, std::optional<ToolbarColors> const& colors)
     {
         std::vector<Item> items;

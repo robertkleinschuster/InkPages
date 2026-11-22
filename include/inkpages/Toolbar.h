@@ -51,6 +51,8 @@ namespace inkpages
         std::wstring text = L"Text";
         std::wstring laser = L"Laser pointer";
         std::wstring copyArea = L"Copy PDF area";
+        std::wstring copyAreaTransparent = L"Transparent";
+        std::wstring copyAreaWithBackground = L"With PDF background";
         std::wstring textTip = L"Text: tap on the page to write (the keyboard types), tap a text to edit it, tap beside "
             L"it to finish. The arrow: font, size and color";
         std::wstring ruler = L"Ruler";

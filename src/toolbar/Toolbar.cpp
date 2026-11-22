@@ -362,6 +362,7 @@ namespace inkpages
                 return;
             }
             else if (id == ButtonId::Select) next = SelectModeMenu(container, anchor, choices, texts, colors);
+            else if (id == ButtonId::CopyArea) next = CopyAreaMenu(container, anchor, choices, texts, colors);
             else if (id == ButtonId::Shape)
             {
                 if (auto chosen = ShapeMenu(container, anchor, choices, texts, colors))

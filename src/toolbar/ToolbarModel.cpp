@@ -32,7 +32,7 @@ namespace inkpages::detail
         b.push_back({ ButtonId::WholeStrokes, ToolbarSymbol::WholeStrokes, std::nullopt, Check, false });
         b.push_back({ ButtonId::Shape, ToolbarSymbol::Shapes, std::nullopt, CheckWithMenu, false });
         b.push_back({ ButtonId::Select, ToolbarSymbol::Select, std::nullopt, CheckWithMenu, true });
-        if (copyArea) b.push_back({ ButtonId::CopyArea, ToolbarSymbol::CopyArea, {}, Check, false });
+        if (copyArea) b.push_back({ ButtonId::CopyArea, ToolbarSymbol::CopyArea, {}, CheckWithMenu, false });
         b.push_back({ ButtonId::Laser, ToolbarSymbol::Laser, {}, CheckWithMenu, false });
         b.push_back({ ButtonId::Text, ToolbarSymbol::Text, Palette::Pens[std::clamp(choices.textColor, 0, 9)], CheckWithMenu, false });
         b.push_back({ ButtonId::Ruler, ToolbarSymbol::Ruler, std::nullopt, CheckWithMenu, false });

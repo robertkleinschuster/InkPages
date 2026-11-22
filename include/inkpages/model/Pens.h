@@ -120,6 +120,7 @@ namespace inkpages
         bool squareEraser = false;
         static constexpr std::array LaserDurations{ 1, 2, 3, 5, 10 };
         int laserSeconds = 2;
+        bool copyAreaBackground = false;
 
         bool DrawingShape() const { return IsDrawingTool(tool) && shapeEnabled; }
         void ToggleShape(ShapeKind kind)

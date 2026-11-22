@@ -19,6 +19,8 @@ namespace inkpages::detail
         std::optional<ToolbarColors> const& colors, bool darkPaper);
     std::optional<ToolChoices> RadiusMenu(HWND owner, RECT anchor, ToolChoices choices, ToolbarTexts const& texts, std::optional<ToolbarColors> const& colors);
     std::optional<ToolChoices> SelectModeMenu(HWND owner, RECT anchor, ToolChoices choices, ToolbarTexts const& texts, std::optional<ToolbarColors> const& colors);
+    std::optional<ToolChoices> CopyAreaMenu(HWND owner, RECT anchor, ToolChoices choices, ToolbarTexts const& texts,
+        std::optional<ToolbarColors> const& colors);
     std::optional<ToolChoices> LaserMenu(HWND owner, RECT anchor, ToolChoices choices,
         std::optional<ToolbarColors> const& colors);
     std::optional<ToolChoices> TextMenu(HWND owner, RECT anchor, ToolChoices choices, ToolbarTexts const& texts,

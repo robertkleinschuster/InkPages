@@ -101,10 +101,10 @@ namespace inkpages
     std::string ToolChoices::Serialize() const
     {
         return std::format("pens={};highlighters={};eraser={};whole={};tool={};preset={};select={};shape={};recognize={};"
-            "text={}:{}:{};shapeEnabled={};squareEraser={};laserSeconds={}",
+            "text={}:{}:{};shapeEnabled={};squareEraser={};laserSeconds={};copyAreaBackground={}",
             Presets(pens), Presets(highlighters), eraserRadius, wholeStrokeErasing ? 1 : 0, static_cast<int>(tool), preset,
             static_cast<int>(selectMode), static_cast<int>(shape), recognizeShapes ? 1 : 0, textFont, textSize, textColor,
-            shapeEnabled ? 1 : 0, squareEraser ? 1 : 0, laserSeconds);
+            shapeEnabled ? 1 : 0, squareEraser ? 1 : 0, laserSeconds, copyAreaBackground ? 1 : 0);
     }
 
     ToolChoices ToolChoices::Parse(std::string const& text)
@@ -127,6 +127,7 @@ namespace inkpages
             else if (key == "squareEraser" && Number(value, i)) c.squareEraser = i != 0;
             else if (key == "whole" && Number(value, i)) c.wholeStrokeErasing = i != 0;
             else if (key == "tool" && Number(value, i) && i >= 0 && i <= static_cast<int>(Tool::CopyArea)) c.tool = static_cast<Tool>(i);
+            else if (key == "copyAreaBackground" && Number(value, i)) c.copyAreaBackground = i == 1;
             else if (key == "laserSeconds" && Number(value, i) &&
                 std::find(LaserDurations.begin(), LaserDurations.end(), i) != LaserDurations.end()) c.laserSeconds = i;
             else if (key == "text") ParseText(value, c);
