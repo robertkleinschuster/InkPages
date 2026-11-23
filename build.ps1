@@ -3,7 +3,7 @@
 #   .\build.ps1 -NoTests   build only
 param([switch]$NoTests, [string]$Config = 'Release')
 $ErrorActionPreference = 'Stop'
-$vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+$vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -property installationPath
 if (-not $vs) { throw 'Visual Studio not found (vswhere)' }
 $cmake = Join-Path $vs 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'
 $build = Join-Path $PSScriptRoot '.local-build\cmake'
