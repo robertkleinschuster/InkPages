@@ -59,6 +59,9 @@ namespace inkpages
         float minZoom = 0.2f, maxZoom = 6;
         float gap = 24, margin = 24;          // between pages, around the document (page units)
         Color background{ 0xFF, 0xE6, 0xE6, 0xE6 };
+        /// false: the surface sits inline in a parent that navigates (scroll, zoom, keys): the pen still writes, all other
+        /// pointer, wheel and key input goes to the parent through DefWindowProc.
+        bool allowViewportInput = true;
     };
 
     /// What the pen does (the toolbar makes it from ToolChoices).

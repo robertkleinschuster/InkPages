@@ -88,6 +88,26 @@ namespace inkpages::detail
             LRESULT result = 0;
             if (textEditor->OnMessage(message, wp, lp, result)) return result;
         }
+        if (!options.allowViewportInput)
+        {
+            switch (message)
+            {
+            case WM_POINTERDOWN:
+            case WM_POINTERUPDATE:
+            case WM_POINTERUP:
+                if (TypeOf(wp) == PT_PEN) break;
+                return DefWindowProcW(window, message, wp, lp);
+            case DM_POINTERHITTEST:
+            case WM_MOUSEWHEEL:
+            case WM_MOUSEHWHEEL:
+            case WM_KEYDOWN:
+            case WM_LBUTTONDOWN:
+            case WM_LBUTTONDBLCLK:
+            case WM_MBUTTONDOWN:
+            case WM_RBUTTONDOWN:
+                return DefWindowProcW(window, message, wp, lp);
+            }
+        }
         switch (message)
         {
         case WM_POINTERDOWN:
