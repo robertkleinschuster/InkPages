@@ -31,6 +31,11 @@ target_compile_options(InkPages PRIVATE ${INKPAGES_COMPILE_OPTIONS})
 target_compile_definitions(InkPages PUBLIC ${INKPAGES_DEFINITIONS})
 target_link_libraries(InkPages PUBLIC windowsapp d3d11 dxgi d2d1 dcomp comctl32 imm32 uiautomationcore ninput windowscodecs coremessaging)
 
+# The demo, the test tools and the unit tests belong to this repository's own build; an app that embeds InkPages with
+# add_subdirectory gets the library only (set the option ON to build them there too).
+option(INKPAGES_BUILD_DEMO_AND_TESTS "Build the demo, the test tools and the unit tests" ${PROJECT_IS_TOP_LEVEL})
+if(INKPAGES_BUILD_DEMO_AND_TESTS)
+
 # The demo and development app (UI tests in Windows Sandbox run against it).
 add_executable(InkPagesDemo WIN32 demo/main.cpp demo/DemoPictures.cpp demo/app.rc)
 target_compile_options(InkPagesDemo PRIVATE ${INKPAGES_COMPILE_OPTIONS})
@@ -70,4 +75,6 @@ target_link_libraries(uiaprobe PRIVATE windowsapp oleaut32 uiautomationcore dwma
 if(PROJECT_IS_TOP_LEVEL)
     set_target_properties(InkPagesDemo PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/demo/$<CONFIG>")
     set_target_properties(cursorprobe uiaprobe PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools/$<CONFIG>")
+endif()
+
 endif()
