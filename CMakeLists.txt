@@ -37,6 +37,7 @@ target_compile_options(InkPagesDemo PRIVATE ${INKPAGES_COMPILE_OPTIONS})
 target_link_options(InkPagesDemo PRIVATE /MANIFEST:NO) # the manifest is a resource (app.manifest)
 target_link_libraries(InkPagesDemo PRIVATE InkPages comctl32 dwrite)
 
+
 # Test tool (sandbox UI tests): the pointer as the screen draws it, from DXGI Desktop Duplication.
 add_executable(cursorprobe tools/cursorprobe.cpp)
 target_compile_options(cursorprobe PRIVATE ${INKPAGES_COMPILE_OPTIONS})
@@ -64,3 +65,9 @@ add_executable(uiaprobe tools/uiaprobe.cpp)
 target_compile_options(uiaprobe PRIVATE ${INKPAGES_COMPILE_OPTIONS})
 target_compile_definitions(uiaprobe PRIVATE ${INKPAGES_DEFINITIONS})
 target_link_libraries(uiaprobe PRIVATE windowsapp oleaut32 uiautomationcore dwmapi)
+
+# Standalone build: the demo and the test tools get their own output folders (the sandbox UI tests copy a folder).
+if(PROJECT_IS_TOP_LEVEL)
+    set_target_properties(InkPagesDemo PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/demo/$<CONFIG>")
+    set_target_properties(cursorprobe uiaprobe PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools/$<CONFIG>")
+endif()

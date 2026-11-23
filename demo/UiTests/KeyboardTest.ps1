@@ -2,7 +2,7 @@
 # with the text pattern (uiaprobe --focus), and whether Windows' touch keyboard comes up (uiaprobe --keyboard, screenshot)
 # - first with the sandbox's default setting, then with "show the touch keyboard: always" (TabletTip\1.7\
 # TouchKeyboardTapInvoke = 2, Settings > Time & language > Typing; a sandbox has a keyboard attached).
-#   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\KeyboardTest.ps1 -Data .local-build\tools\uiaprobe.exe
+#   UiTests\Run-SandboxTest.ps1 -App .local-build\cmake\demo\Release -Test demo\UiTests\KeyboardTest.ps1 -Data .local-build\cmake\tools\Release\uiaprobe.exe
 . C:\sbx\TestKit.ps1
 
 $INRANGE = 0x2; $INCONTACT = 0x4; $FIRST = 0x10; $PRIMARY = 0x2000; $DOWN = 0x10000; $UPDATE = 0x20000; $UP = 0x40000

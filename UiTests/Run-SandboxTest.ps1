@@ -1,11 +1,11 @@
 ﻿# UI test in Windows Sandbox with real (synthetic) pen and touch input. The sandbox's window (the client of
 # `wsb connect`, which the test's interactive session needs) opens on a separate Win32 desktop (HiddenDesktop.cs), so
 # it never shows on the user's screen; -Show opens it on the user's desktop to watch or debug a test.
-# Copies an app build (-App, e.g. .local-build\demo), optional test data and the test script into a shared folder,
+# Copies an app build (-App, e.g. .local-build\cmake\demo\Release), optional test data and the test script into a shared folder,
 # starts a sandbox, runs the script in its user session and collects screenshots and logs in <Work>\out.
 # In-sandbox scripts dot-source C:\sbx\TestKit.ps1 (shared helpers: start the app, UI Automation, pen injection).
-# The library's own tests: .\build.ps1 (the demo goes to .local-build\demo), then
-#   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\StartTest.ps1
+# The library's own tests: .\build.ps1 (the demo goes to .local-build\cmake\demo\Release), then
+#   UiTests\Run-SandboxTest.ps1 -App .local-build\cmake\demo\Release -Test demo\UiTests\StartTest.ps1
 # Apps that embed InkPages can use this runner and TestKit.ps1 for their own UI tests.
 param(
     [Parameter(Mandatory)][string]$App,            # folder with the app (copied to C:\sbx\app)

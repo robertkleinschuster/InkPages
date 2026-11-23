@@ -1,6 +1,6 @@
 # A stroke across the gap between two pages: one presenter over the document collects it as one stroke, owned by the
 # page where it began (the log says which, with its first and last point); the screenshot shows how it is drawn.
-#   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\BoundaryTest.ps1
+#   UiTests\Run-SandboxTest.ps1 -App .local-build\cmake\demo\Release -Test demo\UiTests\BoundaryTest.ps1
 . C:\sbx\TestKit.ps1
 
 $INRANGE = 0x2; $INCONTACT = 0x4; $FIRST = 0x10; $PRIMARY = 0x2000; $DOWN = 0x10000; $UPDATE = 0x20000; $UP = 0x40000

@@ -1,7 +1,7 @@
 # The mouse never writes: a right drag lassos, a left drag on the selection moves it, and a click
 # beside it clears it, a click on a picture selects it; a click on nothing and a finger tap are the app's taps, a finger
 # pan is no tap.
-#   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\MouseTest.ps1
+#   UiTests\Run-SandboxTest.ps1 -App .local-build\cmake\demo\Release -Test demo\UiTests\MouseTest.ps1
 # The log (out\demo.log) says what happened: "mouse: ...", "touch: ...", "demo: tap ...", selections, edits.
 . C:\sbx\TestKit.ps1
 

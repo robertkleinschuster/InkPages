@@ -27,10 +27,14 @@ Used by [Xournal Studio for Windows](https://github.com/robertkleinschuster/xour
 
 ## Build
 
-Requirements: Windows 11 (x64), Visual Studio 2026 with the C++ desktop workload (its CMake and Windows SDK).
+Requirements: Windows 11 (x64), Visual Studio 2026 or its Build Tools with the components listed in `.vsconfig` (MSVC, CMake,
+Windows 11 SDK). On a clean machine: `winget install Microsoft.VisualStudio.BuildTools --override "--passive --config .vsconfig"`
+(run in this folder). The configuration is `CMakePresets.json` (Ninja Multi-Config, build folder `.local-build\cmake`), so Visual
+Studio, VS Code and CLion build it the same way; `build.ps1` only enters the x64 developer environment and runs
+`cmake --preset default`, `cmake --build --preset release` and `ctest --preset release`.
 
 ```powershell
-.\build.ps1            # Release build + unit tests (GoogleTest via CTest); the demo goes to .local-build\demo
+.\build.ps1            # Release build + unit tests (GoogleTest via CTest); the demo goes to .local-build\cmake\demo\Release
 .\build.ps1 -NoTests
 ```
 
@@ -106,7 +110,8 @@ UiTests/                 the Windows Sandbox kit for embedding apps too: Run-San
                          TestKit.ps1, Inj.cs (synthetic pen, touch, mouse, keys), Finger.cs, CursorShot.cs, HiddenDesktop.cs
 tools/                   test tools: uiaprobe (native UI Automation: find by name, focus, touch keyboard),
                          cursorprobe (the pointer as the screen draws it)
-build.ps1                CMake (Visual Studio's) Release build + unit tests; .github/workflows/build.yml runs it
+CMakePresets.json        the build configuration (Ninja Multi-Config); .vsconfig lists the Visual Studio components
+build.ps1                developer environment + preset build + CTest; .github/workflows/build.yml runs it
 ```
 
 The WinUI 3 (C#) version is at the tag `winui-final`.

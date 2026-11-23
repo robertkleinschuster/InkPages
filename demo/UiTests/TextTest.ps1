@@ -1,7 +1,7 @@
 # The Text tool: a pen tap writes a text (typed with the keyboard, umlauts included), a tap beside ends it, a tap on
 # the text edits it, undo/redo; the selection (mouse) selects and moves a text, undo; an empty new text is nothing; at
 # another zoom the box lies on the text.
-#   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\TextTest.ps1
+#   UiTests\Run-SandboxTest.ps1 -App .local-build\cmake\demo\Release -Test demo\UiTests\TextTest.ps1
 # The log (out\demo.log) says what happened: "text: ...", "demo: text ...", selections, undo.
 # (Umlauts as [char] codes: Windows PowerShell 5.1 reads a script without BOM in the ANSI code page.)
 . C:\sbx\TestKit.ps1

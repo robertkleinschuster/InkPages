@@ -1,7 +1,7 @@
 # The writing surface (phase 1): finger pan with inertia and pinch zoom, mouse wheel and Ctrl+wheel, pen ink under the
 # pen after zoom and pan, a stroke on page 2 after scrolling there, lazy pages (a page far away gives its strokes to
 # the app and gets them back), pen + finger at once, and the pen cursor as the screen draws it (cursorprobe).
-#   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\SurfaceTest.ps1 -Data .local-build\tools\cursorprobe.exe
+#   UiTests\Run-SandboxTest.ps1 -App .local-build\cmake\demo\Release -Test demo\UiTests\SurfaceTest.ps1 -Data .local-build\cmake\tools\Release\cursorprobe.exe
 # Every pen stroke is logged here with the client DIPs it was injected at ("pen <name>: x0,y0 -> x1,y1"); the library
 # logs each stroke's first/last ink point mapped back to client DIPs ("ink: stroke on page N ...", out\demo.log).
 . C:\sbx\TestKit.ps1

@@ -1,6 +1,6 @@
 # The page in view is outlined in the accent color (MarkCurrentPage): at fit width, at zoom 0.5 and 2, while a finger
 # drag scrolls towards the next page and after it. Screenshots (and crops of the outline) show it.
-#   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\MarkTest.ps1
+#   UiTests\Run-SandboxTest.ps1 -App .local-build\cmake\demo\Release -Test demo\UiTests\MarkTest.ps1
 . C:\sbx\TestKit.ps1
 
 function Key($k) { [Inj]::Key($k); Start-Sleep -Milliseconds 1200; "key 0x{0:X}" -f $k }

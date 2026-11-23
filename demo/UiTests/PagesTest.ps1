@@ -1,6 +1,6 @@
 # Page operations keep the history, and the toolbar's buttons have names (native UI Automation finds them by name:
 # uiaprobe; the managed client of Windows PowerShell sees comctl32 toolbars only as an empty pane).
-#   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\PagesTest.ps1 -Data .local-build\tools\uiaprobe.exe
+#   UiTests\Run-SandboxTest.ps1 -App .local-build\cmake\demo\Release -Test demo\UiTests\PagesTest.ps1 -Data .local-build\cmake\tools\Release\uiaprobe.exe
 . C:\sbx\TestKit.ps1
 
 $INRANGE = 0x2; $INCONTACT = 0x4; $FIRST = 0x10; $PRIMARY = 0x2000; $DOWN = 0x10000; $UPDATE = 0x20000; $UP = 0x40000

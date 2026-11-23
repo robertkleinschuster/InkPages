@@ -2,7 +2,7 @@
 # the demo's card with the strokes), undo/redo of the move, a tap inside keeps it and a tap outside clears it (no dot), duplicate,
 # delete, copy/paste (Windows ink's clipboard), a drag to the view's edge auto-scrolls onto the next page, strokes cut
 # at the page edge, shapes, shape recognition, Windows' ruler.
-#   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\SelectionTest.ps1
+#   UiTests\Run-SandboxTest.ps1 -App .local-build\cmake\demo\Release -Test demo\UiTests\SelectionTest.ps1
 # The log (out\demo.log) says what happened: selections, drags, moves (with their pages), edits, recognition.
 . C:\sbx\TestKit.ps1
 Add-Type -Path C:\sbx\CursorShot.cs -ReferencedAssemblies System.Drawing

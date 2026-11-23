@@ -1,7 +1,7 @@
 # Phase 2a tools: pen presets ink in their color, the highlighter, the eraser (exact and whole strokes), the pen's eraser
 # end (taken on its inverted hover), undo/redo across two pages, the pen cursor on the first
 # hover (cursorprobe) and the exact eraser's circle.
-#   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\ToolsTest.ps1 -Data .local-build\tools\cursorprobe.exe
+#   UiTests\Run-SandboxTest.ps1 -App .local-build\cmake\demo\Release -Test demo\UiTests\ToolsTest.ps1 -Data .local-build\cmake\tools\Release\cursorprobe.exe
 # Tools are chosen with the demo's keys (1/2/3 pens, 4 highlighter, 0 eraser, X whole strokes, Ctrl+Z/Y); the log
 # (out\demo.log) says what happened: strokes with their color, erasing, undo/redo.
 . C:\sbx\TestKit.ps1

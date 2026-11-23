@@ -1,6 +1,6 @@
 # Open points of phase 2: a selection tap on a picture selects it; the frame keeps its screen size when zooming;
 # Windows' ruler and touch: does a finger move the ruler, or does DirectManipulation pan the pages?
-#   UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\RulerTouchTest.ps1
+#   UiTests\Run-SandboxTest.ps1 -App .local-build\cmake\demo\Release -Test demo\UiTests\RulerTouchTest.ps1
 . C:\sbx\TestKit.ps1
 
 $INRANGE = 0x2; $INCONTACT = 0x4; $FIRST = 0x10; $PRIMARY = 0x2000; $DOWN = 0x10000; $UPDATE = 0x20000; $UP = 0x40000

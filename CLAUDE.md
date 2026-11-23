@@ -49,9 +49,9 @@ are in the global CLAUDE.md ("WinUI 3"); what it taught that still holds is fold
 ## Build, test
 
 ```powershell
-.\build.ps1            # Visual Studio's CMake, Release build + unit tests (CTest); demo -> .local-build\demo,
-.\build.ps1 -NoTests   # uiaprobe/cursorprobe -> .local-build\tools
-UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\<Test>.ps1 -Data .local-build\tools\uiaprobe.exe
+.\build.ps1            # CMakePresets.json (Ninja Multi-Config) in the x64 developer shell: Release build + unit tests (CTest); demo -> .local-build\cmake\demo\Release,
+.\build.ps1 -NoTests   # uiaprobe/cursorprobe -> .local-build\cmake\tools\Release
+UiTests\Run-SandboxTest.ps1 -App .local-build\cmake\demo\Release -Test demo\UiTests\<Test>.ps1 -Data .local-build\cmake\tools\Release\uiaprobe.exe
 ```
 - CI (`.github/workflows/build.yml`, `windows-2025`): every push and PR runs `build.ps1`.
 - Unit tests: GoogleTest (fetched by CMake at configure time, pinned; only for tests). Microsoft's CppUnitTest was tried

@@ -1,5 +1,5 @@
 ﻿# The demo starts in Windows Sandbox: its window appears, it logs, and it ends cleanly when closed (phase 0 skeleton).
-# UiTests\Run-SandboxTest.ps1 -App .local-build\demo -Test demo\UiTests\StartTest.ps1
+# UiTests\Run-SandboxTest.ps1 -App .local-build\cmake\demo\Release -Test demo\UiTests\StartTest.ps1
 . C:\sbx\TestKit.ps1
 
 Invoke-Test {
