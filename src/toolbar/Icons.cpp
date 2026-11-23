@@ -30,7 +30,7 @@ namespace inkpages::detail
 {
     namespace
     {
-        constexpr int AtlasCell = 64, AtlasColumns = 5, AtlasRows = 5;
+        constexpr int AtlasCell = 64, AtlasColumns = 5, AtlasRows = 6;
         BYTE atlasPng[] = {
 #include "toolbar-atlas.inc"
         };
