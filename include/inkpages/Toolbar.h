@@ -85,7 +85,7 @@ namespace inkpages
     enum class ToolbarSymbol
     {
         Save, ExportPdf, Undo, Redo, Pen, Highlighter, Eraser, WholeStrokes, Shapes, Select, Text, Ruler, Cut, Copy,
-        Paste, Duplicate, Delete, InsertPage, DeletePage, Laser, CopyArea, Sync, RevealFile
+        Paste, Duplicate, Delete, InsertPage, DeletePage, Laser, CopyArea, Sync, RevealFile, MovePageUp, MovePageDown
     };
 
     /// Creates a DPI-sized shared toolbar bitmap. The caller owns the HBITMAP.

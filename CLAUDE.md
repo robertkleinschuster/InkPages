@@ -213,7 +213,9 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   (a swatch bitmap replaces the check mark, so the current color is bold) – windowed popups, pen taps reach them. A
   second tap on the active preset opens its menu (WinUI behavior). Numbers use `ToolbarTexts::decimalSeparator`
   ("0,85 pt"). InkPages owns the shared icon set. The embedded `assets/toolbar-icons.png` atlas has five columns
-  and five rows of 64 px tiles in `ToolbarSymbol` order. WIC scales the selected tile to the toolbar's current DPI.
+  and five rows of 64 px tiles in `ToolbarSymbol` order (all 25 used; the next symbol needs a sixth row: `AtlasRows` in
+  `Icons.cpp`). New tiles come from Codex imagegen in the set's style, cropped and scaled to ~58 px. WIC scales the selected
+  tile to the toolbar's current DPI.
   The native toolbar uses `TBSTYLE_WRAPABLE`. Apps call `HeightForWidth` before laying out the content below it.
   [measured, Windows 11 26200] `TB_GETMAXSIZE` still reported a single-row height after wrapping here.
   The layout measures the bottom of the native item rectangles (`TB_GETITEMRECT`).
