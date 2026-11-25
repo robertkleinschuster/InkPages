@@ -80,6 +80,7 @@ namespace inkpages
         bool shapeEnabled = false;
         bool squareEraser = false;
         int laserSeconds = 2;
+        bool copyAreaObjects = false;               // the CopyArea tool takes the ink, pictures and texts inside too
         UINT darkCursor = 0;                        // optional cursor resource for dark paper
     };
 
@@ -174,8 +175,10 @@ namespace inkpages
         /// double click too.
         std::function<bool(int page, PointF point)> mouseClaims;
         std::function<void(MouseGesture const& gesture)> mouseGesture;
-        /// The CopyArea tool's rectangle, clipped to the page where the gesture began.
-        std::function<void(int page, RectF area)> copyArea;
+        /// The CopyArea tool's rectangle, clipped to the page where the gesture began. `objects` holds what lies inside
+        /// it as a rectangle selection would take it (strokes relative to the area's top left, the app's pictures and
+        /// texts) when ToolChoices::copyAreaObjects is on, else it is empty; `objects.bounds` is the area (document).
+        std::function<void(int page, RectF area, Clip objects)> copyArea;
         std::function<void()> mousePannedWithWriteTool;
         std::function<void()> firstPenStroke;
         /// A finger's press-and-hold over a page in viewer mode (page coordinates and menu screen position).

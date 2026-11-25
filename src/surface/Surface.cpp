@@ -321,7 +321,24 @@ namespace inkpages::detail
                     std::min(paper.bottom, std::max(a.y, b.y)) - paper.top,
                 };
                 float minimum = Tap::MaxDistance(viewport->Current().zoom);
-                if (area.Width() >= minimum && area.Height() >= minimum) copyArea(*page, area);
+                if (area.Width() < minimum || area.Height() < minimum) return;
+                Clip objects{ {}, {}, { paper.left + area.left, paper.top + area.top, paper.left + area.right, paper.top + area.bottom } };
+                if (copyAreaObjects)
+                {
+                    // As a rectangle selection takes it; the ink thread selects, copies and lets go again.
+                    RectF box = objects.bounds;
+                    std::vector<PointF> polygon{ { box.left, box.top }, { box.right, box.top }, { box.right, box.bottom }, { box.left, box.bottom } };
+                    auto strokes = std::make_shared<std::vector<InkStroke>>();
+                    host.Run("copy area objects", [strokes, polygon, box, tools = tools.get()] {
+                        auto& selected = tools->Selection();
+                        selected.Select(polygon);
+                        *strokes = selected.Copies({ box.left, box.top });
+                        selected.Clear();
+                    });
+                    objects.strokes = *strokes;
+                    if (pictureHost) objects.pictures = pictureHost->PicturesIn(*page, polygon);
+                }
+                copyArea(*page, area, std::move(objects));
             });
         };
         tools->cleared = [this] { ui->Post([this] { selection->Cleared(); }); };
@@ -834,6 +851,7 @@ namespace inkpages::detail
         textStyle = state.text;
         if (state.tool == Tool::CopyArea && currentTool != Tool::CopyArea) selection->Clear();
         currentTool = state.tool;
+        copyAreaObjects = state.copyAreaObjects;
         if (state.tool == Tool::Text) textEditor->SetStyle(state.text); // the edited text takes the menu's choice
         else textEditor->End();
         host.Post("tool", [this, settings, look, pens, cursor = state.cursor, darkCursor = state.darkCursor] {

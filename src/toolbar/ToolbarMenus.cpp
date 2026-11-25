@@ -249,9 +249,10 @@ namespace inkpages::detail
     {
         int chosen = Show(owner, anchor, { { t.copyAreaTransparent, !c.copyAreaBackground },
             { t.copyAreaWithBackground, c.copyAreaBackground }, { {}, false, std::nullopt, true },
-            { t.copyAreaFrame, c.copyAreaFrame } }, colors);
+            { t.copyAreaFrame, c.copyAreaFrame }, { t.copyAreaObjects, c.copyAreaObjects } }, colors);
         if (chosen < 0) return std::nullopt;
         if (chosen == 3) c.copyAreaFrame = !c.copyAreaFrame;
+        else if (chosen == 4) c.copyAreaObjects = !c.copyAreaObjects;
         else c.copyAreaBackground = chosen == 1;
         c.tool = Tool::CopyArea;
         return c;

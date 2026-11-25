@@ -54,6 +54,7 @@ namespace inkpages
         std::wstring copyAreaTransparent = L"Transparent";
         std::wstring copyAreaWithBackground = L"White background";
         std::wstring copyAreaFrame = L"Frame";
+        std::wstring copyAreaObjects = L"Include annotations";
         std::wstring textTip = L"Text: tap on the page to write (the keyboard types), tap a text to edit it, tap beside "
             L"it to finish. The arrow: font, size and color";
         std::wstring ruler = L"Ruler";

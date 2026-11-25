@@ -161,6 +161,7 @@ namespace inkpages::detail
         TextHost* textHost = nullptr;
         TextStyle textStyle; // the Text tool's
         Tool currentTool = Tool::Pen;
+        bool copyAreaObjects = false;
         UINT32 touchSelection = 0;
         bool reportedPenStroke = false; // ink thread only
         // Page operations issued (UI thread) and applied on the ink thread: a tool's result made before the ink thread

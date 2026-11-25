@@ -286,6 +286,7 @@ namespace inkpages
             state.recognizeShapes = choices.recognizeShapes;
             state.text = choices.Text();
             state.laserSeconds = choices.laserSeconds;
+            state.copyAreaObjects = choices.copyAreaObjects;
             Tool look = choices.tool == Tool::Highlighter ? Tool::Highlighter : Tool::Pen;
             auto presets = look == Tool::Pen ? choices.PensOrDefault() : choices.HighlightersOrDefault();
             int index = IsDrawingTool(choices.tool) ? choices.preset : 0;

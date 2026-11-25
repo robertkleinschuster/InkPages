@@ -122,6 +122,7 @@ namespace inkpages
         int laserSeconds = 2;
         bool copyAreaBackground = false;
         bool copyAreaFrame = false;
+        bool copyAreaObjects = false; // the ink, pictures and texts inside the area are copied with it (as a rectangle selection)
 
         bool DrawingShape() const { return IsDrawingTool(tool) && shapeEnabled; }
         void ToggleShape(ShapeKind kind)
