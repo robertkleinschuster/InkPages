@@ -291,7 +291,7 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   `InkDragVisual` renders stationary and selected ink with the Windows `IInkD2DRenderer2`; until that is ready (log:
   "drag ink preview ready after N ms") the frame moves and the ink catches up. The live ink visual is hidden and
   DirectComposition offsets the selected visual together with the frame; the ink container changes on release. Page
-  changes or a failed snapshot fall back to the live-ink preview (`SelectionController::Drag::Ink`).
+  changes or a failed snapshot fall back to the live-ink preview (`InkDragPreview`).
   Other previews (scaling, rotation, the pictures and texts themselves) use `MoveSelected` for translations, `PointTransform` for scaling/rotation, and
   `PictureHost::Preview` for pictures. [measured, Windows 11 26200] `MoveSelected` applies a relative delta to
   `PointTransform` and leaves the raw ink points unchanged. In this path the frame and ink change in one ink-thread work item

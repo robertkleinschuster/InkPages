@@ -16,6 +16,7 @@
 #include "ink/InkHost.h"
 #include "ink/UiThread.h"
 #include "inkpages/WritingSurface.h"
+#include "surface/InkDragPreview.h"
 #include "surface/Viewport.h"
 #include "tools/InkSelection.h"
 
@@ -47,7 +48,7 @@ namespace inkpages::detail
     class SelectionController
     {
     public:
-        explicit SelectionController(SelectionContext context) : c(std::move(context)) {}
+        explicit SelectionController(SelectionContext context);
 
         bool HasSelection() const { return !strokes.Empty() || !pictures.empty(); }
         /// A press at this document point would move or scale the selection (it is on the frame).
@@ -96,9 +97,6 @@ namespace inkpages::detail
             POINT client{};         // the pointer, window pixels (auto-scroll keeps the document point under it)
             float farthest = 0;
             bool barrel = false;
-            /// The ink's preview while a Move drag runs: none yet, the composited snapshot is being prepared (the frame
-            /// moves, the ink catches up when it is ready), the composited ink moves, or the live ink is moved instead.
-            enum class Ink { Unused, Pending, Shown, Live } ink = Ink::Unused;
             Affine m;
             std::shared_ptr<Preview> preview;
         };
@@ -125,11 +123,6 @@ namespace inkpages::detail
         std::optional<SelectionFrame> frame;
         float frameZoom = 0; // the zoom the frame was laid out for
         std::optional<Drag> drag;
-        unsigned previewGeneration = 0;
-        /// Moving ink-only selections: the snapshot is prepared when the drag really begins (no work for taps, no guess
-        /// about which selections are "big"); every such drag is composited.
-        void RequestInkPreview();
-        void ShowInkPreview();
-        void MoveInkLive();
+        InkDragPreview inkPreview; // the ink of a Move drag, composited
     };
 }
