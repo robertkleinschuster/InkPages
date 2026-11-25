@@ -29,6 +29,7 @@ namespace inkpages::detail
         bool Move(PointF offset);
         void Reset();
         bool Active() const { return active; }
+        bool Ready() const { return ready; }
 
     private:
         Graphics& graphics;

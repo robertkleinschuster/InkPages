@@ -3,6 +3,7 @@
 #include <windowsx.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <format>
 
@@ -104,31 +105,53 @@ namespace inkpages::detail
         }
         if (any) frame = FrameAround(b);
         Publish();
-        PrepareInkPreview();
     }
 
-    void SelectionController::PrepareInkPreview()
+    void SelectionController::RequestInkPreview()
     {
-        constexpr size_t minimumStrokes = 32;
-        if (strokes.ids.size() < minimumStrokes || !pictures.empty()) return;
+        drag->ink = Drag::Ink::Pending;
         auto selected = strokes.ids;
-        auto generation = previewGeneration;
-        c.host->Post("snapshot drag ink", [this, selected = std::move(selected), generation] {
-            InkLayer* layer = c.ink();
-            if (!layer) return;
-            auto& state = layer->State();
-            InkDragSnapshot snapshot;
-            for (auto const& stroke : state.container.GetStrokes())
+        auto generation = ++previewGeneration;
+        auto requested = std::chrono::steady_clock::now();
+        c.host->Post("snapshot drag ink", [this, selected = std::move(selected), generation, requested] {
+            std::optional<InkDragSnapshot> snapshot;
+            if (InkLayer* layer = c.ink())
             {
-                if (selected.contains(stroke.Id())) snapshot.moving.push_back(stroke.Clone());
-                else snapshot.stationary[state.PageOf(stroke)].push_back(stroke.Clone());
+                auto& state = layer->State();
+                InkDragSnapshot taken;
+                for (auto const& stroke : state.container.GetStrokes())
+                {
+                    if (selected.contains(stroke.Id())) taken.moving.push_back(stroke.Clone());
+                    else taken.stationary[state.PageOf(stroke)].push_back(stroke.Clone());
+                }
+                if (taken.moving.size() == selected.size()) snapshot = std::move(taken);
             }
-            if (snapshot.moving.size() != selected.size()) return;
-            c.ui->Post([this, snapshot = std::move(snapshot), generation]() mutable {
-                if (generation != previewGeneration || (drag && drag->preview)) return;
-                c.dragInk->Prepare(std::move(snapshot), c.scale() * c.viewport->Current().zoom);
+            c.ui->Post([this, snapshot = std::move(snapshot), generation, requested]() mutable {
+                if (generation != previewGeneration || !drag || drag->ink != Drag::Ink::Pending) return;
+                if (snapshot) c.dragInk->Prepare(std::move(*snapshot), c.scale() * c.viewport->Current().zoom);
+                Log(std::format("selection: drag ink preview {} after {:.1f} ms", c.dragInk->Ready() ? "ready" : "unavailable",
+                    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - requested).count()));
+                if (c.dragInk->Ready()) ShowInkPreview();
+                else MoveInkLive();
             });
         });
+    }
+
+    // The composited ink follows the drag's latest offset together with the frame.
+    void SelectionController::ShowInkPreview()
+    {
+        Affine m = drag->m;
+        if (c.dragInk->Move({ m.dx, m.dy })) drag->ink = Drag::Ink::Shown;
+        SelectionFrame shown = *frame;
+        shown.orientation = m;
+        c.previewFrame(shown);
+    }
+
+    // No composited ink (the snapshot failed or its pages changed): the live ink is moved as for any other transform.
+    void SelectionController::MoveInkLive()
+    {
+        drag->ink = Drag::Ink::Live;
+        PostPreview(drag->m);
     }
 
     void SelectionController::InvalidateInkPreview()
@@ -136,11 +159,8 @@ namespace inkpages::detail
         ++previewGeneration;
         bool active = c.dragInk->Active();
         c.dragInk->Reset();
-        if (active)
-        {
-            if (drag) PostPreview(drag->m);
-            c.commit();
-        }
+        if (drag && drag->handle == Handle::Move && drag->ink != Drag::Ink::Unused && drag->ink != Drag::Ink::Live) MoveInkLive();
+        if (active) c.commit();
     }
 
     // The frame and its handles keep their size on the screen: page units = DIPs / zoom.
@@ -306,11 +326,10 @@ namespace inkpages::detail
             (drag->barrel && drag->farthest < Tap::MaxDistance(c.viewport->Current().zoom))) return;
         drag->m = frame->Drag(drag->handle, drag->start, at);
         Affine m = drag->m;
-        if (drag->handle == Handle::Move && !drag->preview && c.dragInk->Move({ m.dx, m.dy }))
+        if (drag->handle == Handle::Move && pictures.empty() && drag->ink != Drag::Ink::Live)
         {
-            SelectionFrame shown = *frame;
-            shown.orientation = m;
-            c.previewFrame(shown);
+            if (drag->ink == Drag::Ink::Unused) RequestInkPreview();
+            ShowInkPreview();
         }
         else PostPreview(m);
         if (PictureHost* host = c.pictures(); host && !pictures.empty()) host->Preview(pictures, m);
@@ -419,7 +438,6 @@ namespace inkpages::detail
             if (frame) c.previewFrame(*frame);
             c.commit();
             Publish(false);
-            PrepareInkPreview();
         }
         c.host->Post("selection preview end", [tools = c.tools] {
             if (ToolInput* t = tools()) t->PreviewSelection({});
