@@ -287,13 +287,15 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   for removal and translation preview), the app's pictures by `PictureHost::PicturesIn`; a tap on no stroke selects the picture
   under the pen (`PictureAt`). Moving, scaling and rotating use window pointer input (the pen hovering over the frame is taken from the
   presenter). Plain arrow keys move the selection by one physical screen pixel at the current zoom and DPI.
-  Moving the ink of a selection (with or without pictures and texts) is always composited, whatever its size: when the drag really begins (not for taps),
+  Dragging a selection (move, scale, rotate; ink with or without pictures and texts) is always composited, whatever its size: when the drag really begins (not for taps),
   `InkDragVisual` renders stationary and selected ink with the Windows `IInkD2DRenderer2`; until that is ready (log:
   "drag preview ready after N ms") the frame moves and the ink catches up. The live ink visual is hidden and
   DirectComposition offsets the selected visual together with the frame; the ink container changes on release. Page
   changes or a failed snapshot fall back to the live-ink preview (`InkDragPreview`).
-  Other previews (scaling, rotation, the pictures and texts themselves) use `MoveSelected` for translations, `PointTransform` for scaling/rotation, and
-  `PictureHost::Preview` for pictures. [measured, Windows 11 26200] `MoveSelected` applies a relative delta to
+  Scaling and rotation are composited the same way (the textures get the drag's affine transform; the strokes' widths
+  look scaled during the drag, the edit keeps them; [measured in the sandbox, a real drawing: scale and rotate looked
+  right and committed as before]). The live paths (`MoveSelected`, `PointTransform`, `PictureHost::Preview`) are the
+  fallback. [measured, Windows 11 26200] `MoveSelected` applies a relative delta to
   `PointTransform` and leaves the raw ink points unchanged. In this path the frame and ink change in one ink-thread work item
   (`ToolInput::PreviewSelection`; hit-testing uses the committed frame until the drag ends); commit: transformed
   strokes replace the originals (width unchanged), cut at page edges, one undo step with the pictures
