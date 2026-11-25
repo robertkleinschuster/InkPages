@@ -326,7 +326,7 @@ namespace inkpages::detail
             (drag->barrel && drag->farthest < Tap::MaxDistance(c.viewport->Current().zoom))) return;
         drag->m = frame->Drag(drag->handle, drag->start, at);
         Affine m = drag->m;
-        if (drag->handle == Handle::Move && pictures.empty() && drag->ink != Drag::Ink::Live)
+        if (drag->handle == Handle::Move && !strokes.Empty() && drag->ink != Drag::Ink::Live)
         {
             if (drag->ink == Drag::Ink::Unused) RequestInkPreview();
             ShowInkPreview();
@@ -471,7 +471,11 @@ namespace inkpages::detail
             return;
         }
         if (PictureHost* host = c.pictures(); host && !pictures.empty())
-            ResetPreview();
+        {
+            // The pictures' preview ends before they are transformed; a composited ink preview stays until the edit.
+            if (d.ink == Drag::Ink::Live || d.ink == Drag::Ink::Unused) ResetPreview();
+            else host->Preview(pictures, {});
+        }
         if (d.handle == Handle::Move && !d.preview && c.dragInk->Move({ d.m.dx, d.m.dy }))
         {
             SelectionFrame shown = *frame;
