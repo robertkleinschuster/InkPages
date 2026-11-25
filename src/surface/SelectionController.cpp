@@ -109,7 +109,7 @@ namespace inkpages::detail
 
     void SelectionController::PrepareInkPreview()
     {
-        constexpr size_t minimumStrokes = 128;
+        constexpr size_t minimumStrokes = 32;
         if (strokes.ids.size() < minimumStrokes || !pictures.empty()) return;
         auto selected = strokes.ids;
         auto generation = previewGeneration;
