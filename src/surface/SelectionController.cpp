@@ -109,7 +109,7 @@ namespace inkpages::detail
 
     SelectionController::SelectionController(SelectionContext context)
         : c(std::move(context)),
-          inkPreview(InkDragPreviewContext{ c.host, c.ui, c.ink, c.dragInk,
+          inkPreview(InkDragPreviewContext{ c.host, c.ui, c.ink, c.dragInk, c.pictures,
               [this] { return c.scale() * c.viewport->Current().zoom; },
               [this](Affine const& m) {
                   SelectionFrame shown = *frame;
@@ -289,9 +289,13 @@ namespace inkpages::detail
             (drag->barrel && drag->farthest < Tap::MaxDistance(c.viewport->Current().zoom))) return;
         drag->m = frame->Drag(drag->handle, drag->start, at);
         Affine m = drag->m;
-        if (drag->handle == Handle::Move && !strokes.Empty() && !inkPreview.Live()) inkPreview.Move(strokes.ids, m);
+        // A Move drag is composited (ink and pictures as textures); the live paths are for the other transforms and the
+        // fallback.
+        bool composited = drag->handle == Handle::Move && (!strokes.Empty() || !pictures.empty()) && !inkPreview.Live();
+        if (composited) inkPreview.Move(strokes.ids, pictures, m);
         else PostPreview(m);
-        if (PictureHost* host = c.pictures(); host && !pictures.empty()) host->Preview(pictures, m);
+        if (PictureHost* host = c.pictures(); host && !pictures.empty() && !(composited && inkPreview.ShowsPictures()))
+            host->Preview(pictures, m);
         // Near the view's edge the pages scroll (per frame) while the pen holds still too.
         RECT rc;
         GetClientRect(c.window, &rc);
@@ -392,6 +396,7 @@ namespace inkpages::detail
 
     void SelectionController::ResetPreview()
     {
+        inkPreview.Unlift();
         if (c.dragInk->Active())
         {
             c.dragInk->Reset();
@@ -436,7 +441,7 @@ namespace inkpages::detail
         {
             // The pictures' preview ends before they are transformed; a composited ink preview stays until the edit.
             if (ink == InkDragPreview::State::Live || ink == InkDragPreview::State::Idle) ResetPreview();
-            else host->Preview(pictures, {});
+            else if (!inkPreview.ShowsPictures()) host->Preview(pictures, {}); // a lifted picture has no preview to end
         }
         if (d.handle == Handle::Move && !d.preview && c.dragInk->Move({ d.m.dx, d.m.dy }))
         {
@@ -450,6 +455,7 @@ namespace inkpages::detail
     void SelectionController::TransformSelection(Affine m)
     {
         if (PictureHost* host = c.pictures(); host && !pictures.empty()) host->Transform(pictures, m);
+        inkPreview.Unlift(); // after Transform: the pages draw the pictures where they are now
         auto pictureEdit = PictureStep(static_cast<int>(PictureEdit::Kind::Transformed), pictures, m, 0, {});
         PushWith([m](ToolInput& t) { return t.Selection().Commit(m); }, pictureEdit, true);
     }

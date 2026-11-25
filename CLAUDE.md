@@ -289,7 +289,7 @@ toolbar  ->  surface  ->  text, tools  ->  ink  ->  render  ->  model        (ba
   presenter). Plain arrow keys move the selection by one physical screen pixel at the current zoom and DPI.
   Moving the ink of a selection (with or without pictures and texts) is always composited, whatever its size: when the drag really begins (not for taps),
   `InkDragVisual` renders stationary and selected ink with the Windows `IInkD2DRenderer2`; until that is ready (log:
-  "drag ink preview ready after N ms") the frame moves and the ink catches up. The live ink visual is hidden and
+  "drag preview ready after N ms") the frame moves and the ink catches up. The live ink visual is hidden and
   DirectComposition offsets the selected visual together with the frame; the ink container changes on release. Page
   changes or a failed snapshot fall back to the live-ink preview (`InkDragPreview`).
   Other previews (scaling, rotation, the pictures and texts themselves) use `MoveSelected` for translations, `PointTransform` for scaling/rotation, and

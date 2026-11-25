@@ -10,6 +10,8 @@
 
 #include "inkpages/model/Geometry.h"
 
+struct ID2D1DeviceContext;
+
 namespace inkpages
 {
     using PictureId = uint64_t;
@@ -29,6 +31,16 @@ namespace inkpages
 
         /// While a selection is dragged: show the pictures transformed by `m` (identity: as they are).
         virtual void Preview(std::vector<PictureId> const& pictures, Affine const& m) = 0;
+        /// Optional, for moving pictures without redrawing their pages at every pointer move: the library draws the
+        /// pictures once into a texture (`DrawLifted`), has the pages leave them out (`Lift`) and moves the texture; the
+        /// pages draw them again when the drag ends (`Lift(false)`, after `Transform`). `DrawLifted` draws the pictures
+        /// as the pages show them; the context's transform maps document units to the texture. false: not supported.
+        virtual bool DrawLifted(ID2D1DeviceContext* dc, std::vector<PictureId> const& pictures, float pixelsPerUnit)
+        {
+            (void)dc; (void)pictures; (void)pixelsPerUnit;
+            return false;
+        }
+        virtual void Lift(std::vector<PictureId> const& pictures, bool lifted) { (void)pictures; (void)lifted; }
         /// A drag ended (or its undo/redo): transform the pictures by `m`. One that lands on another page belongs to it.
         virtual void Transform(std::vector<PictureId> const& pictures, Affine const& m) = 0;
 

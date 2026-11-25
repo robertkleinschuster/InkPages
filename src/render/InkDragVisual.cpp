@@ -48,6 +48,36 @@ namespace inkpages::detail
             winrt::check_hresult(visual->SetTransform(transform));
             return visual;
         }
+
+        // The objects (document units) in a texture of their own; the visual sits at the bounds' top left.
+        winrt::com_ptr<IDCompositionVisual> DrawObjects(Graphics& graphics, InkDragObjects const& objects, float scale, float maxSide)
+        {
+            RectF bounds = objects.bounds.Inflated(2, 2);
+            scale = std::min(scale, maxSide / std::max(bounds.Width(), bounds.Height()));
+            auto width = static_cast<UINT>(std::ceil(bounds.Width() * scale));
+            auto height = static_cast<UINT>(std::ceil(bounds.Height() * scale));
+            winrt::com_ptr<IDCompositionSurface> surface;
+            winrt::check_hresult(graphics.dcomp->CreateSurface(width, height, DXGI_FORMAT_B8G8R8A8_UNORM,
+                DXGI_ALPHA_MODE_PREMULTIPLIED, surface.put()));
+            winrt::com_ptr<ID2D1DeviceContext> dc;
+            POINT origin{};
+            winrt::check_hresult(surface->BeginDraw(nullptr, __uuidof(ID2D1DeviceContext), dc.put_void(), &origin));
+            dc->Clear(D2D1::ColorF(0, 0, 0, 0));
+            dc->SetTransform(D2D1::Matrix3x2F(scale, 0, 0, scale,
+                static_cast<float>(origin.x) - bounds.left * scale, static_cast<float>(origin.y) - bounds.top * scale));
+            bool drawn = false;
+            try { drawn = objects.draw(dc.get()); }
+            catch (...) { LogException("selection: draw the objects of the drag preview"); }
+            winrt::check_hresult(surface->EndDraw());
+            if (!drawn) throw winrt::hresult_error(E_FAIL, L"the objects cannot be drawn for the drag preview");
+
+            winrt::com_ptr<IDCompositionVisual> visual;
+            winrt::check_hresult(graphics.dcomp->CreateVisual(visual.put()));
+            winrt::check_hresult(visual->SetContent(surface.get()));
+            D2D1_MATRIX_3X2_F transform{ 1 / scale, 0, 0, 1 / scale, bounds.left, bounds.top };
+            winrt::check_hresult(visual->SetTransform(transform));
+            return visual;
+        }
     }
 
     InkDragVisual::InkDragVisual(Graphics& graphics, IDCompositionVisual* parent, IDCompositionVisual* liveInk)
@@ -61,30 +91,41 @@ namespace inkpages::detail
         winrt::check_hresult(parent->AddVisual(group.get(), FALSE, nullptr));
     }
 
-    void InkDragVisual::Prepare(InkDragSnapshot snapshot, float scale)
+    void InkDragVisual::Prepare(InkDragSnapshot snapshot, std::optional<InkDragObjects> objects, float scale)
     {
         Reset();
-        if (snapshot.moving.empty() || scale <= 0) return;
+        if ((snapshot.moving.empty() && !objects) || scale <= 0) return;
         try
         {
-            auto renderer = winrt::create_instance<IInkD2DRenderer2>(__uuidof(InkD2DRenderer));
             // Bound the aggregate texture allocation even when several pages have live ink.
-            float maxSide = 4095 / std::sqrt(static_cast<float>(snapshot.stationary.size() + 1));
-            for (auto& entry : snapshot.stationary)
+            float maxSide = 4095 / std::sqrt(static_cast<float>(snapshot.stationary.size() + 2));
+            winrt::check_hresult(graphics.dcomp->CreateVisual(movingObjects.put()));
+            if (objects)
             {
-                auto visual = Draw(graphics, *renderer.get(), std::move(entry.second), scale, maxSide);
-                winrt::check_hresult(preview->AddVisual(visual.get(), FALSE, nullptr));
+                auto visual = DrawObjects(graphics, *objects, scale, maxSide);
+                winrt::check_hresult(movingObjects->AddVisual(visual.get(), FALSE, nullptr));
             }
-            winrt::check_hresult(graphics.dcomp->CreateVisual(moving.put()));
-            auto visual = Draw(graphics, *renderer.get(), std::move(snapshot.moving), scale, maxSide);
-            winrt::check_hresult(moving->AddVisual(visual.get(), FALSE, nullptr));
-            winrt::check_hresult(preview->AddVisual(moving.get(), FALSE, nullptr));
+            winrt::check_hresult(preview->AddVisual(movingObjects.get(), FALSE, nullptr));
+            hidesLive = !snapshot.moving.empty();
+            if (hidesLive)
+            {
+                auto renderer = winrt::create_instance<IInkD2DRenderer2>(__uuidof(InkD2DRenderer));
+                for (auto& entry : snapshot.stationary)
+                {
+                    auto visual = Draw(graphics, *renderer.get(), std::move(entry.second), scale, maxSide);
+                    winrt::check_hresult(preview->AddVisual(visual.get(), FALSE, nullptr));
+                }
+                winrt::check_hresult(graphics.dcomp->CreateVisual(moving.put()));
+                auto visual = Draw(graphics, *renderer.get(), std::move(snapshot.moving), scale, maxSide);
+                winrt::check_hresult(moving->AddVisual(visual.get(), FALSE, nullptr));
+                winrt::check_hresult(preview->AddVisual(moving.get(), FALSE, nullptr));
+            }
             ready = true;
-            Log("selection: composited ink preview ready");
+            Log("selection: composited drag preview ready");
         }
         catch (...)
         {
-            LogException("selection: prepare composited ink preview");
+            LogException("selection: prepare composited drag preview");
             Reset();
         }
     }
@@ -92,12 +133,17 @@ namespace inkpages::detail
     bool InkDragVisual::Move(PointF offset)
     {
         if (!ready) return false;
-        winrt::check_hresult(moving->SetOffsetX(offset.x));
-        winrt::check_hresult(moving->SetOffsetY(offset.y));
+        winrt::check_hresult(movingObjects->SetOffsetX(offset.x));
+        winrt::check_hresult(movingObjects->SetOffsetY(offset.y));
+        if (moving)
+        {
+            winrt::check_hresult(moving->SetOffsetX(offset.x));
+            winrt::check_hresult(moving->SetOffsetY(offset.y));
+        }
         if (!active)
         {
             winrt::check_hresult(preview->SetVisible(TRUE));
-            winrt::check_hresult(live->SetVisible(FALSE));
+            if (hidesLive) winrt::check_hresult(live->SetVisible(FALSE));
             active = true;
             Log("selection: moving composited ink preview");
         }
@@ -109,11 +155,13 @@ namespace inkpages::detail
         ready = false;
         if (active)
         {
-            winrt::check_hresult(live->SetVisible(TRUE));
+            if (hidesLive) winrt::check_hresult(live->SetVisible(TRUE));
             winrt::check_hresult(preview->SetVisible(FALSE));
             active = false;
         }
         moving = nullptr;
+        movingObjects = nullptr;
+        hidesLive = false;
         winrt::check_hresult(preview->RemoveAllVisuals());
     }
 }
