@@ -89,9 +89,9 @@ namespace inkpages::detail
 
     void InkDragPreview::Show()
     {
-        bool switching = state != State::Shown && c.visual->Move({ latest.dx, latest.dy });
+        bool switching = state != State::Shown && c.visual->Move(latest);
         if (switching) state = State::Shown;
-        else if (state == State::Shown) c.visual->Move({ latest.dx, latest.dy });
+        else if (state == State::Shown) c.visual->Move(latest);
         c.showFrame(latest);
         // DirectComposition changes take effect at Commit (IDCompositionDevice::Commit): the switch from the live to the
         // composited ink must not wait for the frame to change.

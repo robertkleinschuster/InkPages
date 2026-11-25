@@ -289,8 +289,9 @@ namespace inkpages::detail
             (drag->barrel && drag->farthest < Tap::MaxDistance(c.viewport->Current().zoom))) return;
         drag->m = frame->Drag(drag->handle, drag->start, at);
         Affine m = drag->m;
-        // A Move drag is composited (ink and pictures as textures); the live paths are for the other transforms and the
-        // fallback.
+        // A Move drag is composited: ink and pictures are textures that DirectComposition offsets. Scaling and rotation
+        // use the live paths (a scaled texture would show the strokes' widths scaled; the edit keeps them) - the
+        // composited preview can transform (InkDragVisual::Move takes an Affine), it is not used for them yet.
         bool composited = drag->handle == Handle::Move && (!strokes.Empty() || !pictures.empty()) && !inkPreview.Live();
         if (composited) inkPreview.Move(strokes.ids, pictures, m);
         else PostPreview(m);
@@ -443,7 +444,7 @@ namespace inkpages::detail
             if (ink == InkDragPreview::State::Live || ink == InkDragPreview::State::Idle) ResetPreview();
             else if (!inkPreview.ShowsPictures()) host->Preview(pictures, {}); // a lifted picture has no preview to end
         }
-        if (d.handle == Handle::Move && !d.preview && c.dragInk->Move({ d.m.dx, d.m.dy }))
+        if (d.handle == Handle::Move && !d.preview && c.dragInk->Move(d.m))
         {
             SelectionFrame shown = *frame;
             shown.orientation = d.m;

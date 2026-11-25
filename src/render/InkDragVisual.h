@@ -8,6 +8,7 @@
 #include <dcomp.h>
 #include <winrt/Windows.UI.Input.Inking.h>
 
+#include "inkpages/model/Geometry.h"
 #include "inkpages/model/PageLayout.h"
 
 namespace inkpages::detail
@@ -37,7 +38,8 @@ namespace inkpages::detail
     public:
         InkDragVisual(Graphics& graphics, IDCompositionVisual* parent, IDCompositionVisual* live);
         void Prepare(InkDragSnapshot snapshot, std::optional<InkDragObjects> objects, float scale);
-        bool Move(PointF offset);
+        /// Moves, scales or rotates what is lifted by `m` (the drag's transform, document units).
+        bool Move(Affine const& m);
         void Reset();
         bool Active() const { return active; }
         bool Ready() const { return ready; }
@@ -45,6 +47,7 @@ namespace inkpages::detail
     private:
         Graphics& graphics;
         winrt::com_ptr<IDCompositionVisual3> live, preview;
+        winrt::com_ptr<IDCompositionVisual> objectsGroup; // below the live ink, always
         winrt::com_ptr<IDCompositionVisual> moving, movingObjects;
         bool ready = false, active = false, hidesLive = false;
     };

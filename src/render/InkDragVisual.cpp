@@ -89,6 +89,10 @@ namespace inkpages::detail
         winrt::check_hresult(liveInk->QueryInterface(__uuidof(IDCompositionVisual3), live.put_void()));
         winrt::check_hresult(preview->SetVisible(FALSE));
         winrt::check_hresult(parent->AddVisual(group.get(), FALSE, nullptr));
+        // The objects (pictures, texts) lie below the ink, as on the pages: their group sits right below the live ink
+        // (and so below the composited ink in `preview`, above it).
+        winrt::check_hresult(graphics.dcomp->CreateVisual(objectsGroup.put()));
+        winrt::check_hresult(parent->AddVisual(objectsGroup.get(), FALSE, liveInk));
     }
 
     void InkDragVisual::Prepare(InkDragSnapshot snapshot, std::optional<InkDragObjects> objects, float scale)
@@ -100,12 +104,12 @@ namespace inkpages::detail
             // Bound the aggregate texture allocation even when several pages have live ink.
             float maxSide = 4095 / std::sqrt(static_cast<float>(snapshot.stationary.size() + 2));
             winrt::check_hresult(graphics.dcomp->CreateVisual(movingObjects.put()));
+            winrt::check_hresult(objectsGroup->AddVisual(movingObjects.get(), FALSE, nullptr));
             if (objects)
             {
                 auto visual = DrawObjects(graphics, *objects, scale, maxSide);
                 winrt::check_hresult(movingObjects->AddVisual(visual.get(), FALSE, nullptr));
             }
-            winrt::check_hresult(preview->AddVisual(movingObjects.get(), FALSE, nullptr));
             hidesLive = !snapshot.moving.empty();
             if (hidesLive)
             {
@@ -130,16 +134,12 @@ namespace inkpages::detail
         }
     }
 
-    bool InkDragVisual::Move(PointF offset)
+    bool InkDragVisual::Move(Affine const& m)
     {
         if (!ready) return false;
-        winrt::check_hresult(movingObjects->SetOffsetX(offset.x));
-        winrt::check_hresult(movingObjects->SetOffsetY(offset.y));
-        if (moving)
-        {
-            winrt::check_hresult(moving->SetOffsetX(offset.x));
-            winrt::check_hresult(moving->SetOffsetY(offset.y));
-        }
+        D2D_MATRIX_3X2_F matrix{ m.m11, m.m12, m.m21, m.m22, m.dx, m.dy };
+        winrt::check_hresult(movingObjects->SetTransform(matrix));
+        if (moving) winrt::check_hresult(moving->SetTransform(matrix));
         if (!active)
         {
             winrt::check_hresult(preview->SetVisible(TRUE));
@@ -160,6 +160,7 @@ namespace inkpages::detail
             active = false;
         }
         moving = nullptr;
+        winrt::check_hresult(objectsGroup->RemoveAllVisuals());
         movingObjects = nullptr;
         hidesLive = false;
         winrt::check_hresult(preview->RemoveAllVisuals());
