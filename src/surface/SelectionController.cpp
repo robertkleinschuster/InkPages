@@ -141,10 +141,15 @@ namespace inkpages::detail
     void SelectionController::ShowInkPreview()
     {
         Affine m = drag->m;
-        if (c.dragInk->Move({ m.dx, m.dy })) drag->ink = Drag::Ink::Shown;
+        bool first = drag->ink != Drag::Ink::Shown && c.dragInk->Move({ m.dx, m.dy });
+        if (first) drag->ink = Drag::Ink::Shown;
+        else if (drag->ink == Drag::Ink::Shown) c.dragInk->Move({ m.dx, m.dy });
         SelectionFrame shown = *frame;
         shown.orientation = m;
         c.previewFrame(shown);
+        // DirectComposition changes take effect at Commit (IDCompositionDevice::Commit): the switch from the live to the
+        // composited ink must not wait for the frame to change.
+        if (first) c.commit();
     }
 
     // No composited ink (the snapshot failed or its pages changed): the live ink is moved as for any other transform.
